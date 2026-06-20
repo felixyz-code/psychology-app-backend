@@ -1,6 +1,8 @@
+import { extname } from 'node:path';
 import {
   ApiBadRequestResponse,
   ApiBody,
+  ApiConsumes,
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
@@ -8,6 +10,7 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -16,12 +19,25 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  UploadedFile,
+  UseInterceptors,
   UsePipes,
   ValidationPipe,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
 import { CreateDocumentDto } from './dto/create-document.dto';
 import { UpdateDocumentDto } from './dto/update-document.dto';
+import { UploadDocumentDto } from './dto/upload-document.dto';
 import { DocumentsService } from './documents.service';
+
+const allowedMimeTypes = new Set([
+  'application/pdf',
+  'image/jpeg',
+  'image/png',
+]);
+
+const allowedExtensions = new Set(['.pdf', '.jpg', '.jpeg', '.png']);
 
 @ApiTags('documents')
 @Controller('documents')
@@ -33,6 +49,72 @@ import { DocumentsService } from './documents.service';
 )
 export class DocumentsController {
   constructor(private readonly documentsService: DocumentsService) {}
+
+  @Post('upload')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: memoryStorage(),
+      limits: {
+        fileSize: 10 * 1024 * 1024,
+      },
+      fileFilter: (_request, file, callback) => {
+        const extension = extname(file.originalname).toLowerCase();
+        const isAllowedType = allowedMimeTypes.has(file.mimetype);
+        const isAllowedExtension = allowedExtensions.has(extension);
+
+        if (!isAllowedType || !isAllowedExtension) {
+          callback(
+            new BadRequestException(
+              'Only PDF, JPG, JPEG and PNG files are allowed',
+            ),
+            false,
+          );
+          return;
+        }
+
+        callback(null, true);
+      },
+    }),
+  )
+  @ApiOperation({ summary: 'Upload a document file and create metadata' })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['file', 'caseFileId', 'uploadedById'],
+      properties: {
+        file: {
+          type: 'string',
+          format: 'binary',
+        },
+        caseFileId: {
+          type: 'string',
+          format: 'uuid',
+          example: '550e8400-e29b-41d4-a716-446655440000',
+        },
+        uploadedById: {
+          type: 'string',
+          format: 'uuid',
+          example: '550e8400-e29b-41d4-a716-446655440001',
+        },
+      },
+    },
+  })
+  @ApiOkResponse({ description: 'Document uploaded successfully' })
+  @ApiBadRequestResponse({
+    description: 'Missing file, invalid payload, unsupported type, or file too large',
+  })
+  @ApiNotFoundResponse({ description: 'Case file or user not found' })
+  upload(
+    @Body() uploadDocumentDto: UploadDocumentDto,
+    @UploadedFile() file?: Express.Multer.File,
+  ) {
+    if (!file) {
+      throw new BadRequestException('File is required');
+    }
+
+    return this.documentsService.upload(uploadDocumentDto, file);
+  }
 
   @Post()
   @ApiOperation({ summary: 'Create document metadata' })
