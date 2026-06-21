@@ -17,6 +17,15 @@ async function bootstrap() {
     .setTitle('Psychology App API')
     .setDescription('REST API documentation for the Psychology App backend')
     .setVersion('1.0.0')
+    .addBearerAuth(
+      {
+        type: 'http',
+        scheme: 'bearer',
+        bearerFormat: 'JWT',
+        description: 'Paste the JWT access token here',
+      },
+      'bearer',
+    )
     .build();
 
   const document = SwaggerModule.createDocument(app, swaggerConfig);
