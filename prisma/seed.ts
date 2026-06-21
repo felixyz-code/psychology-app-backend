@@ -44,11 +44,6 @@ const demoPatients = [
   },
 ];
 
-type SeededUser = {
-  id: string;
-  email: string;
-};
-
 async function upsertUser(params: {
   id: string;
   name: string;
@@ -56,20 +51,26 @@ async function upsertUser(params: {
   passwordHash: string;
   role: UserRole;
 }) {
-  const result = await prisma.$queryRaw<SeededUser[]>(Prisma.sql`
-    INSERT INTO "users" ("id", "name", "email", "passwordHash", "role", "updatedAt")
-    VALUES (${params.id}, ${params.name}, ${params.email}, ${params.passwordHash}, ${params.role}::"UserRole", NOW())
-    ON CONFLICT ("email")
-    DO UPDATE SET
-      "id" = EXCLUDED."id",
-      "name" = EXCLUDED."name",
-      "passwordHash" = EXCLUDED."passwordHash",
-      "role" = EXCLUDED."role",
-      "updatedAt" = NOW()
-    RETURNING "id", "email"
-  `);
-
-  return result[0];
+  return prisma.user.upsert({
+    where: { email: params.email },
+    update: {
+      id: params.id,
+      name: params.name,
+      passwordHash: params.passwordHash,
+      role: params.role,
+    },
+    create: {
+      id: params.id,
+      name: params.name,
+      email: params.email,
+      passwordHash: params.passwordHash,
+      role: params.role,
+    },
+    select: {
+      id: true,
+      email: true,
+    },
+  });
 }
 
 async function upsertPatient(
