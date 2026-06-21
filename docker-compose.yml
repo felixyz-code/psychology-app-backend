@@ -1,0 +1,41 @@
+services:
+  postgres:
+    image: postgres:16-bookworm
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: psychology_app
+      POSTGRES_USER: psychology_user
+      POSTGRES_PASSWORD: psychology_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U psychology_user -d psychology_app"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://psychology_user:psychology_password@postgres:5432/psychology_app?schema=public
+      JWT_SECRET: change_me
+      JWT_EXPIRES_IN: 1d
+      UPLOADS_PATH: /app/uploads
+      PORT: 3000
+    ports:
+      - "3000:3000"
+    volumes:
+      - backend_uploads:/app/uploads
+
+volumes:
+  postgres_data:
+  backend_uploads:
