@@ -1,11 +1,21 @@
 import { randomUUID } from 'node:crypto';
-import { mkdir, writeFile } from 'node:fs/promises';
-import { extname, isAbsolute, join, relative, sep } from 'node:path';
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { access, mkdir, writeFile } from 'node:fs/promises';
+import { extname, isAbsolute, join, relative, resolve, sep } from 'node:path';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateDocumentDto } from './dto/create-document.dto';
 import { UpdateDocumentDto } from './dto/update-document.dto';
 import { UploadDocumentDto } from './dto/upload-document.dto';
+
+const allowedInlineMimeTypes = new Set([
+  'application/pdf',
+  'image/jpeg',
+  'image/png',
+]);
 
 @Injectable()
 export class DocumentsService {
@@ -60,15 +70,7 @@ export class DocumentsService {
   }
 
   async findOne(id: string) {
-    const document = await this.prisma.document.findUnique({
-      where: { id },
-    });
-
-    if (!document) {
-      throw new NotFoundException(`Document with id "${id}" not found`);
-    }
-
-    return document;
+    return this.getDocumentOrThrow(id);
   }
 
   async findByCaseFileId(caseFileId: string) {
@@ -99,6 +101,34 @@ export class DocumentsService {
     });
   }
 
+  async getDownloadFile(id: string) {
+    const document = await this.getDocumentOrThrow(id);
+    const absoluteFilePath = await this.resolveDocumentFilePath(document.filePath);
+
+    return {
+      document,
+      absoluteFilePath,
+      mimeType: document.mimeType ?? 'application/octet-stream',
+    };
+  }
+
+  async getViewFile(id: string) {
+    const document = await this.getDocumentOrThrow(id);
+    const absoluteFilePath = await this.resolveDocumentFilePath(document.filePath);
+
+    if (!document.mimeType || !allowedInlineMimeTypes.has(document.mimeType)) {
+      throw new BadRequestException(
+        'Only PDF, JPG, JPEG and PNG documents can be viewed inline',
+      );
+    }
+
+    return {
+      document,
+      absoluteFilePath,
+      mimeType: document.mimeType,
+    };
+  }
+
   private async ensureCaseFileExists(caseFileId: string) {
     const caseFile = await this.prisma.caseFile.findUnique({
       where: { id: caseFileId },
@@ -124,5 +154,48 @@ export class DocumentsService {
 
   private toRelativePath(absoluteFilePath: string) {
     return relative(process.cwd(), absoluteFilePath).split(sep).join('/');
+  }
+
+  private async getDocumentOrThrow(id: string) {
+    const document = await this.prisma.document.findUnique({
+      where: { id },
+    });
+
+    if (!document) {
+      throw new NotFoundException(`Document with id "${id}" not found`);
+    }
+
+    return document;
+  }
+
+  private getUploadsRoot() {
+    const uploadRoot = process.env.UPLOADS_PATH ?? 'uploads';
+
+    return isAbsolute(uploadRoot)
+      ? resolve(uploadRoot)
+      : resolve(process.cwd(), uploadRoot);
+  }
+
+  private async resolveDocumentFilePath(filePath: string) {
+    const uploadsRoot = this.getUploadsRoot();
+    const candidatePath = isAbsolute(filePath)
+      ? resolve(filePath)
+      : resolve(process.cwd(), filePath);
+    const relativeToUploadsRoot = relative(uploadsRoot, candidatePath);
+
+    if (
+      relativeToUploadsRoot.startsWith('..') ||
+      isAbsolute(relativeToUploadsRoot)
+    ) {
+      throw new NotFoundException('Document file not found');
+    }
+
+    try {
+      await access(candidatePath);
+    } catch {
+      throw new NotFoundException('Document file not found');
+    }
+
+    return candidatePath;
   }
 }

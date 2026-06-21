@@ -1,4 +1,5 @@
 import { extname } from 'node:path';
+import { createReadStream } from 'node:fs';
 import {
   ApiBadRequestResponse,
   ApiBody,
@@ -7,6 +8,7 @@ import {
   ApiOkResponse,
   ApiOperation,
   ApiParam,
+  ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
 import {
@@ -19,12 +21,15 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Res,
+  StreamableFile,
   UploadedFile,
   UseInterceptors,
   UsePipes,
   ValidationPipe,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import type { Response } from 'express';
 import { memoryStorage } from 'multer';
 import { CreateDocumentDto } from './dto/create-document.dto';
 import { UpdateDocumentDto } from './dto/update-document.dto';
@@ -146,6 +151,85 @@ export class DocumentsController {
   @ApiNotFoundResponse({ description: 'Case file not found' })
   findByCaseFileId(@Param('caseFileId', ParseUUIDPipe) caseFileId: string) {
     return this.documentsService.findByCaseFileId(caseFileId);
+  }
+
+  @Get(':id/download')
+  @ApiOperation({ summary: 'Download a document file by ID' })
+  @ApiParam({
+    name: 'id',
+    description: 'Document ID',
+    format: 'uuid',
+    example: '550e8400-e29b-41d4-a716-446655440000',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Document file returned as attachment',
+    content: {
+      'application/pdf': { schema: { type: 'string', format: 'binary' } },
+      'image/jpeg': { schema: { type: 'string', format: 'binary' } },
+      'image/png': { schema: { type: 'string', format: 'binary' } },
+      'application/octet-stream': {
+        schema: { type: 'string', format: 'binary' },
+      },
+    },
+  })
+  @ApiBadRequestResponse({ description: 'Invalid document ID' })
+  @ApiNotFoundResponse({
+    description: 'Document metadata or physical file not found',
+  })
+  async download(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const { document, absoluteFilePath, mimeType } =
+      await this.documentsService.getDownloadFile(id);
+
+    response.setHeader('Content-Type', mimeType);
+    response.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${encodeURIComponent(document.fileName)}"`,
+    );
+
+    return new StreamableFile(createReadStream(absoluteFilePath));
+  }
+
+  @Get(':id/view')
+  @ApiOperation({ summary: 'View a document file inline by ID' })
+  @ApiParam({
+    name: 'id',
+    description: 'Document ID',
+    format: 'uuid',
+    example: '550e8400-e29b-41d4-a716-446655440000',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Document file returned inline for preview',
+    content: {
+      'application/pdf': { schema: { type: 'string', format: 'binary' } },
+      'image/jpeg': { schema: { type: 'string', format: 'binary' } },
+      'image/png': { schema: { type: 'string', format: 'binary' } },
+    },
+  })
+  @ApiBadRequestResponse({
+    description: 'Invalid document ID or unsupported inline MIME type',
+  })
+  @ApiNotFoundResponse({
+    description: 'Document metadata or physical file not found',
+  })
+  async view(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const { document, absoluteFilePath, mimeType } =
+      await this.documentsService.getViewFile(id);
+
+    response.setHeader('Content-Type', mimeType);
+    response.setHeader(
+      'Content-Disposition',
+      `inline; filename="${encodeURIComponent(document.fileName)}"`,
+    );
+
+    return new StreamableFile(createReadStream(absoluteFilePath));
   }
 
   @Get(':id')
