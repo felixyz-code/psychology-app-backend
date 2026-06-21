@@ -22,9 +22,11 @@ import {
   ValidationPipe,
 } from '@nestjs/common';
 import { UserRole } from '@prisma/client';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
+import type { AuthenticatedUser } from '../auth/types/authenticated-user.type';
 import { CreateSessionNoteDto } from './dto/create-session-note.dto';
 import { UpdateSessionNoteDto } from './dto/update-session-note.dto';
 import { SessionNotesService } from './session-notes.service';
@@ -49,15 +51,18 @@ export class SessionNotesController {
   @ApiOkResponse({ description: 'Session note created successfully' })
   @ApiBadRequestResponse({ description: 'Invalid session note payload' })
   @ApiNotFoundResponse({ description: 'Case file or author not found' })
-  create(@Body() createSessionNoteDto: CreateSessionNoteDto) {
-    return this.sessionNotesService.create(createSessionNoteDto);
+  create(
+    @Body() createSessionNoteDto: CreateSessionNoteDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.sessionNotesService.create(createSessionNoteDto, user);
   }
 
   @Get()
   @ApiOperation({ summary: 'List all session notes' })
   @ApiOkResponse({ description: 'Session notes retrieved successfully' })
-  findAll() {
-    return this.sessionNotesService.findAll();
+  findAll(@CurrentUser() user: AuthenticatedUser) {
+    return this.sessionNotesService.findAll(user);
   }
 
   @Get('case-file/:caseFileId')
@@ -71,8 +76,11 @@ export class SessionNotesController {
   @ApiOkResponse({ description: 'Session notes retrieved successfully' })
   @ApiBadRequestResponse({ description: 'Invalid case file ID' })
   @ApiNotFoundResponse({ description: 'Case file not found' })
-  findByCaseFileId(@Param('caseFileId', ParseUUIDPipe) caseFileId: string) {
-    return this.sessionNotesService.findByCaseFileId(caseFileId);
+  findByCaseFileId(
+    @Param('caseFileId', ParseUUIDPipe) caseFileId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.sessionNotesService.findByCaseFileId(caseFileId, user);
   }
 
   @Get(':id')
@@ -86,8 +94,11 @@ export class SessionNotesController {
   @ApiOkResponse({ description: 'Session note retrieved successfully' })
   @ApiBadRequestResponse({ description: 'Invalid session note ID' })
   @ApiNotFoundResponse({ description: 'Session note not found' })
-  findOne(@Param('id', ParseUUIDPipe) id: string) {
-    return this.sessionNotesService.findOne(id);
+  findOne(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.sessionNotesService.findOne(id, user);
   }
 
   @Patch(':id')
@@ -105,8 +116,9 @@ export class SessionNotesController {
   update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updateSessionNoteDto: UpdateSessionNoteDto,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.sessionNotesService.update(id, updateSessionNoteDto);
+    return this.sessionNotesService.update(id, updateSessionNoteDto, user);
   }
 
   @Delete(':id')
@@ -120,7 +132,11 @@ export class SessionNotesController {
   @ApiOkResponse({ description: 'Session note deleted successfully' })
   @ApiBadRequestResponse({ description: 'Invalid session note ID' })
   @ApiNotFoundResponse({ description: 'Session note not found' })
-  remove(@Param('id', ParseUUIDPipe) id: string) {
-    return this.sessionNotesService.remove(id);
+  remove(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.sessionNotesService.remove(id, user);
   }
 }
+

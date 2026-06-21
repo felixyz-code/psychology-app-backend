@@ -34,9 +34,11 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { UserRole } from '@prisma/client';
 import type { Response } from 'express';
 import { memoryStorage } from 'multer';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
+import type { AuthenticatedUser } from '../auth/types/authenticated-user.type';
 import { CreateDocumentDto } from './dto/create-document.dto';
 import { UpdateDocumentDto } from './dto/update-document.dto';
 import { UploadDocumentDto } from './dto/upload-document.dto';
@@ -121,13 +123,14 @@ export class DocumentsController {
   @ApiNotFoundResponse({ description: 'Case file or user not found' })
   upload(
     @Body() uploadDocumentDto: UploadDocumentDto,
-    @UploadedFile() file?: Express.Multer.File,
+    @UploadedFile() file: Express.Multer.File | undefined,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
     if (!file) {
       throw new BadRequestException('File is required');
     }
 
-    return this.documentsService.upload(uploadDocumentDto, file);
+    return this.documentsService.upload(uploadDocumentDto, file, user);
   }
 
   @Post()
@@ -136,15 +139,18 @@ export class DocumentsController {
   @ApiOkResponse({ description: 'Document metadata created successfully' })
   @ApiBadRequestResponse({ description: 'Invalid document payload' })
   @ApiNotFoundResponse({ description: 'Case file or user not found' })
-  create(@Body() createDocumentDto: CreateDocumentDto) {
-    return this.documentsService.create(createDocumentDto);
+  create(
+    @Body() createDocumentDto: CreateDocumentDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.documentsService.create(createDocumentDto, user);
   }
 
   @Get()
   @ApiOperation({ summary: 'List all documents metadata' })
   @ApiOkResponse({ description: 'Documents retrieved successfully' })
-  findAll() {
-    return this.documentsService.findAll();
+  findAll(@CurrentUser() user: AuthenticatedUser) {
+    return this.documentsService.findAll(user);
   }
 
   @Get('case-file/:caseFileId')
@@ -158,8 +164,11 @@ export class DocumentsController {
   @ApiOkResponse({ description: 'Documents retrieved successfully' })
   @ApiBadRequestResponse({ description: 'Invalid case file ID' })
   @ApiNotFoundResponse({ description: 'Case file not found' })
-  findByCaseFileId(@Param('caseFileId', ParseUUIDPipe) caseFileId: string) {
-    return this.documentsService.findByCaseFileId(caseFileId);
+  findByCaseFileId(
+    @Param('caseFileId', ParseUUIDPipe) caseFileId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.documentsService.findByCaseFileId(caseFileId, user);
   }
 
   @Get(':id/download')
@@ -188,10 +197,11 @@ export class DocumentsController {
   })
   async download(
     @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: AuthenticatedUser,
     @Res({ passthrough: true }) response: Response,
   ) {
     const { document, absoluteFilePath, mimeType } =
-      await this.documentsService.getDownloadFile(id);
+      await this.documentsService.getDownloadFile(id, user);
 
     response.setHeader('Content-Type', mimeType);
     response.setHeader(
@@ -227,10 +237,11 @@ export class DocumentsController {
   })
   async view(
     @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: AuthenticatedUser,
     @Res({ passthrough: true }) response: Response,
   ) {
     const { document, absoluteFilePath, mimeType } =
-      await this.documentsService.getViewFile(id);
+      await this.documentsService.getViewFile(id, user);
 
     response.setHeader('Content-Type', mimeType);
     response.setHeader(
@@ -252,8 +263,11 @@ export class DocumentsController {
   @ApiOkResponse({ description: 'Document retrieved successfully' })
   @ApiBadRequestResponse({ description: 'Invalid document ID' })
   @ApiNotFoundResponse({ description: 'Document not found' })
-  findOne(@Param('id', ParseUUIDPipe) id: string) {
-    return this.documentsService.findOne(id);
+  findOne(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.documentsService.findOne(id, user);
   }
 
   @Patch(':id')
@@ -271,8 +285,9 @@ export class DocumentsController {
   update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updateDocumentDto: UpdateDocumentDto,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.documentsService.update(id, updateDocumentDto);
+    return this.documentsService.update(id, updateDocumentDto, user);
   }
 
   @Delete(':id')
@@ -286,7 +301,11 @@ export class DocumentsController {
   @ApiOkResponse({ description: 'Document deleted successfully' })
   @ApiBadRequestResponse({ description: 'Invalid document ID' })
   @ApiNotFoundResponse({ description: 'Document not found' })
-  remove(@Param('id', ParseUUIDPipe) id: string) {
-    return this.documentsService.remove(id);
+  remove(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.documentsService.remove(id, user);
   }
 }
+

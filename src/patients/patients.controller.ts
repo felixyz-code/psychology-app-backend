@@ -22,9 +22,11 @@ import {
   ValidationPipe,
 } from '@nestjs/common';
 import { UserRole } from '@prisma/client';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
+import type { AuthenticatedUser } from '../auth/types/authenticated-user.type';
 import { CreatePatientDto } from './dto/create-patient.dto';
 import { UpdatePatientDto } from './dto/update-patient.dto';
 import { PatientsService } from './patients.service';
@@ -48,15 +50,18 @@ export class PatientsController {
   @ApiBody({ type: CreatePatientDto })
   @ApiOkResponse({ description: 'Patient created successfully' })
   @ApiBadRequestResponse({ description: 'Invalid patient payload' })
-  create(@Body() createPatientDto: CreatePatientDto) {
-    return this.patientsService.create(createPatientDto);
+  create(
+    @Body() createPatientDto: CreatePatientDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.patientsService.create(createPatientDto, user);
   }
 
   @Get()
   @ApiOperation({ summary: 'List all patients' })
   @ApiOkResponse({ description: 'Patients retrieved successfully' })
-  findAll() {
-    return this.patientsService.findAll();
+  findAll(@CurrentUser() user: AuthenticatedUser) {
+    return this.patientsService.findAll(user);
   }
 
   @Get(':id')
@@ -70,8 +75,11 @@ export class PatientsController {
   @ApiOkResponse({ description: 'Patient retrieved successfully' })
   @ApiBadRequestResponse({ description: 'Invalid patient ID' })
   @ApiNotFoundResponse({ description: 'Patient not found' })
-  findOne(@Param('id', ParseUUIDPipe) id: string) {
-    return this.patientsService.findOne(id);
+  findOne(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.patientsService.findOne(id, user);
   }
 
   @Patch(':id')
@@ -89,8 +97,9 @@ export class PatientsController {
   update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updatePatientDto: UpdatePatientDto,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.patientsService.update(id, updatePatientDto);
+    return this.patientsService.update(id, updatePatientDto, user);
   }
 
   @Delete(':id')
@@ -104,7 +113,11 @@ export class PatientsController {
   @ApiOkResponse({ description: 'Patient deleted successfully' })
   @ApiBadRequestResponse({ description: 'Invalid patient ID' })
   @ApiNotFoundResponse({ description: 'Patient not found' })
-  remove(@Param('id', ParseUUIDPipe) id: string) {
-    return this.patientsService.remove(id);
+  remove(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.patientsService.remove(id, user);
   }
 }
+
