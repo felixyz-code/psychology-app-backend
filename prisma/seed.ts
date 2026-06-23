@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import * as bcrypt from 'bcrypt';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient, Prisma, UserRole } from '@prisma/client';
 
@@ -11,8 +12,7 @@ if (!connectionString) {
 const adapter = new PrismaPg(connectionString);
 const prisma = new PrismaClient({ adapter });
 
-const DEFAULT_PASSWORD_HASH =
-  '$2b$10$w2rYxw0lZrYJ5B8j0m5R6uYJ7mL5S7vE4j6Cj3mK7tG0eYlM2p8rK';
+const DEFAULT_PASSWORD = 'ChangeMe123!';
 
 const ADMIN_USER_ID = '1b5d4d7c-b7e6-4d8b-9b3d-a3b12f1e1001';
 const PSYCHOLOGIST_USER_ID = '1b5d4d7c-b7e6-4d8b-9b3d-a3b12f1e1002';
@@ -44,11 +44,6 @@ const demoPatients = [
   },
 ];
 
-type SeededUser = {
-  id: string;
-  email: string;
-};
-
 async function upsertUser(params: {
   id: string;
   name: string;
@@ -56,20 +51,26 @@ async function upsertUser(params: {
   passwordHash: string;
   role: UserRole;
 }) {
-  const result = await prisma.$queryRaw<SeededUser[]>(Prisma.sql`
-    INSERT INTO "users" ("id", "name", "email", "passwordHash", "role", "updatedAt")
-    VALUES (${params.id}, ${params.name}, ${params.email}, ${params.passwordHash}, ${params.role}::"UserRole", NOW())
-    ON CONFLICT ("email")
-    DO UPDATE SET
-      "id" = EXCLUDED."id",
-      "name" = EXCLUDED."name",
-      "passwordHash" = EXCLUDED."passwordHash",
-      "role" = EXCLUDED."role",
-      "updatedAt" = NOW()
-    RETURNING "id", "email"
-  `);
-
-  return result[0];
+  return prisma.user.upsert({
+    where: { email: params.email },
+    update: {
+      id: params.id,
+      name: params.name,
+      passwordHash: params.passwordHash,
+      role: params.role,
+    },
+    create: {
+      id: params.id,
+      name: params.name,
+      email: params.email,
+      passwordHash: params.passwordHash,
+      role: params.role,
+    },
+    select: {
+      id: true,
+      email: true,
+    },
+  });
 }
 
 async function upsertPatient(
@@ -110,11 +111,13 @@ async function upsertPatient(
 }
 
 async function main() {
+  const defaultPasswordHash = await bcrypt.hash(DEFAULT_PASSWORD, 10);
+
   const admin = await upsertUser({
     id: ADMIN_USER_ID,
     name: 'Enrique Felix',
     email: 'admin@psychology-app.local',
-    passwordHash: DEFAULT_PASSWORD_HASH,
+    passwordHash: defaultPasswordHash,
     role: UserRole.ADMIN,
   });
 
@@ -122,7 +125,7 @@ async function main() {
     id: PSYCHOLOGIST_USER_ID,
     name: 'Demo Psychologist',
     email: 'psychologist@psychology-app.local',
-    passwordHash: DEFAULT_PASSWORD_HASH,
+    passwordHash: defaultPasswordHash,
     role: UserRole.PSYCHOLOGIST,
   });
 
@@ -131,6 +134,7 @@ async function main() {
   }
 
   console.log('Seed completed successfully.');
+  console.log(`Demo password: ${DEFAULT_PASSWORD}`);
   console.log(`Admin user: ${admin.email}`);
   console.log(`Psychologist user: ${psychologist.email}`);
   console.log(`Patients seeded: ${demoPatients.length}`);

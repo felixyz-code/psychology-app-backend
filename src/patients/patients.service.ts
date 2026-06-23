@@ -1,4 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { UserRole } from '@prisma/client';
+import { AuthenticatedUser } from '../auth/types/authenticated-user.type';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreatePatientDto } from './dto/create-patient.dto';
 import { UpdatePatientDto } from './dto/update-patient.dto';
@@ -7,24 +9,39 @@ import { UpdatePatientDto } from './dto/update-patient.dto';
 export class PatientsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  create(createPatientDto: CreatePatientDto) {
+  async create(createPatientDto: CreatePatientDto, user: AuthenticatedUser) {
+    const psychologistId = this.isAdmin(user)
+      ? createPatientDto.psychologistId
+      : user.id;
+
+    await this.ensurePsychologistExists(psychologistId);
+
     return this.prisma.patient.create({
-      data: createPatientDto,
+      data: {
+        ...createPatientDto,
+        psychologistId,
+      },
     });
   }
 
-  findAll() {
+  findAll(user: AuthenticatedUser) {
     return this.prisma.patient.findMany({
+      where: this.isAdmin(user) ? undefined : { psychologistId: user.id },
       orderBy: {
         createdAt: 'desc',
       },
     });
   }
 
-  async findOne(id: string) {
-    const patient = await this.prisma.patient.findUnique({
-      where: { id },
-    });
+  async findOne(id: string, user: AuthenticatedUser) {
+    const patient = this.isAdmin(user)
+      ? await this.prisma.patient.findUnique({ where: { id } })
+      : await this.prisma.patient.findFirst({
+          where: {
+            id,
+            psychologistId: user.id,
+          },
+        });
 
     if (!patient) {
       throw new NotFoundException(`Patient with id "${id}" not found`);
@@ -33,20 +50,52 @@ export class PatientsService {
     return patient;
   }
 
-  async update(id: string, updatePatientDto: UpdatePatientDto) {
-    await this.findOne(id);
+  async update(
+    id: string,
+    updatePatientDto: UpdatePatientDto,
+    user: AuthenticatedUser,
+  ) {
+    await this.findOne(id, user);
+
+    let psychologistId = updatePatientDto.psychologistId;
+
+    if (!this.isAdmin(user)) {
+      psychologistId = user.id;
+    }
+
+    if (psychologistId) {
+      await this.ensurePsychologistExists(psychologistId);
+    }
 
     return this.prisma.patient.update({
       where: { id },
-      data: updatePatientDto,
+      data: {
+        ...updatePatientDto,
+        ...(psychologistId ? { psychologistId } : {}),
+      },
     });
   }
 
-  async remove(id: string) {
-    await this.findOne(id);
+  async remove(id: string, user: AuthenticatedUser) {
+    await this.findOne(id, user);
 
     return this.prisma.patient.delete({
       where: { id },
     });
+  }
+
+  private isAdmin(user: AuthenticatedUser) {
+    return user.role === UserRole.ADMIN;
+  }
+
+  private async ensurePsychologistExists(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true },
+    });
+
+    if (!user) {
+      throw new NotFoundException(`User with id "${userId}" not found`);
+    }
   }
 }

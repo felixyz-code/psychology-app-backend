@@ -1,4 +1,5 @@
 import {
+  ApiBearerAuth,
   ApiBadRequestResponse,
   ApiBody,
   ApiNotFoundResponse,
@@ -16,15 +17,25 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  UseGuards,
   UsePipes,
   ValidationPipe,
 } from '@nestjs/common';
+import { UserRole } from '@prisma/client';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import type { AuthenticatedUser } from '../auth/types/authenticated-user.type';
 import { AppointmentsService } from './appointments.service';
 import { CreateAppointmentDto } from './dto/create-appointment.dto';
 import { UpdateAppointmentDto } from './dto/update-appointment.dto';
 
 @ApiTags('appointments')
+@ApiBearerAuth('bearer')
 @Controller('appointments')
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(UserRole.ADMIN, UserRole.PSYCHOLOGIST)
 @UsePipes(
   new ValidationPipe({
     whitelist: true,
@@ -40,15 +51,18 @@ export class AppointmentsController {
   @ApiOkResponse({ description: 'Appointment created successfully' })
   @ApiBadRequestResponse({ description: 'Invalid appointment payload' })
   @ApiNotFoundResponse({ description: 'Patient or psychologist not found' })
-  create(@Body() createAppointmentDto: CreateAppointmentDto) {
-    return this.appointmentsService.create(createAppointmentDto);
+  create(
+    @Body() createAppointmentDto: CreateAppointmentDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.appointmentsService.create(createAppointmentDto, user);
   }
 
   @Get()
   @ApiOperation({ summary: 'List all appointments' })
   @ApiOkResponse({ description: 'Appointments retrieved successfully' })
-  findAll() {
-    return this.appointmentsService.findAll();
+  findAll(@CurrentUser() user: AuthenticatedUser) {
+    return this.appointmentsService.findAll(user);
   }
 
   @Get('patient/:patientId')
@@ -62,8 +76,11 @@ export class AppointmentsController {
   @ApiOkResponse({ description: 'Appointments retrieved successfully' })
   @ApiBadRequestResponse({ description: 'Invalid patient ID' })
   @ApiNotFoundResponse({ description: 'Patient not found' })
-  findByPatientId(@Param('patientId', ParseUUIDPipe) patientId: string) {
-    return this.appointmentsService.findByPatientId(patientId);
+  findByPatientId(
+    @Param('patientId', ParseUUIDPipe) patientId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.appointmentsService.findByPatientId(patientId, user);
   }
 
   @Get(':id')
@@ -77,8 +94,11 @@ export class AppointmentsController {
   @ApiOkResponse({ description: 'Appointment retrieved successfully' })
   @ApiBadRequestResponse({ description: 'Invalid appointment ID' })
   @ApiNotFoundResponse({ description: 'Appointment not found' })
-  findOne(@Param('id', ParseUUIDPipe) id: string) {
-    return this.appointmentsService.findOne(id);
+  findOne(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.appointmentsService.findOne(id, user);
   }
 
   @Patch(':id')
@@ -98,8 +118,9 @@ export class AppointmentsController {
   update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updateAppointmentDto: UpdateAppointmentDto,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.appointmentsService.update(id, updateAppointmentDto);
+    return this.appointmentsService.update(id, updateAppointmentDto, user);
   }
 
   @Delete(':id')
@@ -113,7 +134,11 @@ export class AppointmentsController {
   @ApiOkResponse({ description: 'Appointment deleted successfully' })
   @ApiBadRequestResponse({ description: 'Invalid appointment ID' })
   @ApiNotFoundResponse({ description: 'Appointment not found' })
-  remove(@Param('id', ParseUUIDPipe) id: string) {
-    return this.appointmentsService.remove(id);
+  remove(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.appointmentsService.remove(id, user);
   }
 }
+

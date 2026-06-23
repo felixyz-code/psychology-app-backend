@@ -1,5 +1,7 @@
 import { extname } from 'node:path';
+import { createReadStream } from 'node:fs';
 import {
+  ApiBearerAuth,
   ApiBadRequestResponse,
   ApiBody,
   ApiConsumes,
@@ -7,6 +9,7 @@ import {
   ApiOkResponse,
   ApiOperation,
   ApiParam,
+  ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
 import {
@@ -19,13 +22,23 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Res,
+  StreamableFile,
   UploadedFile,
+  UseGuards,
   UseInterceptors,
   UsePipes,
   ValidationPipe,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { UserRole } from '@prisma/client';
+import type { Response } from 'express';
 import { memoryStorage } from 'multer';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import type { AuthenticatedUser } from '../auth/types/authenticated-user.type';
 import { CreateDocumentDto } from './dto/create-document.dto';
 import { UpdateDocumentDto } from './dto/update-document.dto';
 import { UploadDocumentDto } from './dto/upload-document.dto';
@@ -40,7 +53,10 @@ const allowedMimeTypes = new Set([
 const allowedExtensions = new Set(['.pdf', '.jpg', '.jpeg', '.png']);
 
 @ApiTags('documents')
+@ApiBearerAuth('bearer')
 @Controller('documents')
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(UserRole.ADMIN, UserRole.PSYCHOLOGIST)
 @UsePipes(
   new ValidationPipe({
     whitelist: true,
@@ -107,13 +123,14 @@ export class DocumentsController {
   @ApiNotFoundResponse({ description: 'Case file or user not found' })
   upload(
     @Body() uploadDocumentDto: UploadDocumentDto,
-    @UploadedFile() file?: Express.Multer.File,
+    @UploadedFile() file: Express.Multer.File | undefined,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
     if (!file) {
       throw new BadRequestException('File is required');
     }
 
-    return this.documentsService.upload(uploadDocumentDto, file);
+    return this.documentsService.upload(uploadDocumentDto, file, user);
   }
 
   @Post()
@@ -122,15 +139,18 @@ export class DocumentsController {
   @ApiOkResponse({ description: 'Document metadata created successfully' })
   @ApiBadRequestResponse({ description: 'Invalid document payload' })
   @ApiNotFoundResponse({ description: 'Case file or user not found' })
-  create(@Body() createDocumentDto: CreateDocumentDto) {
-    return this.documentsService.create(createDocumentDto);
+  create(
+    @Body() createDocumentDto: CreateDocumentDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.documentsService.create(createDocumentDto, user);
   }
 
   @Get()
   @ApiOperation({ summary: 'List all documents metadata' })
   @ApiOkResponse({ description: 'Documents retrieved successfully' })
-  findAll() {
-    return this.documentsService.findAll();
+  findAll(@CurrentUser() user: AuthenticatedUser) {
+    return this.documentsService.findAll(user);
   }
 
   @Get('case-file/:caseFileId')
@@ -144,8 +164,92 @@ export class DocumentsController {
   @ApiOkResponse({ description: 'Documents retrieved successfully' })
   @ApiBadRequestResponse({ description: 'Invalid case file ID' })
   @ApiNotFoundResponse({ description: 'Case file not found' })
-  findByCaseFileId(@Param('caseFileId', ParseUUIDPipe) caseFileId: string) {
-    return this.documentsService.findByCaseFileId(caseFileId);
+  findByCaseFileId(
+    @Param('caseFileId', ParseUUIDPipe) caseFileId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.documentsService.findByCaseFileId(caseFileId, user);
+  }
+
+  @Get(':id/download')
+  @ApiOperation({ summary: 'Download a document file by ID' })
+  @ApiParam({
+    name: 'id',
+    description: 'Document ID',
+    format: 'uuid',
+    example: '550e8400-e29b-41d4-a716-446655440000',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Document file returned as attachment',
+    content: {
+      'application/pdf': { schema: { type: 'string', format: 'binary' } },
+      'image/jpeg': { schema: { type: 'string', format: 'binary' } },
+      'image/png': { schema: { type: 'string', format: 'binary' } },
+      'application/octet-stream': {
+        schema: { type: 'string', format: 'binary' },
+      },
+    },
+  })
+  @ApiBadRequestResponse({ description: 'Invalid document ID' })
+  @ApiNotFoundResponse({
+    description: 'Document metadata or physical file not found',
+  })
+  async download(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const { document, absoluteFilePath, mimeType } =
+      await this.documentsService.getDownloadFile(id, user);
+
+    response.setHeader('Content-Type', mimeType);
+    response.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${encodeURIComponent(document.fileName)}"`,
+    );
+
+    return new StreamableFile(createReadStream(absoluteFilePath));
+  }
+
+  @Get(':id/view')
+  @ApiOperation({ summary: 'View a document file inline by ID' })
+  @ApiParam({
+    name: 'id',
+    description: 'Document ID',
+    format: 'uuid',
+    example: '550e8400-e29b-41d4-a716-446655440000',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Document file returned inline for preview',
+    content: {
+      'application/pdf': { schema: { type: 'string', format: 'binary' } },
+      'image/jpeg': { schema: { type: 'string', format: 'binary' } },
+      'image/png': { schema: { type: 'string', format: 'binary' } },
+    },
+  })
+  @ApiBadRequestResponse({
+    description: 'Invalid document ID or unsupported inline MIME type',
+  })
+  @ApiNotFoundResponse({
+    description: 'Document metadata or physical file not found',
+  })
+  async view(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const { document, absoluteFilePath, mimeType } =
+      await this.documentsService.getViewFile(id, user);
+
+    response.setHeader('Content-Type', mimeType);
+    response.setHeader(
+      'Content-Disposition',
+      `inline; filename="${encodeURIComponent(document.fileName)}"`,
+    );
+
+    return new StreamableFile(createReadStream(absoluteFilePath));
   }
 
   @Get(':id')
@@ -159,8 +263,11 @@ export class DocumentsController {
   @ApiOkResponse({ description: 'Document retrieved successfully' })
   @ApiBadRequestResponse({ description: 'Invalid document ID' })
   @ApiNotFoundResponse({ description: 'Document not found' })
-  findOne(@Param('id', ParseUUIDPipe) id: string) {
-    return this.documentsService.findOne(id);
+  findOne(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.documentsService.findOne(id, user);
   }
 
   @Patch(':id')
@@ -178,8 +285,9 @@ export class DocumentsController {
   update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updateDocumentDto: UpdateDocumentDto,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.documentsService.update(id, updateDocumentDto);
+    return this.documentsService.update(id, updateDocumentDto, user);
   }
 
   @Delete(':id')
@@ -193,7 +301,11 @@ export class DocumentsController {
   @ApiOkResponse({ description: 'Document deleted successfully' })
   @ApiBadRequestResponse({ description: 'Invalid document ID' })
   @ApiNotFoundResponse({ description: 'Document not found' })
-  remove(@Param('id', ParseUUIDPipe) id: string) {
-    return this.documentsService.remove(id);
+  remove(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.documentsService.remove(id, user);
   }
 }
+

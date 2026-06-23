@@ -3,6 +3,8 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { UserRole } from '@prisma/client';
+import { AuthenticatedUser } from '../auth/types/authenticated-user.type';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateCaseFileDto } from './dto/create-case-file.dto';
 import { UpdateCaseFileDto } from './dto/update-case-file.dto';
@@ -11,8 +13,8 @@ import { UpdateCaseFileDto } from './dto/update-case-file.dto';
 export class CaseFilesService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async create(createCaseFileDto: CreateCaseFileDto) {
-    await this.ensurePatientExists(createCaseFileDto.patientId);
+  async create(createCaseFileDto: CreateCaseFileDto, user: AuthenticatedUser) {
+    await this.getAccessiblePatientOrThrow(createCaseFileDto.patientId, user);
 
     const existingCaseFile = await this.prisma.caseFile.findUnique({
       where: { patientId: createCaseFileDto.patientId },
@@ -29,28 +31,29 @@ export class CaseFilesService {
     });
   }
 
-  findAll() {
+  findAll(user: AuthenticatedUser) {
     return this.prisma.caseFile.findMany({
+      where: this.isAdmin(user)
+        ? undefined
+        : {
+            patient: {
+              psychologistId: user.id,
+            },
+          },
       orderBy: {
         createdAt: 'desc',
       },
     });
   }
 
-  async findOne(id: string) {
-    const caseFile = await this.prisma.caseFile.findUnique({
-      where: { id },
-    });
-
-    if (!caseFile) {
-      throw new NotFoundException(`Case file with id "${id}" not found`);
-    }
+  async findOne(id: string, user: AuthenticatedUser) {
+    const caseFile = await this.getAccessibleCaseFileOrThrow(id, user);
 
     return caseFile;
   }
 
-  async findByPatientId(patientId: string) {
-    await this.ensurePatientExists(patientId);
+  async findByPatientId(patientId: string, user: AuthenticatedUser) {
+    await this.getAccessiblePatientOrThrow(patientId, user);
 
     const caseFile = await this.prisma.caseFile.findUnique({
       where: { patientId },
@@ -65,8 +68,12 @@ export class CaseFilesService {
     return caseFile;
   }
 
-  async update(id: string, updateCaseFileDto: UpdateCaseFileDto) {
-    await this.findOne(id);
+  async update(
+    id: string,
+    updateCaseFileDto: UpdateCaseFileDto,
+    user: AuthenticatedUser,
+  ) {
+    await this.getAccessibleCaseFileOrThrow(id, user);
 
     return this.prisma.caseFile.update({
       where: { id },
@@ -74,13 +81,49 @@ export class CaseFilesService {
     });
   }
 
-  private async ensurePatientExists(patientId: string) {
-    const patient = await this.prisma.patient.findUnique({
-      where: { id: patientId },
-    });
+  private isAdmin(user: AuthenticatedUser) {
+    return user.role === UserRole.ADMIN;
+  }
+
+  private async getAccessiblePatientOrThrow(
+    patientId: string,
+    user: AuthenticatedUser,
+  ) {
+    const patient = this.isAdmin(user)
+      ? await this.prisma.patient.findUnique({ where: { id: patientId } })
+      : await this.prisma.patient.findFirst({
+          where: {
+            id: patientId,
+            psychologistId: user.id,
+          },
+        });
 
     if (!patient) {
       throw new NotFoundException(`Patient with id "${patientId}" not found`);
     }
+
+    return patient;
+  }
+
+  private async getAccessibleCaseFileOrThrow(
+    id: string,
+    user: AuthenticatedUser,
+  ) {
+    const caseFile = this.isAdmin(user)
+      ? await this.prisma.caseFile.findUnique({ where: { id } })
+      : await this.prisma.caseFile.findFirst({
+          where: {
+            id,
+            patient: {
+              psychologistId: user.id,
+            },
+          },
+        });
+
+    if (!caseFile) {
+      throw new NotFoundException(`Case file with id "${id}" not found`);
+    }
+
+    return caseFile;
   }
 }

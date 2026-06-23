@@ -1,4 +1,5 @@
 import {
+  ApiBearerAuth,
   ApiBadRequestResponse,
   ApiBody,
   ApiConflictResponse,
@@ -16,15 +17,25 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  UseGuards,
   UsePipes,
   ValidationPipe,
 } from '@nestjs/common';
+import { UserRole } from '@prisma/client';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import type { AuthenticatedUser } from '../auth/types/authenticated-user.type';
 import { CaseFilesService } from './case-files.service';
 import { CreateCaseFileDto } from './dto/create-case-file.dto';
 import { UpdateCaseFileDto } from './dto/update-case-file.dto';
 
 @ApiTags('case-files')
+@ApiBearerAuth('bearer')
 @Controller('case-files')
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(UserRole.ADMIN, UserRole.PSYCHOLOGIST)
 @UsePipes(
   new ValidationPipe({
     whitelist: true,
@@ -43,15 +54,18 @@ export class CaseFilesController {
     description: 'The patient already has an existing case file',
   })
   @ApiNotFoundResponse({ description: 'Patient not found' })
-  create(@Body() createCaseFileDto: CreateCaseFileDto) {
-    return this.caseFilesService.create(createCaseFileDto);
+  create(
+    @Body() createCaseFileDto: CreateCaseFileDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.caseFilesService.create(createCaseFileDto, user);
   }
 
   @Get()
   @ApiOperation({ summary: 'List all case files' })
   @ApiOkResponse({ description: 'Case files retrieved successfully' })
-  findAll() {
-    return this.caseFilesService.findAll();
+  findAll(@CurrentUser() user: AuthenticatedUser) {
+    return this.caseFilesService.findAll(user);
   }
 
   @Get('patient/:patientId')
@@ -65,8 +79,11 @@ export class CaseFilesController {
   @ApiOkResponse({ description: 'Case file retrieved successfully' })
   @ApiBadRequestResponse({ description: 'Invalid patient ID' })
   @ApiNotFoundResponse({ description: 'Patient or case file not found' })
-  findByPatientId(@Param('patientId', ParseUUIDPipe) patientId: string) {
-    return this.caseFilesService.findByPatientId(patientId);
+  findByPatientId(
+    @Param('patientId', ParseUUIDPipe) patientId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.caseFilesService.findByPatientId(patientId, user);
   }
 
   @Get(':id')
@@ -80,8 +97,11 @@ export class CaseFilesController {
   @ApiOkResponse({ description: 'Case file retrieved successfully' })
   @ApiBadRequestResponse({ description: 'Invalid case file ID' })
   @ApiNotFoundResponse({ description: 'Case file not found' })
-  findOne(@Param('id', ParseUUIDPipe) id: string) {
-    return this.caseFilesService.findOne(id);
+  findOne(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.caseFilesService.findOne(id, user);
   }
 
   @Patch(':id')
@@ -99,7 +119,9 @@ export class CaseFilesController {
   update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updateCaseFileDto: UpdateCaseFileDto,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.caseFilesService.update(id, updateCaseFileDto);
+    return this.caseFilesService.update(id, updateCaseFileDto, user);
   }
 }
+
