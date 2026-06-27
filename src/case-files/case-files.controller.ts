@@ -124,4 +124,3 @@ export class CaseFilesController {
     return this.caseFilesService.update(id, updateCaseFileDto, user);
   }
 }
-

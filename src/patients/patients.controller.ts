@@ -120,4 +120,3 @@ export class PatientsController {
     return this.patientsService.remove(id, user);
   }
 }
-

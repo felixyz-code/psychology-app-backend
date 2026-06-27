@@ -13,9 +13,14 @@ export class SessionNotesService {
     createSessionNoteDto: CreateSessionNoteDto,
     user: AuthenticatedUser,
   ) {
-    await this.getAccessibleCaseFileOrThrow(createSessionNoteDto.caseFileId, user);
+    await this.getAccessibleCaseFileOrThrow(
+      createSessionNoteDto.caseFileId,
+      user,
+    );
 
-    const authorId = this.isAdmin(user) ? createSessionNoteDto.authorId : user.id;
+    const authorId = this.isAdmin(user)
+      ? createSessionNoteDto.authorId
+      : user.id;
 
     if (this.isAdmin(user)) {
       await this.ensureAuthorExists(authorId);
@@ -104,7 +109,9 @@ export class SessionNotesService {
         });
 
     if (!caseFile) {
-      throw new NotFoundException(`Case file with id "${caseFileId}" not found`);
+      throw new NotFoundException(
+        `Case file with id "${caseFileId}" not found`,
+      );
     }
 
     return caseFile;

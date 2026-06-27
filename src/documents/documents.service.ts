@@ -142,7 +142,9 @@ export class DocumentsService {
 
   async getDownloadFile(id: string, user: AuthenticatedUser) {
     const document = await this.getDocumentOrThrow(id, user);
-    const absoluteFilePath = await this.resolveDocumentFilePath(document.filePath);
+    const absoluteFilePath = await this.resolveDocumentFilePath(
+      document.filePath,
+    );
 
     return {
       document,
@@ -153,7 +155,9 @@ export class DocumentsService {
 
   async getViewFile(id: string, user: AuthenticatedUser) {
     const document = await this.getDocumentOrThrow(id, user);
-    const absoluteFilePath = await this.resolveDocumentFilePath(document.filePath);
+    const absoluteFilePath = await this.resolveDocumentFilePath(
+      document.filePath,
+    );
 
     if (!document.mimeType || !allowedInlineMimeTypes.has(document.mimeType)) {
       throw new BadRequestException(
@@ -188,7 +192,9 @@ export class DocumentsService {
         });
 
     if (!caseFile) {
-      throw new NotFoundException(`Case file with id "${caseFileId}" not found`);
+      throw new NotFoundException(
+        `Case file with id "${caseFileId}" not found`,
+      );
     }
 
     return caseFile;

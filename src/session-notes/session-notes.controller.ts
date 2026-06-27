@@ -139,4 +139,3 @@ export class SessionNotesController {
     return this.sessionNotesService.remove(id, user);
   }
 }
-

@@ -118,7 +118,8 @@ export class DocumentsController {
   })
   @ApiOkResponse({ description: 'Document uploaded successfully' })
   @ApiBadRequestResponse({
-    description: 'Missing file, invalid payload, unsupported type, or file too large',
+    description:
+      'Missing file, invalid payload, unsupported type, or file too large',
   })
   @ApiNotFoundResponse({ description: 'Case file or user not found' })
   upload(
@@ -308,4 +309,3 @@ export class DocumentsController {
     return this.documentsService.remove(id, user);
   }
 }
-
