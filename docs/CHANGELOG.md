@@ -4,6 +4,28 @@
 
 ---
 
+# Sprint 9.3
+
+## Added
+
+* NestJS module `FinancialTransactionsModule` with controller, service and DTOs.
+* Base CRUD endpoints for `FinancialTransaction`.
+* Swagger documentation and DTO validation for the financial transactions API.
+* Base ownership rules for `ADMIN` and `PSYCHOLOGIST` in the financial service.
+* Relational validation for `patientId`, `appointmentId` and admin-provided `createdById`.
+
+## Changed
+
+* `AppModule` now registers the financial transactions module.
+* Backend documentation now reflects the financial CRUD base and Sprint 9.3 scope.
+
+## Notes
+
+* This sprint intentionally excludes advanced filters, pagination, dashboards, fiscal invoicing and bank reconciliation.
+* Financial ownership still does not duplicate `psychologistId`; it is resolved through related entities and `createdById`.
+
+---
+
 # Sprint 9.2
 
 ## Added

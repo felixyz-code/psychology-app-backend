@@ -393,6 +393,8 @@ It does not yet include REST endpoints, tax invoicing, payment gateways or bank 
 
 `paymentMethod` is modeled as an enum instead of free text to avoid inconsistent values and facilitate future reporting and dashboard aggregation.
 
+The backend now exposes a base CRUD module for this entity with ownership resolved through existing relationships and `createdById`.
+
 ---
 
 # Entity Relationships

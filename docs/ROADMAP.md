@@ -27,7 +27,7 @@ Current priorities:
 * Clinical workflow validation
 * Docker deployment
 * Documentation standardization
-* Financial domain foundation in Prisma
+* Financial CRUD validation
 
 ---
 
@@ -82,7 +82,7 @@ Current development efforts include:
 * UI refinement
 * Clinical workflow validation
 * Documentation improvements
-* Financial data model foundation without REST exposure yet
+* Financial transactions CRUD base validation
 
 ---
 
@@ -120,7 +120,6 @@ Current development efforts include:
 * Filtering
 * Pagination
 * User Management improvements
-* Financial transactions REST module
 * Financial transaction filters and summaries
 
 ---
@@ -166,6 +165,7 @@ Current technical debt includes:
 * Seed improvements
 * API examples
 * Frontend integration documentation
+* Financial reporting and dashboard layers
 
 Technical debt should be addressed incrementally.
 

@@ -36,7 +36,7 @@ Current capabilities include:
 - Role-based authorization
 - Ownership filtering
 - Clinical data management
-- Financial data modeling through Prisma
+- Financial transactions CRUD base
 - Local filesystem document storage
 
 The application follows a modular architecture where business logic resides in services and persistence is handled through Prisma.
@@ -78,6 +78,7 @@ Current modules:
 - SessionNotesModule
 - DocumentsModule
 - AppointmentsModule
+- FinancialTransactionsModule
 - PrismaModule
 
 ---
@@ -260,9 +261,9 @@ Current ownership rules:
 
 ## Financial Transactions
 
-- Current sprint adds only the Prisma data model.
-- Future ownership rules must resolve through `patientId`, `appointmentId` or `createdById`.
+- Ownership is resolved through `patientId`, `appointmentId` or `createdById`.
 - The model must not duplicate ownership with a `psychologistId` column.
+- CRUD access is enforced in the financial transactions service with the same `404` convention used by other protected modules.
 
 ---
 

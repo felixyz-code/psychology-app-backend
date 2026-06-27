@@ -861,6 +861,184 @@ Bearer Token required.
 
 ---
 
+# Financial Transactions
+
+## `POST /financial-transactions`
+
+Creates a financial transaction.
+
+### Authentication
+
+Bearer Token required.
+
+### Body
+
+```json
+{
+  "type": "INCOME | EXPENSE | ADJUSTMENT | REFUND",
+  "status": "PENDING | COMPLETED | CANCELLED | optional",
+  "category": "SESSION | ASSESSMENT | MANUAL | RENT | UTILITIES | SUPPLIES | SOFTWARE | SALARY | OTHER | optional",
+  "amount": "number",
+  "currency": "string | optional",
+  "concept": "string",
+  "description": "string | optional",
+  "occurredAt": "date-time",
+  "dueDate": "date-time | optional",
+  "paymentMethod": "CASH | CARD | TRANSFER | CHECK | OTHER | optional",
+  "notes": "string | optional",
+  "patientId": "uuid | optional",
+  "appointmentId": "uuid | optional",
+  "createdById": "uuid | optional"
+}
+```
+
+### Behavior
+
+* `amount` must be positive.
+* `type`, `amount`, `concept` and `occurredAt` are required.
+* Prisma applies defaults for `status`, `category` and `currency`.
+* If `patientId` is provided, the patient must exist.
+* If `appointmentId` is provided, the appointment must exist.
+* If both are provided, the appointment must belong to the same patient.
+* If `createdById` is provided by `ADMIN`, the user must exist.
+
+### Ownership
+
+* `ADMIN` can create transactions for any valid user, patient or appointment.
+* `PSYCHOLOGIST` ignores `createdById` from the body and always uses `user.id`.
+* `PSYCHOLOGIST` can only associate owned patients and owned appointments.
+
+### Errors
+
+* `400 Bad Request` for invalid payloads or mismatched `patientId` / `appointmentId`.
+* `404 Not Found` when a related patient, appointment or user does not exist or is not accessible.
+
+---
+
+## `GET /financial-transactions`
+
+Lists financial transactions ordered by `occurredAt desc`.
+
+### Authentication
+
+Bearer Token required.
+
+### Ownership
+
+* `ADMIN` sees all transactions.
+* `PSYCHOLOGIST` sees transactions when:
+  * `createdById === user.id`, or
+  * the transaction belongs to an owned patient, or
+  * the transaction belongs to an owned appointment.
+
+### Notes
+
+* This sprint only includes the base list endpoint.
+* Advanced filters, pagination and financial summaries are intentionally out of scope.
+
+---
+
+## `GET /financial-transactions/:id`
+
+Gets a financial transaction by ID.
+
+### Authentication
+
+Bearer Token required.
+
+### Params
+
+* `id: uuid`
+
+### Ownership
+
+* `ADMIN` can access any transaction.
+* `PSYCHOLOGIST` can only access transactions visible under the base ownership rules.
+* If the transaction exists but is not accessible, the API returns `404 Not Found`.
+
+---
+
+## `PATCH /financial-transactions/:id`
+
+Updates a financial transaction.
+
+### Authentication
+
+Bearer Token required.
+
+### Params
+
+* `id: uuid`
+
+### Body
+
+```json
+{
+  "type": "INCOME | EXPENSE | ADJUSTMENT | REFUND | optional",
+  "status": "PENDING | COMPLETED | CANCELLED | optional",
+  "category": "SESSION | ASSESSMENT | MANUAL | RENT | UTILITIES | SUPPLIES | SOFTWARE | SALARY | OTHER | optional",
+  "amount": "number | optional",
+  "currency": "string | optional",
+  "concept": "string | optional",
+  "description": "string | optional",
+  "occurredAt": "date-time | optional",
+  "dueDate": "date-time | optional",
+  "paymentMethod": "CASH | CARD | TRANSFER | CHECK | OTHER | optional",
+  "notes": "string | optional",
+  "patientId": "uuid | optional",
+  "appointmentId": "uuid | optional",
+  "createdById": "uuid | optional"
+}
+```
+
+### Behavior
+
+* Relational validations from creation also apply on update.
+* `ADMIN` may change `createdById` only to an existing user.
+* `PSYCHOLOGIST` cannot change ownership through `createdById`.
+* Reassignments remain conservative and must stay within accessible relations.
+
+### Ownership
+
+* `ADMIN` can update any transaction.
+* `PSYCHOLOGIST` can only update transactions visible under the base ownership rules.
+* If the transaction exists but is not accessible, the API returns `404 Not Found`.
+
+### Errors
+
+* `400 Bad Request` for invalid payloads or mismatched `patientId` / `appointmentId`.
+* `404 Not Found` when the transaction or a related resource is not found or not accessible.
+
+---
+
+## `DELETE /financial-transactions/:id`
+
+Deletes a financial transaction.
+
+### Authentication
+
+Bearer Token required.
+
+### Params
+
+* `id: uuid`
+
+### Behavior
+
+* Uses physical delete for consistency with the current backend pattern.
+
+### Ownership
+
+* `ADMIN` can delete any transaction.
+* `PSYCHOLOGIST` can only delete transactions visible under the base ownership rules.
+* If the transaction exists but is not accessible, the API returns `404 Not Found`.
+
+### Notes
+
+* This module does not include tax invoicing or bank reconciliation logic.
+
+---
+
 # Pending API Improvements
 
 The following items should be reviewed in future backend sprints:
@@ -868,7 +1046,6 @@ The following items should be reviewed in future backend sprints:
 * Define standard error response format.
 * Add pagination contract for list endpoints.
 * Add search/filter query parameters.
-* Define the future REST contract for financial transactions.
 * Decide whether `POST /documents` should remain available.
 * Decide whether `DELETE /documents/:id` should also delete the physical file.
 * Replace root `GET /` response with a health or API status endpoint.
