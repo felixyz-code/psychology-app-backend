@@ -395,6 +395,8 @@ It does not yet include REST endpoints, tax invoicing, payment gateways or bank 
 
 The backend now exposes a base CRUD module for this entity with ownership resolved through existing relationships and `createdById`.
 
+Basic financial summaries and filtered reports use `occurredAt` as the temporal field for calculations.
+
 ---
 
 # Entity Relationships

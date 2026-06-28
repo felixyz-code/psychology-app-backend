@@ -931,10 +931,78 @@ Bearer Token required.
   * the transaction belongs to an owned patient, or
   * the transaction belongs to an owned appointment.
 
+### Query Params
+
+* `from: date-time | date | optional`
+* `to: date-time | date | optional`
+* `type: INCOME | EXPENSE | ADJUSTMENT | REFUND | optional`
+* `status: PENDING | COMPLETED | CANCELLED | optional`
+* `category: SESSION | ASSESSMENT | MANUAL | RENT | UTILITIES | SUPPLIES | SOFTWARE | SALARY | OTHER | optional`
+* `paymentMethod: CASH | CARD | TRANSFER | CHECK | OTHER | optional`
+* `patientId: uuid | optional`
+* `appointmentId: uuid | optional`
+* `createdById: uuid | optional`
+
+### Filter Rules
+
+* Date filters apply to `occurredAt`.
+* `from` maps to `gte`.
+* `to` maps to `lte`.
+* `ADMIN` may filter by any supported field.
+* `PSYCHOLOGIST` may only see owned records under the existing ownership rules.
+* If `PSYCHOLOGIST` sends `createdById`, the backend constrains it to `user.id`.
+* If `PSYCHOLOGIST` sends `patientId` or `appointmentId`, non-owned values return an empty result set instead of exposing resource existence.
+
 ### Notes
 
-* This sprint only includes the base list endpoint.
-* Advanced filters, pagination and financial summaries are intentionally out of scope.
+* This module now supports basic filtering.
+* Pagination, tax invoicing, bank reconciliation and advanced dashboards remain out of scope.
+
+---
+
+## `GET /financial-transactions/summary`
+
+Returns a basic financial summary calculated from filtered transactions.
+
+### Authentication
+
+Bearer Token required.
+
+### Query Params
+
+* `from: date-time | date | optional`
+* `to: date-time | date | optional`
+* `type: INCOME | EXPENSE | ADJUSTMENT | REFUND | optional`
+* `status: PENDING | COMPLETED | CANCELLED | optional`
+* `category: SESSION | ASSESSMENT | MANUAL | RENT | UTILITIES | SUPPLIES | SOFTWARE | SALARY | OTHER | optional`
+* `paymentMethod: CASH | CARD | TRANSFER | CHECK | OTHER | optional`
+* `patientId: uuid | optional`
+* `appointmentId: uuid | optional`
+* `createdById: uuid | optional`
+
+### Ownership
+
+* Uses the same visibility and filter rules as `GET /financial-transactions`.
+
+### Response
+
+```json
+{
+  "incomeTotal": 2500,
+  "expenseTotal": 450,
+  "adjustmentTotal": 100,
+  "refundTotal": 200,
+  "netTotal": 1950,
+  "transactionCount": 8
+}
+```
+
+### Notes
+
+* The summary is calculated using `occurredAt`, not `createdAt`.
+* It includes every visible status unless `status` is explicitly filtered.
+* This is not tax invoicing, bank reconciliation or an advanced financial dashboard.
+* For `PSYCHOLOGIST`, non-owned `patientId` and `appointmentId` filters resolve to an empty summary instead of exposing resource existence.
 
 ---
 

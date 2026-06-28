@@ -100,6 +100,16 @@ PORT=3000
 
 These values may differ in production environments.
 
+`DATABASE_URL` is also required by `prisma.config.ts`, so local Prisma CLI commands such as `prisma generate` must run with that variable available.
+
+Example in PowerShell:
+
+```powershell
+$env:DATABASE_URL="postgresql://psychology_user:psychology_password@localhost:5432/psychology_app?schema=public"; npx.cmd prisma generate
+```
+
+The command only needs a valid-looking connection string for config resolution; it does not require a live database server just to generate the client.
+
 ---
 
 # Common Commands

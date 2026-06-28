@@ -13,6 +13,7 @@ import {
   Controller,
   Delete,
   Get,
+  Query,
   Param,
   ParseUUIDPipe,
   Patch,
@@ -28,6 +29,8 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import type { AuthenticatedUser } from '../auth/types/authenticated-user.type';
 import { CreateFinancialTransactionDto } from './dto/create-financial-transaction.dto';
+import { FindFinancialTransactionsQueryDto } from './dto/find-financial-transactions-query.dto';
+import { FinancialTransactionSummaryDto } from './dto/financial-transaction-summary.dto';
 import { UpdateFinancialTransactionDto } from './dto/update-financial-transaction.dto';
 import { FinancialTransactionsService } from './financial-transactions.service';
 
@@ -72,8 +75,24 @@ export class FinancialTransactionsController {
   @ApiOkResponse({
     description: 'Financial transactions retrieved successfully',
   })
-  findAll(@CurrentUser() user: AuthenticatedUser) {
-    return this.financialTransactionsService.findAll(user);
+  findAll(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query() query: FindFinancialTransactionsQueryDto,
+  ) {
+    return this.financialTransactionsService.findAll(user, query);
+  }
+
+  @Get('summary')
+  @ApiOperation({ summary: 'Get a basic financial summary' })
+  @ApiOkResponse({
+    description: 'Financial summary retrieved successfully',
+    type: FinancialTransactionSummaryDto,
+  })
+  getSummary(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query() query: FindFinancialTransactionsQueryDto,
+  ) {
+    return this.financialTransactionsService.getSummary(user, query);
   }
 
   @Get(':id')

@@ -3,10 +3,11 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { UserRole } from '@prisma/client';
+import { FinancialTransactionType, Prisma, UserRole } from '@prisma/client';
 import { AuthenticatedUser } from '../auth/types/authenticated-user.type';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateFinancialTransactionDto } from './dto/create-financial-transaction.dto';
+import { FindFinancialTransactionsQueryDto } from './dto/find-financial-transactions-query.dto';
 import { UpdateFinancialTransactionDto } from './dto/update-financial-transaction.dto';
 
 @Injectable()
@@ -44,21 +45,65 @@ export class FinancialTransactionsService {
     });
   }
 
-  findAll(user: AuthenticatedUser) {
+  async findAll(
+    user: AuthenticatedUser,
+    query: FindFinancialTransactionsQueryDto,
+  ) {
     return this.prisma.financialTransaction.findMany({
-      where: this.isAdmin(user)
-        ? undefined
-        : {
-            OR: [
-              { createdById: user.id },
-              { patient: { psychologistId: user.id } },
-              { appointment: { psychologistId: user.id } },
-            ],
-          },
+      where: this.buildFindManyWhere(user, query),
       orderBy: {
         occurredAt: 'desc',
       },
     });
+  }
+
+  async getSummary(
+    user: AuthenticatedUser,
+    query: FindFinancialTransactionsQueryDto,
+  ) {
+    const transactions = await this.prisma.financialTransaction.findMany({
+      where: this.buildFindManyWhere(user, query),
+      select: {
+        type: true,
+        amount: true,
+      },
+    });
+
+    const summary = {
+      incomeTotal: 0,
+      expenseTotal: 0,
+      adjustmentTotal: 0,
+      refundTotal: 0,
+      netTotal: 0,
+      transactionCount: transactions.length,
+    };
+
+    for (const transaction of transactions) {
+      const amount = transaction.amount.toNumber();
+
+      switch (transaction.type) {
+        case FinancialTransactionType.INCOME:
+          summary.incomeTotal += amount;
+          break;
+        case FinancialTransactionType.EXPENSE:
+          summary.expenseTotal += amount;
+          break;
+        case FinancialTransactionType.ADJUSTMENT:
+          summary.adjustmentTotal += amount;
+          break;
+        case FinancialTransactionType.REFUND:
+          summary.refundTotal += amount;
+          break;
+      }
+    }
+
+    summary.netTotal =
+      summary.incomeTotal +
+      summary.adjustmentTotal -
+      summary.expenseTotal -
+      summary.refundTotal;
+
+    return summary;
   }
 
   async findOne(user: AuthenticatedUser, id: string) {
@@ -127,6 +172,63 @@ export class FinancialTransactionsService {
 
   private isAdmin(user: AuthenticatedUser) {
     return user.role === UserRole.ADMIN;
+  }
+
+  private buildFindManyWhere(
+    user: AuthenticatedUser,
+    query: FindFinancialTransactionsQueryDto,
+  ): Prisma.FinancialTransactionWhereInput {
+    const {
+      from,
+      to,
+      type,
+      status,
+      category,
+      paymentMethod,
+      patientId,
+      appointmentId,
+      createdById,
+    } = query;
+
+    const occurredAt: Prisma.DateTimeFilter = {};
+
+    if (from) {
+      occurredAt.gte = new Date(from);
+    }
+
+    if (to) {
+      occurredAt.lte = new Date(to);
+    }
+
+    return {
+      ...(type ? { type } : {}),
+      ...(status ? { status } : {}),
+      ...(category ? { category } : {}),
+      ...(paymentMethod ? { paymentMethod } : {}),
+      ...(patientId ? { patientId } : {}),
+      ...(appointmentId ? { appointmentId } : {}),
+      ...(from || to ? { occurredAt } : {}),
+      ...(this.isAdmin(user)
+        ? createdById
+          ? { createdById }
+          : {}
+        : {
+            AND: [
+              {
+                OR: [
+                  { createdById: user.id },
+                  { patient: { psychologistId: user.id } },
+                  { appointment: { psychologistId: user.id } },
+                ],
+              },
+              ...(patientId ? [{ patient: { psychologistId: user.id } }] : []),
+              ...(appointmentId
+                ? [{ appointment: { psychologistId: user.id } }]
+                : []),
+              ...(createdById ? [{ createdById: user.id }] : []),
+            ],
+          }),
+    };
   }
 
   private async getAccessibleTransactionOrThrow(

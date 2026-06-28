@@ -82,7 +82,7 @@ Current development efforts include:
 * UI refinement
 * Clinical workflow validation
 * Documentation improvements
-* Financial transactions CRUD base validation
+* Financial transactions CRUD validation and basic reporting follow-up
 
 ---
 
@@ -120,7 +120,9 @@ Current development efforts include:
 * Filtering
 * Pagination
 * User Management improvements
-* Financial transaction filters and summaries
+* Advanced financial dashboards
+* Bank reconciliation
+* Fiscal invoicing support
 
 ---
 
@@ -166,6 +168,12 @@ Current technical debt includes:
 * API examples
 * Frontend integration documentation
 * Financial reporting and dashboard layers
+
+Recent backend progress:
+
+* Financial transactions CRUD base completed
+* Financial transaction filters completed
+* Basic financial summary endpoint completed
 
 Technical debt should be addressed incrementally.
 
