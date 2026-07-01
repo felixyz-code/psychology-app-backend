@@ -311,6 +311,134 @@ Bearer Token required.
 
 ---
 
+## `GET /case-files/:id/workspace`
+
+Gets an aggregated clinical workspace for a case file.
+
+This endpoint reduces frontend composition across case files, patients, appointments, session notes and documents.
+
+### Authentication
+
+Bearer Token required.
+
+### Params
+
+* `id: uuid`
+
+### Ownership
+
+* `ADMIN` can access any case file workspace.
+* `PSYCHOLOGIST` can only access workspaces for case files from owned patients.
+* If the case file exists but is not accessible to the authenticated `PSYCHOLOGIST`, the API returns `404 Not Found`.
+
+### Response
+
+```json
+{
+  "caseFile": {
+    "id": "uuid",
+    "patientId": "uuid",
+    "diagnosis": "string | null",
+    "treatmentPlan": "string | null",
+    "createdAt": "date-time",
+    "updatedAt": "date-time"
+  },
+  "patient": {
+    "id": "uuid",
+    "firstName": "string",
+    "lastName": "string",
+    "email": "string | null",
+    "phoneNumber": "string | null",
+    "birthDate": "date | null",
+    "createdAt": "date-time",
+    "updatedAt": "date-time"
+  },
+  "summary": {
+    "appointmentsCount": 0,
+    "sessionNotesCount": 0,
+    "documentsCount": 0,
+    "lastActivityAt": "date-time | null",
+    "nextAppointmentAt": "date-time | null",
+    "lastAppointmentAt": "date-time | null"
+  },
+  "appointments": [
+    {
+      "id": "uuid",
+      "patientId": "uuid",
+      "psychologistId": "uuid",
+      "scheduledAt": "date-time",
+      "durationMinutes": 50,
+      "status": "SCHEDULED | COMPLETED | CANCELLED | NO_SHOW",
+      "notes": "string | null",
+      "createdAt": "date-time",
+      "updatedAt": "date-time"
+    }
+  ],
+  "sessionNotes": [
+    {
+      "id": "uuid",
+      "caseFileId": "uuid",
+      "authorId": "uuid",
+      "sessionDate": "date-time",
+      "title": "string | null",
+      "content": "string",
+      "createdAt": "date-time",
+      "updatedAt": "date-time"
+    }
+  ],
+  "documents": [
+    {
+      "id": "uuid",
+      "caseFileId": "uuid",
+      "uploadedById": "uuid",
+      "fileName": "string",
+      "filePath": "string",
+      "mimeType": "string | null",
+      "uploadedAt": "date-time",
+      "updatedAt": "date-time"
+    }
+  ],
+  "timeline": [
+    {
+      "id": "string",
+      "type": "CASE_FILE_CREATED | APPOINTMENT_COMPLETED | SESSION_NOTE_CREATED | DOCUMENT_UPLOADED",
+      "title": "string",
+      "description": "string | null",
+      "occurredAt": "date-time",
+      "sourceId": "uuid",
+      "sourceType": "CASE_FILE | APPOINTMENT | SESSION_NOTE | DOCUMENT"
+    }
+  ]
+}
+```
+
+### Summary Rules
+
+* `appointmentsCount` counts all appointments linked to the patient that owns the case file.
+* `sessionNotesCount` counts session notes linked to the case file.
+* `documentsCount` counts documents linked to the case file.
+* `lastActivityAt` is the most recent `occurredAt` from the generated timeline.
+* `nextAppointmentAt` is the next future appointment with status `SCHEDULED`.
+* `lastAppointmentAt` is the latest past appointment with status `COMPLETED`.
+
+### Timeline Rules
+
+Timeline events use only real persisted records:
+
+* `CASE_FILE_CREATED`: `occurredAt = caseFile.createdAt`.
+* `SESSION_NOTE_CREATED`: `occurredAt = sessionNote.sessionDate`, because it represents the clinical session date. `createdAt` remains the record audit timestamp.
+* `DOCUMENT_UPLOADED`: `occurredAt = document.uploadedAt`.
+* `APPOINTMENT_COMPLETED`: only appointments with status `COMPLETED`; `occurredAt = appointment.scheduledAt`.
+
+The timeline is ordered by `occurredAt desc`.
+
+### Current Limitations
+
+* Appointments are linked to patients, not directly to case files, so workspace appointments are resolved through the case file patient.
+* No synthetic events are generated for updates, cancellations, diagnosis changes, treatment plan changes or deleted resources.
+
+---
+
 ## `PATCH /case-files/:id`
 
 Updates a case file.
@@ -513,7 +641,6 @@ multipart/form-data
 
 * `file`
 * `caseFileId: uuid`
-* `uploadedById: uuid`
 
 ### Behavior
 
@@ -522,12 +649,14 @@ multipart/form-data
 * Preserves `fileName` with the original filename.
 * Stores `filePath` as a relative path.
 * Uses the structure `patients/{patientId}/{uuid}.{ext}`.
+* Sets `uploadedById` from the authenticated JWT user.
+* Legacy clients may still send `uploadedById`, but the backend ignores it.
 
 ### Ownership
 
-* `ADMIN` can use `uploadedById` from the body.
+* `ADMIN` can upload to any accessible case file.
 * `PSYCHOLOGIST` must own the case file.
-* For `PSYCHOLOGIST`, `uploadedById` is replaced with `user.id`.
+* For every role, `uploadedById` is replaced with `user.id`.
 
 ---
 

@@ -47,6 +47,18 @@ Clinical information grows from the patient outward.
 
 The financial domain begins as a supporting operational layer and does not replace the clinical hierarchy.
 
+The Clinical Workspace is an API projection over existing entities, not a persisted database entity.
+
+It is anchored by `CaseFile` and aggregates:
+
+* The case file
+* Its patient
+* Appointments linked to that patient
+* Session notes linked to that case file
+* Documents linked to that case file
+
+The workspace timeline is derived at request time from existing timestamps and does not introduce new tables or schema fields.
+
 ---
 
 # Enumerations

@@ -52,13 +52,7 @@ export class DocumentsService {
       user,
     );
 
-    const uploadedById = this.isAdmin(user)
-      ? uploadDocumentDto.uploadedById
-      : user.id;
-
-    if (this.isAdmin(user)) {
-      await this.ensureUserExists(uploadedById);
-    }
+    const uploadedById = user.id;
 
     const extension = extname(file.originalname).toLowerCase();
     const safeFileName = `${randomUUID()}${extension}`;

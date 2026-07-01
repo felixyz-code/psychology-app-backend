@@ -37,6 +37,7 @@ Current capabilities include:
 - Ownership filtering
 - Clinical data management
 - Financial transactions CRUD base
+- Clinical workspace aggregation
 - Local filesystem document storage
 
 The application follows a modular architecture where business logic resides in services and persistence is handled through Prisma.
@@ -256,6 +257,39 @@ Current ownership rules:
 
 - ADMIN can access every appointment.
 - PSYCHOLOGIST only accesses owned appointments.
+
+---
+
+# Clinical Workspace Aggregation
+
+The `GET /case-files/:id/workspace` endpoint aggregates the current clinical workspace for a single case file.
+
+It is implemented in the Case Files module because the workspace is anchored by the clinical record.
+
+The endpoint reads:
+
+- Case file fields
+- Owning patient fields
+- Appointments for the owning patient
+- Session notes for the case file
+- Documents for the case file
+
+Ownership is resolved before returning the aggregate:
+
+- ADMIN can access any workspace.
+- PSYCHOLOGIST can only access workspaces for owned patients.
+- Inaccessible workspaces return `404 Not Found`, matching the protected module convention.
+
+The timeline is a derived API projection, not a database table.
+
+Initial timeline events:
+
+- `CASE_FILE_CREATED` from `caseFile.createdAt`
+- `SESSION_NOTE_CREATED` from `sessionNote.sessionDate`
+- `DOCUMENT_UPLOADED` from `document.uploadedAt`
+- `APPOINTMENT_COMPLETED` from completed appointment `scheduledAt`
+
+No synthetic events are created for updates or status changes without a clear persisted source timestamp.
 
 ---
 
