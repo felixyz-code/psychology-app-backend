@@ -1,6 +1,6 @@
-import 'dotenv/config';
-import * as bcrypt from 'bcrypt';
-import { PrismaPg } from '@prisma/adapter-pg';
+import "dotenv/config";
+import * as bcrypt from "bcrypt";
+import { PrismaPg } from "@prisma/adapter-pg";
 import {
   AppointmentStatus,
   FinancialTransactionCategory,
@@ -10,22 +10,22 @@ import {
   Prisma,
   PrismaClient,
   UserRole,
-} from '@prisma/client';
+} from "@prisma/client";
 
 const connectionString = process.env.DATABASE_URL;
 
 if (!connectionString) {
-  throw new Error('DATABASE_URL is not defined.');
+  throw new Error("DATABASE_URL is not defined.");
 }
 
 const adapter = new PrismaPg(connectionString);
 const prisma = new PrismaClient({ adapter });
 
-const DEFAULT_PASSWORD = 'ChangeMe123!';
-const DEMO_TAG = '[demo-seed]';
+const DEFAULT_PASSWORD = "ChangeMe123!";
+const DEMO_TAG = "[demo-seed]";
 
-const ADMIN_USER_ID = '1b5d4d7c-b7e6-4d8b-9b3d-a3b12f1e1001';
-const PSYCHOLOGIST_USER_ID = '1b5d4d7c-b7e6-4d8b-9b3d-a3b12f1e1002';
+const ADMIN_USER_ID = "1b5d4d7c-b7e6-4d8b-9b3d-a3b12f1e1001";
+const PSYCHOLOGIST_USER_ID = "1b5d4d7c-b7e6-4d8b-9b3d-a3b12f1e1002";
 
 const now = new Date();
 
@@ -98,23 +98,23 @@ function birthDate(year: number, month: number, day: number) {
 }
 
 function demoUuid(namespace: number, value: number) {
-  return `${namespace.toString().padStart(8, '0')}-0000-4000-8000-${value
+  return `${namespace.toString().padStart(8, "0")}-0000-4000-8000-${value
     .toString()
-    .padStart(12, '0')}`;
+    .padStart(12, "0")}`;
 }
 
 const patientBlueprints: PatientBlueprint[] = [
   {
     code: 1,
-    firstName: 'Sofia',
-    lastName: 'Ramirez',
-    phoneNumber: '+526621110001',
-    email: 'sofia.ramirez@psychology-app.local',
+    firstName: "Sofia",
+    lastName: "Ramirez",
+    phoneNumber: "+526621110001",
+    email: "sofia.ramirez@psychology-app.local",
     birthDate: birthDate(1998, 4, 12),
     diagnosis:
-      'Consulta por estres academico, dificultad para sostener descanso y tendencia a sobrecarga en semanas de evaluaciones.',
+      "Consulta por estres academico, dificultad para sostener descanso y tendencia a sobrecarga en semanas de evaluaciones.",
     treatmentPlan:
-      'Psicoeducacion sobre estres, rutina de descanso, registro semanal y tecnicas breves de regulacion.',
+      "Psicoeducacion sobre estres, rutina de descanso, registro semanal y tecnicas breves de regulacion.",
     appointments: [
       {
         daysFromNow: -42,
@@ -122,7 +122,7 @@ const patientBlueprints: PatientBlueprint[] = [
         minute: 0,
         durationMinutes: 60,
         status: AppointmentStatus.COMPLETED,
-        notes: 'Entrevista inicial y encuadre.',
+        notes: "Entrevista inicial y encuadre.",
         fee: 700,
         paymentMethod: PaymentMethod.TRANSFER,
       },
@@ -132,7 +132,7 @@ const patientBlueprints: PatientBlueprint[] = [
         minute: 0,
         durationMinutes: 50,
         status: AppointmentStatus.COMPLETED,
-        notes: 'Seguimiento de rutina de descanso.',
+        notes: "Seguimiento de rutina de descanso.",
         fee: 700,
         paymentMethod: PaymentMethod.CARD,
       },
@@ -142,7 +142,7 @@ const patientBlueprints: PatientBlueprint[] = [
         minute: 0,
         durationMinutes: 50,
         status: AppointmentStatus.SCHEDULED,
-        notes: 'Revision de habitos y carga academica.',
+        notes: "Revision de habitos y carga academica.",
         fee: 700,
         createPendingCharge: true,
       },
@@ -152,38 +152,38 @@ const patientBlueprints: PatientBlueprint[] = [
         daysAgo: 42,
         hour: 10,
         minute: 0,
-        title: 'Evaluacion inicial',
+        title: "Evaluacion inicial",
         content:
-          'Se explora motivo de consulta, presiones academicas y habitos de descanso. Se acuerda registro breve de sueno.',
+          "Se explora motivo de consulta, presiones academicas y habitos de descanso. Se acuerda registro breve de sueno.",
       },
       {
         daysAgo: 14,
         hour: 10,
         minute: 0,
-        title: 'Seguimiento de habitos',
+        title: "Seguimiento de habitos",
         content:
-          'Refiere mayor orden semanal. Se refuerzan pausas breves y respiracion diafragmatica antes de estudiar.',
+          "Refiere mayor orden semanal. Se refuerzan pausas breves y respiracion diafragmatica antes de estudiar.",
       },
     ],
     documents: [
       {
         daysAgo: 40,
-        fileName: 'consentimiento-informado-sofia.pdf',
-        mimeType: 'application/pdf',
+        fileName: "consentimiento-informado-sofia.pdf",
+        mimeType: "application/pdf",
       },
     ],
   },
   {
     code: 2,
-    firstName: 'Carlos',
-    lastName: 'Navarro',
-    phoneNumber: '+526621110002',
-    email: 'carlos.navarro@psychology-app.local',
+    firstName: "Carlos",
+    lastName: "Navarro",
+    phoneNumber: "+526621110002",
+    email: "carlos.navarro@psychology-app.local",
     birthDate: birthDate(1989, 9, 23),
     diagnosis:
-      'Dificultades de comunicacion laboral y tension sostenida ante conversaciones dificiles.',
+      "Dificultades de comunicacion laboral y tension sostenida ante conversaciones dificiles.",
     treatmentPlan:
-      'Entrenamiento en comunicacion asertiva, identificacion de pensamientos automaticos y planeacion conductual.',
+      "Entrenamiento en comunicacion asertiva, identificacion de pensamientos automaticos y planeacion conductual.",
     appointments: [
       {
         daysFromNow: -49,
@@ -191,7 +191,7 @@ const patientBlueprints: PatientBlueprint[] = [
         minute: 30,
         durationMinutes: 60,
         status: AppointmentStatus.COMPLETED,
-        notes: 'Historia del problema y objetivos iniciales.',
+        notes: "Historia del problema y objetivos iniciales.",
         fee: 800,
         paymentMethod: PaymentMethod.TRANSFER,
       },
@@ -201,7 +201,7 @@ const patientBlueprints: PatientBlueprint[] = [
         minute: 30,
         durationMinutes: 45,
         status: AppointmentStatus.NO_SHOW,
-        notes: 'No se presento a la cita programada.',
+        notes: "No se presento a la cita programada.",
       },
       {
         daysFromNow: 12,
@@ -209,7 +209,7 @@ const patientBlueprints: PatientBlueprint[] = [
         minute: 0,
         durationMinutes: 60,
         status: AppointmentStatus.SCHEDULED,
-        notes: 'Seguimiento de comunicacion asertiva.',
+        notes: "Seguimiento de comunicacion asertiva.",
         fee: 800,
         createPendingCharge: true,
       },
@@ -219,46 +219,46 @@ const patientBlueprints: PatientBlueprint[] = [
         daysAgo: 49,
         hour: 9,
         minute: 30,
-        title: 'Historia del problema',
+        title: "Historia del problema",
         content:
-          'Se revisan situaciones laborales recientes y respuestas de tension. Se propone observar detonantes.',
+          "Se revisan situaciones laborales recientes y respuestas de tension. Se propone observar detonantes.",
       },
       {
         daysAgo: 28,
         hour: 9,
         minute: 30,
-        title: 'Comunicacion asertiva',
+        title: "Comunicacion asertiva",
         content:
-          'Se practica estructura de mensajes en primera persona y preparacion previa de conversaciones.',
+          "Se practica estructura de mensajes en primera persona y preparacion previa de conversaciones.",
       },
       {
         daysAgo: 7,
         hour: 9,
         minute: 30,
-        title: 'Revision de acuerdos',
+        title: "Revision de acuerdos",
         content:
-          'Se refuerzan avances y se ajusta tarea de registrar conversaciones breves.',
+          "Se refuerzan avances y se ajusta tarea de registrar conversaciones breves.",
       },
     ],
     documents: [
       {
         daysAgo: 46,
-        fileName: 'plan-objetivos-carlos.pdf',
-        mimeType: 'application/pdf',
+        fileName: "plan-objetivos-carlos.pdf",
+        mimeType: "application/pdf",
       },
     ],
   },
   {
     code: 3,
-    firstName: 'Mariana',
-    lastName: 'Lopez',
-    phoneNumber: '+526621110003',
-    email: 'mariana.lopez@psychology-app.local',
+    firstName: "Mariana",
+    lastName: "Lopez",
+    phoneNumber: "+526621110003",
+    email: "mariana.lopez@psychology-app.local",
     birthDate: birthDate(1995, 1, 30),
     diagnosis:
-      'Ajuste a cambios de rutina y fortalecimiento de limites personales.',
+      "Ajuste a cambios de rutina y fortalecimiento de limites personales.",
     treatmentPlan:
-      'Trabajo en limites saludables, actividades gratificantes y seguimiento quincenal de avances.',
+      "Trabajo en limites saludables, actividades gratificantes y seguimiento quincenal de avances.",
     appointments: [
       {
         daysFromNow: -24,
@@ -266,7 +266,7 @@ const patientBlueprints: PatientBlueprint[] = [
         minute: 0,
         durationMinutes: 50,
         status: AppointmentStatus.COMPLETED,
-        notes: 'Definicion de objetivos terapeuticos.',
+        notes: "Definicion de objetivos terapeuticos.",
         fee: 750,
         paymentMethod: PaymentMethod.CASH,
       },
@@ -276,7 +276,7 @@ const patientBlueprints: PatientBlueprint[] = [
         minute: 30,
         durationMinutes: 50,
         status: AppointmentStatus.SCHEDULED,
-        notes: 'Sesion programada para hoy por la tarde.',
+        notes: "Sesion programada para hoy por la tarde.",
         fee: 750,
         createPendingCharge: true,
       },
@@ -286,23 +286,23 @@ const patientBlueprints: PatientBlueprint[] = [
         daysAgo: 24,
         hour: 16,
         minute: 0,
-        title: 'Objetivos terapeuticos',
+        title: "Objetivos terapeuticos",
         content:
-          'Se delimitan objetivos iniciales y se acuerda observacion de necesidades y limites.',
+          "Se delimitan objetivos iniciales y se acuerda observacion de necesidades y limites.",
       },
     ],
   },
   {
     code: 4,
-    firstName: 'Diego',
-    lastName: 'Torres',
-    phoneNumber: '+526621110004',
-    email: 'diego.torres@psychology-app.local',
+    firstName: "Diego",
+    lastName: "Torres",
+    phoneNumber: "+526621110004",
+    email: "diego.torres@psychology-app.local",
     birthDate: birthDate(1992, 6, 5),
     diagnosis:
-      'Adaptacion a nuevo empleo con preocupacion recurrente por desempeno.',
+      "Adaptacion a nuevo empleo con preocupacion recurrente por desempeno.",
     treatmentPlan:
-      'Psicoeducacion, solucion de problemas y registro de logros diarios.',
+      "Psicoeducacion, solucion de problemas y registro de logros diarios.",
     appointments: [
       {
         daysFromNow: -36,
@@ -310,7 +310,7 @@ const patientBlueprints: PatientBlueprint[] = [
         minute: 0,
         durationMinutes: 60,
         status: AppointmentStatus.COMPLETED,
-        notes: 'Evaluacion de adaptacion laboral.',
+        notes: "Evaluacion de adaptacion laboral.",
         fee: 800,
         paymentMethod: PaymentMethod.TRANSFER,
       },
@@ -320,7 +320,7 @@ const patientBlueprints: PatientBlueprint[] = [
         minute: 0,
         durationMinutes: 60,
         status: AppointmentStatus.COMPLETED,
-        notes: 'Revision de pensamientos automaticos.',
+        notes: "Revision de pensamientos automaticos.",
         fee: 800,
         paymentMethod: PaymentMethod.CARD,
       },
@@ -330,7 +330,7 @@ const patientBlueprints: PatientBlueprint[] = [
         minute: 30,
         durationMinutes: 60,
         status: AppointmentStatus.SCHEDULED,
-        notes: 'Seguimiento de metas laborales.',
+        notes: "Seguimiento de metas laborales.",
         fee: 800,
         createPendingCharge: true,
       },
@@ -340,37 +340,37 @@ const patientBlueprints: PatientBlueprint[] = [
         daysAgo: 36,
         hour: 13,
         minute: 0,
-        title: 'Adaptacion laboral',
+        title: "Adaptacion laboral",
         content:
-          'Se identifican fuentes de presion y recursos ya disponibles. Se registra evidencia de desempeno suficiente.',
+          "Se identifican fuentes de presion y recursos ya disponibles. Se registra evidencia de desempeno suficiente.",
       },
       {
         daysAgo: 3,
         hour: 13,
         minute: 0,
-        title: 'Flexibilidad cognitiva',
+        title: "Flexibilidad cognitiva",
         content:
-          'Se revisan pensamientos de exigencia elevada y se construyen alternativas mas realistas.',
+          "Se revisan pensamientos de exigencia elevada y se construyen alternativas mas realistas.",
       },
     ],
     documents: [
       {
         daysAgo: 2,
-        fileName: 'registro-logros-diego.png',
-        mimeType: 'image/png',
+        fileName: "registro-logros-diego.png",
+        mimeType: "image/png",
       },
     ],
   },
   {
     code: 5,
-    firstName: 'Valeria',
-    lastName: 'Mendoza',
-    phoneNumber: '+526621110005',
-    email: 'valeria.mendoza@psychology-app.local',
+    firstName: "Valeria",
+    lastName: "Mendoza",
+    phoneNumber: "+526621110005",
+    email: "valeria.mendoza@psychology-app.local",
     birthDate: birthDate(2001, 11, 18),
-    diagnosis: 'Organizacion personal y preocupacion por rendimiento escolar.',
+    diagnosis: "Organizacion personal y preocupacion por rendimiento escolar.",
     treatmentPlan:
-      'Agenda semanal, division de tareas largas y autoinstrucciones funcionales.',
+      "Agenda semanal, division de tareas largas y autoinstrucciones funcionales.",
     appointments: [
       {
         daysFromNow: -56,
@@ -378,7 +378,7 @@ const patientBlueprints: PatientBlueprint[] = [
         minute: 0,
         durationMinutes: 50,
         status: AppointmentStatus.COMPLETED,
-        notes: 'Revision de rutina academica.',
+        notes: "Revision de rutina academica.",
         fee: 650,
         paymentMethod: PaymentMethod.CASH,
       },
@@ -388,7 +388,7 @@ const patientBlueprints: PatientBlueprint[] = [
         minute: 0,
         durationMinutes: 50,
         status: AppointmentStatus.CANCELLED,
-        notes: 'Cancelada por cambio de horario del paciente.',
+        notes: "Cancelada por cambio de horario del paciente.",
       },
       {
         daysFromNow: 28,
@@ -396,7 +396,7 @@ const patientBlueprints: PatientBlueprint[] = [
         minute: 30,
         durationMinutes: 50,
         status: AppointmentStatus.SCHEDULED,
-        notes: 'Seguimiento mensual de organizacion.',
+        notes: "Seguimiento mensual de organizacion.",
         fee: 650,
         createPendingCharge: true,
       },
@@ -406,39 +406,39 @@ const patientBlueprints: PatientBlueprint[] = [
         daysAgo: 56,
         hour: 17,
         minute: 0,
-        title: 'Planeacion academica',
+        title: "Planeacion academica",
         content:
-          'Se revisa calendario escolar y se priorizan tareas con bloques cortos de trabajo.',
+          "Se revisa calendario escolar y se priorizan tareas con bloques cortos de trabajo.",
       },
       {
         daysAgo: 42,
         hour: 17,
         minute: 0,
-        title: 'Autoinstrucciones',
+        title: "Autoinstrucciones",
         content:
-          'Se practican frases funcionales para iniciar tareas y reducir postergacion.',
+          "Se practican frases funcionales para iniciar tareas y reducir postergacion.",
       },
       {
         daysAgo: 15,
         hour: 17,
         minute: 0,
-        title: 'Ajuste de plan',
+        title: "Ajuste de plan",
         content:
-          'Se ajusta agenda semanal incorporando descansos y metas realistas.',
+          "Se ajusta agenda semanal incorporando descansos y metas realistas.",
       },
     ],
   },
   {
     code: 6,
-    firstName: 'Luis',
-    lastName: 'Herrera',
-    phoneNumber: '+526621110006',
-    email: 'luis.herrera@psychology-app.local',
+    firstName: "Luis",
+    lastName: "Herrera",
+    phoneNumber: "+526621110006",
+    email: "luis.herrera@psychology-app.local",
     birthDate: birthDate(1984, 2, 2),
     diagnosis:
-      'Desequilibrio entre trabajo y vida personal, con baja recuperacion semanal.',
+      "Desequilibrio entre trabajo y vida personal, con baja recuperacion semanal.",
     treatmentPlan:
-      'Definir limites de disponibilidad, agenda de recuperacion y comunicacion familiar.',
+      "Definir limites de disponibilidad, agenda de recuperacion y comunicacion familiar.",
     appointments: [
       {
         daysFromNow: -30,
@@ -446,7 +446,7 @@ const patientBlueprints: PatientBlueprint[] = [
         minute: 30,
         durationMinutes: 45,
         status: AppointmentStatus.COMPLETED,
-        notes: 'Exploracion de balance trabajo-vida.',
+        notes: "Exploracion de balance trabajo-vida.",
         fee: 850,
         paymentMethod: PaymentMethod.TRANSFER,
       },
@@ -456,7 +456,7 @@ const patientBlueprints: PatientBlueprint[] = [
         minute: 30,
         durationMinutes: 45,
         status: AppointmentStatus.SCHEDULED,
-        notes: 'Seguimiento de limites de disponibilidad.',
+        notes: "Seguimiento de limites de disponibilidad.",
         fee: 850,
       },
     ],
@@ -465,31 +465,31 @@ const patientBlueprints: PatientBlueprint[] = [
         daysAgo: 30,
         hour: 8,
         minute: 30,
-        title: 'Balance personal',
+        title: "Balance personal",
         content:
-          'Se revisan horarios y responsabilidades. Se identifican dos espacios semanales de recuperacion personal.',
+          "Se revisan horarios y responsabilidades. Se identifican dos espacios semanales de recuperacion personal.",
       },
       {
         daysAgo: 3,
         hour: 8,
         minute: 30,
-        title: 'Limites de disponibilidad',
+        title: "Limites de disponibilidad",
         content:
-          'Reporta mejora al cerrar jornada en horario definido. Se practica comunicacion clara de limites.',
+          "Reporta mejora al cerrar jornada en horario definido. Se practica comunicacion clara de limites.",
       },
     ],
   },
   {
     code: 7,
-    firstName: 'Ana Paula',
-    lastName: 'Castro',
-    phoneNumber: '+526621110007',
-    email: 'ana.castro@psychology-app.local',
+    firstName: "Ana Paula",
+    lastName: "Castro",
+    phoneNumber: "+526621110007",
+    email: "ana.castro@psychology-app.local",
     birthDate: birthDate(1990, 7, 14),
     diagnosis:
-      'Ajuste a cambios familiares recientes y fortalecimiento de red de apoyo.',
+      "Ajuste a cambios familiares recientes y fortalecimiento de red de apoyo.",
     treatmentPlan:
-      'Explorar recursos de apoyo, autocuidado y acuerdos concretos de seguimiento.',
+      "Explorar recursos de apoyo, autocuidado y acuerdos concretos de seguimiento.",
     appointments: [
       {
         daysFromNow: -15,
@@ -497,7 +497,7 @@ const patientBlueprints: PatientBlueprint[] = [
         minute: 0,
         durationMinutes: 60,
         status: AppointmentStatus.COMPLETED,
-        notes: 'Exploracion de red de apoyo.',
+        notes: "Exploracion de red de apoyo.",
         fee: 780,
         paymentMethod: PaymentMethod.CARD,
       },
@@ -507,7 +507,7 @@ const patientBlueprints: PatientBlueprint[] = [
         minute: 0,
         durationMinutes: 60,
         status: AppointmentStatus.SCHEDULED,
-        notes: 'Seguimiento de autocuidado y apoyo familiar.',
+        notes: "Seguimiento de autocuidado y apoyo familiar.",
         fee: 780,
       },
     ],
@@ -516,22 +516,22 @@ const patientBlueprints: PatientBlueprint[] = [
         daysAgo: 15,
         hour: 18,
         minute: 0,
-        title: 'Red de apoyo',
+        title: "Red de apoyo",
         content:
-          'Se identifica red cercana y formas practicas de pedir apoyo. Se acuerda una actividad de autocuidado.',
+          "Se identifica red cercana y formas practicas de pedir apoyo. Se acuerda una actividad de autocuidado.",
       },
     ],
   },
   {
     code: 8,
-    firstName: 'Ricardo',
-    lastName: 'Salazar',
-    phoneNumber: '+526621110008',
-    email: 'ricardo.salazar@psychology-app.local',
+    firstName: "Ricardo",
+    lastName: "Salazar",
+    phoneNumber: "+526621110008",
+    email: "ricardo.salazar@psychology-app.local",
     birthDate: birthDate(1978, 12, 9),
-    diagnosis: 'Manejo de preocupaciones cotidianas y mejora de descanso.',
+    diagnosis: "Manejo de preocupaciones cotidianas y mejora de descanso.",
     treatmentPlan:
-      'Higiene del sueno, registro de preocupaciones y tecnicas de relajacion.',
+      "Higiene del sueno, registro de preocupaciones y tecnicas de relajacion.",
     appointments: [
       {
         daysFromNow: -60,
@@ -539,7 +539,7 @@ const patientBlueprints: PatientBlueprint[] = [
         minute: 30,
         durationMinutes: 90,
         status: AppointmentStatus.COMPLETED,
-        notes: 'Evaluacion extensa de rutina y descanso.',
+        notes: "Evaluacion extensa de rutina y descanso.",
         fee: 950,
         paymentMethod: PaymentMethod.TRANSFER,
       },
@@ -549,7 +549,7 @@ const patientBlueprints: PatientBlueprint[] = [
         minute: 30,
         durationMinutes: 60,
         status: AppointmentStatus.COMPLETED,
-        notes: 'Revision de registro de preocupaciones.',
+        notes: "Revision de registro de preocupaciones.",
         fee: 850,
         paymentMethod: PaymentMethod.TRANSFER,
       },
@@ -559,7 +559,7 @@ const patientBlueprints: PatientBlueprint[] = [
         minute: 30,
         durationMinutes: 60,
         status: AppointmentStatus.SCHEDULED,
-        notes: 'Seguimiento a 30 dias.',
+        notes: "Seguimiento a 30 dias.",
         fee: 850,
         createPendingCharge: true,
       },
@@ -569,46 +569,46 @@ const patientBlueprints: PatientBlueprint[] = [
         daysAgo: 60,
         hour: 12,
         minute: 30,
-        title: 'Rutina de descanso',
+        title: "Rutina de descanso",
         content:
-          'Se revisan horarios de sueno y habitos nocturnos. Se acuerda reducir pantallas antes de dormir.',
+          "Se revisan horarios de sueno y habitos nocturnos. Se acuerda reducir pantallas antes de dormir.",
       },
       {
         daysAgo: 45,
         hour: 12,
         minute: 30,
-        title: 'Registro de preocupaciones',
+        title: "Registro de preocupaciones",
         content:
-          'Se implementa tecnica de posponer preocupaciones y registrar temas recurrentes.',
+          "Se implementa tecnica de posponer preocupaciones y registrar temas recurrentes.",
       },
       {
         daysAgo: 7,
         hour: 12,
         minute: 30,
-        title: 'Seguimiento',
+        title: "Seguimiento",
         content:
-          'Refiere descanso mas estable y continuidad del plan con ajustes menores.',
+          "Refiere descanso mas estable y continuidad del plan con ajustes menores.",
       },
     ],
     documents: [
       {
         daysAgo: 21,
-        fileName: 'higiene-sueno-ricardo.jpg',
-        mimeType: 'image/jpeg',
+        fileName: "higiene-sueno-ricardo.jpg",
+        mimeType: "image/jpeg",
       },
     ],
   },
   {
     code: 9,
-    firstName: 'Fernanda',
-    lastName: 'Rios',
-    phoneNumber: '+526621110009',
-    email: 'fernanda.rios@psychology-app.local',
+    firstName: "Fernanda",
+    lastName: "Rios",
+    phoneNumber: "+526621110009",
+    email: "fernanda.rios@psychology-app.local",
     birthDate: birthDate(1997, 5, 27),
     diagnosis:
-      'Toma de decisiones personales con necesidad de mayor claridad de metas.',
+      "Toma de decisiones personales con necesidad de mayor claridad de metas.",
     treatmentPlan:
-      'Ejercicios de valores, matriz de decisiones y seguimiento de acciones pequenas.',
+      "Ejercicios de valores, matriz de decisiones y seguimiento de acciones pequenas.",
     appointments: [
       {
         daysFromNow: -45,
@@ -616,7 +616,7 @@ const patientBlueprints: PatientBlueprint[] = [
         minute: 0,
         durationMinutes: 60,
         status: AppointmentStatus.COMPLETED,
-        notes: 'Exploracion de metas.',
+        notes: "Exploracion de metas.",
         fee: 760,
         paymentMethod: PaymentMethod.CARD,
       },
@@ -626,7 +626,7 @@ const patientBlueprints: PatientBlueprint[] = [
         minute: 0,
         durationMinutes: 50,
         status: AppointmentStatus.SCHEDULED,
-        notes: 'Seguimiento de acciones concretas.',
+        notes: "Seguimiento de acciones concretas.",
         fee: 760,
       },
     ],
@@ -635,30 +635,30 @@ const patientBlueprints: PatientBlueprint[] = [
         daysAgo: 45,
         hour: 15,
         minute: 0,
-        title: 'Claridad de metas',
+        title: "Claridad de metas",
         content:
-          'Se exploran metas personales de corto plazo y valores asociados. Se priorizan dos acciones concretas.',
+          "Se exploran metas personales de corto plazo y valores asociados. Se priorizan dos acciones concretas.",
       },
       {
         daysAgo: 15,
         hour: 15,
         minute: 0,
-        title: 'Matriz de decisiones',
+        title: "Matriz de decisiones",
         content:
-          'Se revisan opciones y costos percibidos. Reporta mayor claridad para decidir gradualmente.',
+          "Se revisan opciones y costos percibidos. Reporta mayor claridad para decidir gradualmente.",
       },
     ],
   },
   {
     code: 10,
-    firstName: 'Jorge',
-    lastName: 'Molina',
-    phoneNumber: '+526621110010',
-    email: 'jorge.molina@psychology-app.local',
+    firstName: "Jorge",
+    lastName: "Molina",
+    phoneNumber: "+526621110010",
+    email: "jorge.molina@psychology-app.local",
     birthDate: birthDate(1982, 3, 21),
-    diagnosis: 'Comunicacion en pareja y manejo de desacuerdos cotidianos.',
+    diagnosis: "Comunicacion en pareja y manejo de desacuerdos cotidianos.",
     treatmentPlan:
-      'Entrenar escucha activa, pausa ante discusiones y acuerdos semanales.',
+      "Entrenar escucha activa, pausa ante discusiones y acuerdos semanales.",
     appointments: [
       {
         daysFromNow: -30,
@@ -666,7 +666,7 @@ const patientBlueprints: PatientBlueprint[] = [
         minute: 0,
         durationMinutes: 60,
         status: AppointmentStatus.COMPLETED,
-        notes: 'Entrenamiento en escucha activa.',
+        notes: "Entrenamiento en escucha activa.",
         fee: 820,
         paymentMethod: PaymentMethod.TRANSFER,
       },
@@ -676,7 +676,7 @@ const patientBlueprints: PatientBlueprint[] = [
         minute: 0,
         durationMinutes: 60,
         status: AppointmentStatus.CANCELLED,
-        notes: 'Cancelada con anticipacion por agenda laboral.',
+        notes: "Cancelada con anticipacion por agenda laboral.",
       },
       {
         daysFromNow: 24,
@@ -684,7 +684,7 @@ const patientBlueprints: PatientBlueprint[] = [
         minute: 0,
         durationMinutes: 60,
         status: AppointmentStatus.SCHEDULED,
-        notes: 'Seguimiento de acuerdos semanales.',
+        notes: "Seguimiento de acuerdos semanales.",
         fee: 820,
       },
     ],
@@ -693,33 +693,33 @@ const patientBlueprints: PatientBlueprint[] = [
         daysAgo: 30,
         hour: 19,
         minute: 0,
-        title: 'Escucha activa',
+        title: "Escucha activa",
         content:
-          'Se identifica patron de interrupciones y se practica validacion breve.',
+          "Se identifica patron de interrupciones y se practica validacion breve.",
       },
       {
         daysAgo: 7,
         hour: 19,
         minute: 0,
-        title: 'Acuerdos semanales',
+        title: "Acuerdos semanales",
         content:
-          'Se definen acuerdos especificos y uso de pausas antes de responder.',
+          "Se definen acuerdos especificos y uso de pausas antes de responder.",
       },
     ],
     documents: [
       {
         daysAgo: 5,
-        fileName: 'acuerdos-semanales-jorge.pdf',
-        mimeType: 'application/pdf',
+        fileName: "acuerdos-semanales-jorge.pdf",
+        mimeType: "application/pdf",
       },
     ],
   },
   {
     code: 11,
-    firstName: 'Camila',
-    lastName: 'Ortega',
-    phoneNumber: '+526621110011',
-    email: 'camila.ortega@psychology-app.local',
+    firstName: "Camila",
+    lastName: "Ortega",
+    phoneNumber: "+526621110011",
+    email: "camila.ortega@psychology-app.local",
     birthDate: birthDate(2000, 8, 3),
     appointments: [
       {
@@ -728,7 +728,7 @@ const patientBlueprints: PatientBlueprint[] = [
         minute: 30,
         durationMinutes: 50,
         status: AppointmentStatus.COMPLETED,
-        notes: 'Definicion de metas sociales graduales.',
+        notes: "Definicion de metas sociales graduales.",
         fee: 690,
         paymentMethod: PaymentMethod.CASH,
       },
@@ -738,22 +738,22 @@ const patientBlueprints: PatientBlueprint[] = [
         minute: 30,
         durationMinutes: 50,
         status: AppointmentStatus.SCHEDULED,
-        notes: 'Seguimiento de exposicion gradual.',
+        notes: "Seguimiento de exposicion gradual.",
         fee: 690,
       },
     ],
   },
   {
     code: 12,
-    firstName: 'Andres',
-    lastName: 'Vega',
-    phoneNumber: '+526621110012',
-    email: 'andres.vega@psychology-app.local',
+    firstName: "Andres",
+    lastName: "Vega",
+    phoneNumber: "+526621110012",
+    email: "andres.vega@psychology-app.local",
     birthDate: birthDate(1987, 10, 16),
     diagnosis:
-      'Manejo de frustracion ante cambios de planes y ajuste de expectativas.',
+      "Manejo de frustracion ante cambios de planes y ajuste de expectativas.",
     treatmentPlan:
-      'Planeacion flexible, registro de avances y reestructuracion de expectativas.',
+      "Planeacion flexible, registro de avances y reestructuracion de expectativas.",
     appointments: [
       {
         daysFromNow: -60,
@@ -761,7 +761,7 @@ const patientBlueprints: PatientBlueprint[] = [
         minute: 0,
         durationMinutes: 90,
         status: AppointmentStatus.COMPLETED,
-        notes: 'Evaluacion inicial amplia.',
+        notes: "Evaluacion inicial amplia.",
         fee: 950,
         paymentMethod: PaymentMethod.TRANSFER,
       },
@@ -771,7 +771,7 @@ const patientBlueprints: PatientBlueprint[] = [
         minute: 0,
         durationMinutes: 60,
         status: AppointmentStatus.NO_SHOW,
-        notes: 'No asistio a seguimiento programado.',
+        notes: "No asistio a seguimiento programado.",
       },
       {
         daysFromNow: 4,
@@ -779,7 +779,7 @@ const patientBlueprints: PatientBlueprint[] = [
         minute: 0,
         durationMinutes: 60,
         status: AppointmentStatus.SCHEDULED,
-        notes: 'Reprogramacion de seguimiento.',
+        notes: "Reprogramacion de seguimiento.",
         fee: 850,
         createPendingCharge: true,
       },
@@ -789,38 +789,38 @@ const patientBlueprints: PatientBlueprint[] = [
         daysAgo: 60,
         hour: 14,
         minute: 0,
-        title: 'Expectativas y metas',
+        title: "Expectativas y metas",
         content:
-          'Se identifican expectativas rigidas y se acuerdan metas ajustables.',
+          "Se identifican expectativas rigidas y se acuerdan metas ajustables.",
       },
       {
         daysAgo: 45,
         hour: 14,
         minute: 0,
-        title: 'Planeacion flexible',
-        content: 'Se practica generar alternativas ante cambios de agenda.',
+        title: "Planeacion flexible",
+        content: "Se practica generar alternativas ante cambios de agenda.",
       },
       {
         daysAgo: 15,
         hour: 14,
         minute: 0,
-        title: 'Seguimiento de frustracion',
+        title: "Seguimiento de frustracion",
         content:
-          'Se analizan respuestas ante imprevistos recientes y pausas antes de decidir cambios.',
+          "Se analizan respuestas ante imprevistos recientes y pausas antes de decidir cambios.",
       },
     ],
   },
   {
     code: 13,
-    firstName: 'Natalia',
-    lastName: 'Paredes',
-    phoneNumber: '+526621110013',
-    email: 'natalia.paredes@psychology-app.local',
+    firstName: "Natalia",
+    lastName: "Paredes",
+    phoneNumber: "+526621110013",
+    email: "natalia.paredes@psychology-app.local",
     birthDate: birthDate(1993, 4, 6),
     diagnosis:
-      'Autocuidado y recuperacion de actividades significativas tras periodos de alta demanda.',
+      "Autocuidado y recuperacion de actividades significativas tras periodos de alta demanda.",
     treatmentPlan:
-      'Agenda de autocuidado, revision de energia disponible y limites en compromisos.',
+      "Agenda de autocuidado, revision de energia disponible y limites en compromisos.",
     appointments: [
       {
         daysFromNow: -30,
@@ -828,7 +828,7 @@ const patientBlueprints: PatientBlueprint[] = [
         minute: 30,
         durationMinutes: 50,
         status: AppointmentStatus.COMPLETED,
-        notes: 'Exploracion de autocuidado.',
+        notes: "Exploracion de autocuidado.",
         fee: 720,
         paymentMethod: PaymentMethod.CARD,
       },
@@ -838,7 +838,7 @@ const patientBlueprints: PatientBlueprint[] = [
         minute: 30,
         durationMinutes: 50,
         status: AppointmentStatus.SCHEDULED,
-        notes: 'Seguimiento de actividades significativas.',
+        notes: "Seguimiento de actividades significativas.",
         fee: 720,
       },
     ],
@@ -847,26 +847,26 @@ const patientBlueprints: PatientBlueprint[] = [
         daysAgo: 30,
         hour: 10,
         minute: 30,
-        title: 'Actividades significativas',
+        title: "Actividades significativas",
         content:
-          'Se identifican actividades que aportan bienestar y barreras para retomarlas.',
+          "Se identifican actividades que aportan bienestar y barreras para retomarlas.",
       },
       {
         daysAgo: 7,
         hour: 10,
         minute: 30,
-        title: 'Energia disponible',
+        title: "Energia disponible",
         content:
-          'Se revisa carga semanal y se ajustan compromisos. Mejora reconocimiento de limites.',
+          "Se revisa carga semanal y se ajustan compromisos. Mejora reconocimiento de limites.",
       },
     ],
   },
   {
     code: 14,
-    firstName: 'Mateo',
-    lastName: 'Cardenas',
-    phoneNumber: '+526621110014',
-    email: 'mateo.cardenas@psychology-app.local',
+    firstName: "Mateo",
+    lastName: "Cardenas",
+    phoneNumber: "+526621110014",
+    email: "mateo.cardenas@psychology-app.local",
     birthDate: birthDate(1999, 9, 11),
     appointments: [
       {
@@ -875,7 +875,7 @@ const patientBlueprints: PatientBlueprint[] = [
         minute: 30,
         durationMinutes: 60,
         status: AppointmentStatus.COMPLETED,
-        notes: 'Tecnica pausa-respuesta.',
+        notes: "Tecnica pausa-respuesta.",
         fee: 740,
         paymentMethod: PaymentMethod.CASH,
       },
@@ -885,22 +885,22 @@ const patientBlueprints: PatientBlueprint[] = [
         minute: 30,
         durationMinutes: 60,
         status: AppointmentStatus.SCHEDULED,
-        notes: 'Seguimiento de toma de perspectiva.',
+        notes: "Seguimiento de toma de perspectiva.",
         fee: 740,
       },
     ],
   },
   {
     code: 15,
-    firstName: 'Elena',
-    lastName: 'Soto',
-    phoneNumber: '+526621110015',
-    email: 'elena.soto@psychology-app.local',
+    firstName: "Elena",
+    lastName: "Soto",
+    phoneNumber: "+526621110015",
+    email: "elena.soto@psychology-app.local",
     birthDate: birthDate(1975, 1, 25),
     diagnosis:
-      'Transicion de etapa personal y redefinicion de rutinas de bienestar.',
+      "Transicion de etapa personal y redefinicion de rutinas de bienestar.",
     treatmentPlan:
-      'Explorar prioridades actuales, crear rutina flexible y revisar avances mensuales.',
+      "Explorar prioridades actuales, crear rutina flexible y revisar avances mensuales.",
     appointments: [
       {
         daysFromNow: -60,
@@ -908,7 +908,7 @@ const patientBlueprints: PatientBlueprint[] = [
         minute: 0,
         durationMinutes: 90,
         status: AppointmentStatus.COMPLETED,
-        notes: 'Evaluacion inicial de transicion vital.',
+        notes: "Evaluacion inicial de transicion vital.",
         fee: 900,
         paymentMethod: PaymentMethod.TRANSFER,
       },
@@ -918,7 +918,7 @@ const patientBlueprints: PatientBlueprint[] = [
         minute: 0,
         durationMinutes: 60,
         status: AppointmentStatus.SCHEDULED,
-        notes: 'Revision mensual de rutina flexible.',
+        notes: "Revision mensual de rutina flexible.",
         fee: 780,
       },
     ],
@@ -927,38 +927,38 @@ const patientBlueprints: PatientBlueprint[] = [
         daysAgo: 60,
         hour: 9,
         minute: 0,
-        title: 'Transicion de etapa',
-        content: 'Se exploran cambios recientes y prioridades actuales.',
+        title: "Transicion de etapa",
+        content: "Se exploran cambios recientes y prioridades actuales.",
       },
       {
         daysAgo: 30,
         hour: 9,
         minute: 0,
-        title: 'Rutina flexible',
+        title: "Rutina flexible",
         content:
-          'Se disena rutina semanal con espacios de actividad fisica ligera y contacto social.',
+          "Se disena rutina semanal con espacios de actividad fisica ligera y contacto social.",
       },
       {
         daysAgo: 7,
         hour: 9,
         minute: 0,
-        title: 'Revision mensual',
+        title: "Revision mensual",
         content:
-          'Reporta mayor estructura durante la semana y se ajustan metas para sostener consistencia.',
+          "Reporta mayor estructura durante la semana y se ajustan metas para sostener consistencia.",
       },
     ],
   },
   {
     code: 16,
-    firstName: 'Paula',
-    lastName: 'Ibarra',
-    phoneNumber: '+526621110016',
-    email: 'paula.ibarra@psychology-app.local',
+    firstName: "Paula",
+    lastName: "Ibarra",
+    phoneNumber: "+526621110016",
+    email: "paula.ibarra@psychology-app.local",
     birthDate: birthDate(1991, 12, 1),
     diagnosis:
-      'Seguimiento de ansiedad situacional asociada a presentaciones de trabajo.',
+      "Seguimiento de ansiedad situacional asociada a presentaciones de trabajo.",
     treatmentPlan:
-      'Exposicion gradual, ensayo de presentaciones y regulacion fisiologica breve.',
+      "Exposicion gradual, ensayo de presentaciones y regulacion fisiologica breve.",
     appointments: [
       {
         daysFromNow: -20,
@@ -966,7 +966,7 @@ const patientBlueprints: PatientBlueprint[] = [
         minute: 30,
         durationMinutes: 50,
         status: AppointmentStatus.COMPLETED,
-        notes: 'Revision de detonantes en presentaciones.',
+        notes: "Revision de detonantes en presentaciones.",
         fee: 790,
         paymentMethod: PaymentMethod.CARD,
       },
@@ -976,7 +976,7 @@ const patientBlueprints: PatientBlueprint[] = [
         minute: 30,
         durationMinutes: 50,
         status: AppointmentStatus.SCHEDULED,
-        notes: 'Ensayo de presentacion proxima.',
+        notes: "Ensayo de presentacion proxima.",
         fee: 790,
         createPendingCharge: true,
       },
@@ -986,16 +986,16 @@ const patientBlueprints: PatientBlueprint[] = [
         daysAgo: 20,
         hour: 18,
         minute: 30,
-        title: 'Ansiedad situacional',
+        title: "Ansiedad situacional",
         content:
-          'Se identifican detonantes previos a exposiciones y se practica respiracion breve.',
+          "Se identifican detonantes previos a exposiciones y se practica respiracion breve.",
       },
     ],
     documents: [
       {
         daysAgo: 18,
-        fileName: 'jerarquia-exposicion-paula.pdf',
-        mimeType: 'application/pdf',
+        fileName: "jerarquia-exposicion-paula.pdf",
+        mimeType: "application/pdf",
       },
     ],
   },
@@ -1089,7 +1089,7 @@ function buildFinancialTransactions(psychologistId: string) {
         status: FinancialTransactionStatus.COMPLETED,
         category: FinancialTransactionCategory.SESSION,
         amount: appointment.fee,
-        currency: 'MXN',
+        currency: "MXN",
         concept: `Pago de sesion - ${appointment.patientName}`,
         description: `${DEMO_TAG} Ingreso registrado por sesion completada.`,
         occurredAt: addMinutes(
@@ -1117,7 +1117,7 @@ function buildFinancialTransactions(psychologistId: string) {
         status: FinancialTransactionStatus.PENDING,
         category: FinancialTransactionCategory.SESSION,
         amount: appointment.fee,
-        currency: 'MXN',
+        currency: "MXN",
         concept: `Cobro pendiente - ${appointment.patientName}`,
         description: `${DEMO_TAG} Cargo pendiente para sesion programada.`,
         occurredAt: appointment.scheduledAt,
@@ -1138,8 +1138,8 @@ function buildFinancialTransactions(psychologistId: string) {
       status: FinancialTransactionStatus.COMPLETED,
       category: FinancialTransactionCategory.RENT,
       amount: 8500,
-      currency: 'MXN',
-      concept: 'Renta del consultorio',
+      currency: "MXN",
+      concept: "Renta del consultorio",
       description: `${DEMO_TAG} Renta mensual del espacio de consulta.`,
       occurredAt: dateFromNow(-25, 8, 0),
       dueDate: null,
@@ -1155,8 +1155,8 @@ function buildFinancialTransactions(psychologistId: string) {
       status: FinancialTransactionStatus.PENDING,
       category: FinancialTransactionCategory.RENT,
       amount: 8500,
-      currency: 'MXN',
-      concept: 'Renta del consultorio',
+      currency: "MXN",
+      concept: "Renta del consultorio",
       description: `${DEMO_TAG} Renta mensual del espacio de consulta.`,
       occurredAt: dateFromNow(5, 8, 0),
       dueDate: dateFromNow(5, 18, 0),
@@ -1172,8 +1172,8 @@ function buildFinancialTransactions(psychologistId: string) {
       status: FinancialTransactionStatus.COMPLETED,
       category: FinancialTransactionCategory.SOFTWARE,
       amount: 349,
-      currency: 'MXN',
-      concept: 'Suscripcion de videollamadas',
+      currency: "MXN",
+      concept: "Suscripcion de videollamadas",
       description: `${DEMO_TAG} Herramienta para sesiones remotas y seguimiento.`,
       occurredAt: dateFromNow(-19, 7, 30),
       dueDate: null,
@@ -1189,8 +1189,8 @@ function buildFinancialTransactions(psychologistId: string) {
       status: FinancialTransactionStatus.COMPLETED,
       category: FinancialTransactionCategory.SOFTWARE,
       amount: 229,
-      currency: 'MXN',
-      concept: 'Suscripcion de agenda clinica',
+      currency: "MXN",
+      concept: "Suscripcion de agenda clinica",
       description: `${DEMO_TAG} Herramienta de gestion administrativa.`,
       occurredAt: dateFromNow(-4, 7, 45),
       dueDate: null,
@@ -1206,8 +1206,8 @@ function buildFinancialTransactions(psychologistId: string) {
       status: FinancialTransactionStatus.COMPLETED,
       category: FinancialTransactionCategory.UTILITIES,
       amount: 1180,
-      currency: 'MXN',
-      concept: 'Internet y servicios',
+      currency: "MXN",
+      concept: "Internet y servicios",
       description: `${DEMO_TAG} Pago de internet y energia del consultorio.`,
       occurredAt: dateFromNow(-12, 9, 15),
       dueDate: null,
@@ -1223,8 +1223,8 @@ function buildFinancialTransactions(psychologistId: string) {
       status: FinancialTransactionStatus.PENDING,
       category: FinancialTransactionCategory.SUPPLIES,
       amount: 540,
-      currency: 'MXN',
-      concept: 'Material de oficina y papeleria',
+      currency: "MXN",
+      concept: "Material de oficina y papeleria",
       description: `${DEMO_TAG} Compra pendiente de hojas, carpetas y material impreso.`,
       occurredAt: dateFromNow(3, 13, 0),
       dueDate: dateFromNow(6, 18, 0),
@@ -1240,8 +1240,8 @@ function buildFinancialTransactions(psychologistId: string) {
       status: FinancialTransactionStatus.COMPLETED,
       category: FinancialTransactionCategory.MANUAL,
       amount: 300,
-      currency: 'MXN',
-      concept: 'Ajuste por redondeo de caja',
+      currency: "MXN",
+      concept: "Ajuste por redondeo de caja",
       description: `${DEMO_TAG} Ajuste administrativo menor para cuadrar ingresos en efectivo.`,
       occurredAt: dateFromNow(-2, 20, 0),
       dueDate: null,
@@ -1257,8 +1257,8 @@ function buildFinancialTransactions(psychologistId: string) {
       status: FinancialTransactionStatus.COMPLETED,
       category: FinancialTransactionCategory.SESSION,
       amount: 400,
-      currency: 'MXN',
-      concept: 'Reembolso parcial por reprogramacion',
+      currency: "MXN",
+      concept: "Reembolso parcial por reprogramacion",
       description: `${DEMO_TAG} Reembolso parcial por cambio de horario solicitado con anticipacion.`,
       occurredAt: dateFromNow(-8, 12, 15),
       dueDate: null,
@@ -1360,6 +1360,37 @@ async function resetDemoClinicalData() {
   ]);
 }
 
+function countFinancialTransactionsBy<K extends string>(
+  transactions: DemoFinancialTransaction[],
+  getKey: (transaction: DemoFinancialTransaction) => K,
+) {
+  return transactions.reduce(
+    (accumulator, transaction) => {
+      const key = getKey(transaction);
+      accumulator[key] = (accumulator[key] ?? 0) + 1;
+      return accumulator;
+    },
+    {} as Record<K, number>,
+  );
+}
+
+function summarizeFinancialTransactions(
+  transactions: DemoFinancialTransaction[],
+) {
+  return {
+    total: transactions.length,
+    byType: countFinancialTransactionsBy(transactions, (transaction) =>
+      String(transaction.type),
+    ),
+    byStatus: countFinancialTransactionsBy(transactions, (transaction) =>
+      String(transaction.status),
+    ),
+    byCategory: countFinancialTransactionsBy(transactions, (transaction) =>
+      String(transaction.category),
+    ),
+  };
+}
+
 async function seedDemoClinicalData(psychologistId: string) {
   const patients = buildPatients(psychologistId);
   const caseFiles = buildCaseFiles();
@@ -1377,7 +1408,14 @@ async function seedDemoClinicalData(psychologistId: string) {
   );
   const financialTransactions = buildFinancialTransactions(psychologistId);
 
-  await prisma.$transaction([
+  const [
+    patientsInsert,
+    caseFilesInsert,
+    sessionNotesInsert,
+    documentsInsert,
+    appointmentsInsert,
+    financialTransactionsInsert,
+  ] = await prisma.$transaction([
     prisma.patient.createMany({ data: patients }),
     prisma.caseFile.createMany({ data: caseFiles }),
     prisma.sessionNote.createMany({ data: sessionNotes }),
@@ -1385,6 +1423,10 @@ async function seedDemoClinicalData(psychologistId: string) {
     prisma.appointment.createMany({ data: appointments }),
     prisma.financialTransaction.createMany({ data: financialTransactions }),
   ]);
+
+  const financialTransactionsSummary = summarizeFinancialTransactions(
+    financialTransactions,
+  );
 
   const appointmentDates = appointments.map(
     (appointment) => appointment.scheduledAt,
@@ -1401,6 +1443,18 @@ async function seedDemoClinicalData(psychologistId: string) {
     appointments: appointments.length,
     scheduledAppointments: scheduledAppointments.length,
     financialTransactions: financialTransactions.length,
+    financialTransactionsInserted: financialTransactionsInsert.count,
+    financialTransactionsByType: financialTransactionsSummary.byType,
+    financialTransactionsByStatus: financialTransactionsSummary.byStatus,
+    financialTransactionsByCategory: financialTransactionsSummary.byCategory,
+    insertedRows: {
+      patients: patientsInsert.count,
+      caseFiles: caseFilesInsert.count,
+      sessionNotes: sessionNotesInsert.count,
+      documents: documentsInsert.count,
+      appointments: appointmentsInsert.count,
+      financialTransactions: financialTransactionsInsert.count,
+    },
     firstAppointmentDate: new Date(
       Math.min(...appointmentDates.map((date) => date.getTime())),
     ),
@@ -1415,16 +1469,16 @@ async function main() {
 
   const admin = await upsertUser({
     id: ADMIN_USER_ID,
-    name: 'Enrique Felix',
-    email: 'admin@psychology-app.local',
+    name: "Enrique Felix",
+    email: "admin@psychology-app.local",
     passwordHash: defaultPasswordHash,
     role: UserRole.ADMIN,
   });
 
   const psychologist = await upsertUser({
     id: PSYCHOLOGIST_USER_ID,
-    name: 'Demo Psychologist',
-    email: 'psychologist@psychology-app.local',
+    name: "Demo Psychologist",
+    email: "psychologist@psychology-app.local",
     passwordHash: defaultPasswordHash,
     role: UserRole.PSYCHOLOGIST,
   });
@@ -1432,7 +1486,7 @@ async function main() {
   await resetDemoClinicalData();
   const seedSummary = await seedDemoClinicalData(psychologist.id);
 
-  console.log('Seed completed successfully.');
+  console.log("Seed completed successfully.");
   console.log(`Demo password: ${DEFAULT_PASSWORD}`);
   console.log(`Admin user: ${admin.email}`);
   console.log(`Psychologist user: ${psychologist.email}`);
@@ -1445,7 +1499,19 @@ async function main() {
     `Scheduled appointments seeded: ${seedSummary.scheduledAppointments}`,
   );
   console.log(
-    `Financial transactions seeded: ${seedSummary.financialTransactions}`,
+    `Financial transactions built: ${seedSummary.financialTransactions}`,
+  );
+  console.log(
+    `Financial transactions inserted: ${seedSummary.financialTransactionsInserted}`,
+  );
+  console.log(
+    `Financial transactions by type: ${JSON.stringify(seedSummary.financialTransactionsByType)}`,
+  );
+  console.log(
+    `Financial transactions by status: ${JSON.stringify(seedSummary.financialTransactionsByStatus)}`,
+  );
+  console.log(
+    `Financial transactions by category: ${JSON.stringify(seedSummary.financialTransactionsByCategory)}`,
   );
   console.log(`Date reference used: ${now.toISOString()}`);
   console.log(
@@ -1455,7 +1521,7 @@ async function main() {
 
 main()
   .catch((error) => {
-    console.error('Seed failed:', error);
+    console.error("Seed failed:", error);
     process.exitCode = 1;
   })
   .finally(async () => {
