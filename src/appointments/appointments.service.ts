@@ -13,7 +13,10 @@ export class AppointmentsService {
     createAppointmentDto: CreateAppointmentDto,
     user: AuthenticatedUser,
   ) {
-    await this.getAccessiblePatientOrThrow(createAppointmentDto.patientId, user);
+    await this.getAccessiblePatientOrThrow(
+      createAppointmentDto.patientId,
+      user,
+    );
 
     const psychologistId = this.isAdmin(user)
       ? createAppointmentDto.psychologistId
@@ -66,7 +69,10 @@ export class AppointmentsService {
     await this.getAccessibleAppointmentOrThrow(id, user);
 
     if (updateAppointmentDto.patientId) {
-      await this.getAccessiblePatientOrThrow(updateAppointmentDto.patientId, user);
+      await this.getAccessiblePatientOrThrow(
+        updateAppointmentDto.patientId,
+        user,
+      );
     }
 
     let psychologistId = updateAppointmentDto.psychologistId;

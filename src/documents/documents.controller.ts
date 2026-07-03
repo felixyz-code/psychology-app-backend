@@ -97,7 +97,7 @@ export class DocumentsController {
   @ApiBody({
     schema: {
       type: 'object',
-      required: ['file', 'caseFileId', 'uploadedById'],
+      required: ['file', 'caseFileId'],
       properties: {
         file: {
           type: 'string',
@@ -108,17 +108,13 @@ export class DocumentsController {
           format: 'uuid',
           example: '550e8400-e29b-41d4-a716-446655440000',
         },
-        uploadedById: {
-          type: 'string',
-          format: 'uuid',
-          example: '550e8400-e29b-41d4-a716-446655440001',
-        },
       },
     },
   })
   @ApiOkResponse({ description: 'Document uploaded successfully' })
   @ApiBadRequestResponse({
-    description: 'Missing file, invalid payload, unsupported type, or file too large',
+    description:
+      'Missing file, invalid payload, unsupported type, or file too large',
   })
   @ApiNotFoundResponse({ description: 'Case file or user not found' })
   upload(
@@ -308,4 +304,3 @@ export class DocumentsController {
     return this.documentsService.remove(id, user);
   }
 }
-

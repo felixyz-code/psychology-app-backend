@@ -18,6 +18,39 @@ enum AppointmentStatus {
   NO_SHOW
 }
 
+enum FinancialTransactionType {
+  INCOME
+  EXPENSE
+  ADJUSTMENT
+  REFUND
+}
+
+enum FinancialTransactionStatus {
+  PENDING
+  COMPLETED
+  CANCELLED
+}
+
+enum FinancialTransactionCategory {
+  SESSION
+  ASSESSMENT
+  MANUAL
+  RENT
+  UTILITIES
+  SUPPLIES
+  SOFTWARE
+  SALARY
+  OTHER
+}
+
+enum PaymentMethod {
+  CASH
+  CARD
+  TRANSFER
+  CHECK
+  OTHER
+}
+
 model User {
   id                String         @id @default(uuid()) @db.Uuid
   name              String         @db.VarChar(150)
@@ -28,6 +61,7 @@ model User {
   sessionNotes      SessionNote[]
   uploadedDocuments Document[]
   appointments      Appointment[]
+  financialTransactions FinancialTransaction[]
   createdAt         DateTime       @default(now())
   updatedAt         DateTime       @updatedAt
 
@@ -35,18 +69,19 @@ model User {
 }
 
 model Patient {
-  id             String        @id @default(uuid()) @db.Uuid
-  psychologistId String        @db.Uuid
-  firstName      String        @db.VarChar(100)
-  lastName       String        @db.VarChar(100)
-  phoneNumber    String?       @db.VarChar(30)
-  email          String?       @db.VarChar(255)
-  birthDate      DateTime?     @db.Date
-  psychologist   User          @relation(fields: [psychologistId], references: [id], onDelete: Restrict, onUpdate: Cascade)
-  caseFile       CaseFile?
-  appointments   Appointment[]
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
+  id                    String                 @id @default(uuid()) @db.Uuid
+  psychologistId        String                 @db.Uuid
+  firstName             String                 @db.VarChar(100)
+  lastName              String                 @db.VarChar(100)
+  phoneNumber           String?                @db.VarChar(30)
+  email                 String?                @db.VarChar(255)
+  birthDate             DateTime?              @db.Date
+  psychologist          User                   @relation(fields: [psychologistId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  caseFile              CaseFile?
+  appointments          Appointment[]
+  financialTransactions FinancialTransaction[]
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
 
   @@index([psychologistId])
   @@map("patients")
@@ -102,20 +137,53 @@ model Document {
 }
 
 model Appointment {
-  id              String            @id @default(uuid()) @db.Uuid
-  patientId       String            @db.Uuid
-  psychologistId  String            @db.Uuid
-  scheduledAt     DateTime
-  durationMinutes Int
-  status          AppointmentStatus @default(SCHEDULED)
-  notes           String?           @db.Text
-  patient         Patient           @relation(fields: [patientId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  psychologist    User              @relation(fields: [psychologistId], references: [id], onDelete: Restrict, onUpdate: Cascade)
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
+  id                    String                 @id @default(uuid()) @db.Uuid
+  patientId             String                 @db.Uuid
+  psychologistId        String                 @db.Uuid
+  scheduledAt           DateTime
+  durationMinutes       Int
+  status                AppointmentStatus      @default(SCHEDULED)
+  notes                 String?                @db.Text
+  patient               Patient                @relation(fields: [patientId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  psychologist          User                   @relation(fields: [psychologistId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  financialTransactions FinancialTransaction[]
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
 
   @@index([patientId])
   @@index([psychologistId])
   @@index([scheduledAt])
   @@map("appointments")
+}
+
+model FinancialTransaction {
+  id            String                       @id @default(uuid()) @db.Uuid
+  type          FinancialTransactionType
+  status        FinancialTransactionStatus   @default(PENDING)
+  category      FinancialTransactionCategory @default(OTHER)
+  amount        Decimal                      @db.Decimal(10, 2)
+  currency      String                       @default("MXN") @db.VarChar(3)
+  concept       String                       @db.VarChar(255)
+  description   String?                      @db.Text
+  occurredAt    DateTime
+  dueDate       DateTime?
+  paymentMethod PaymentMethod?
+  notes         String?                      @db.Text
+  patientId     String?                      @db.Uuid
+  appointmentId String?                      @db.Uuid
+  createdById   String                       @db.Uuid
+  patient       Patient?                     @relation(fields: [patientId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  appointment   Appointment?                 @relation(fields: [appointmentId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  createdBy     User                         @relation(fields: [createdById], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  createdAt     DateTime                     @default(now())
+  updatedAt     DateTime                     @updatedAt
+
+  @@index([type])
+  @@index([status])
+  @@index([category])
+  @@index([occurredAt])
+  @@index([patientId])
+  @@index([appointmentId])
+  @@index([createdById])
+  @@map("financial_transactions")
 }

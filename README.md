@@ -105,6 +105,20 @@ UPLOADS_PATH=
 PORT=
 ```
 
+`DATABASE_URL` is required by Prisma tooling and by `PrismaService`.
+
+Examples for local Prisma commands:
+
+```bash
+DATABASE_URL="postgresql://psychology_user:psychology_password@localhost:5432/psychology_app?schema=public" npx prisma generate
+```
+
+```powershell
+$env:DATABASE_URL="postgresql://psychology_user:psychology_password@localhost:5432/psychology_app?schema=public"; npx.cmd prisma generate
+```
+
+Unit tests inject a safe dummy `DATABASE_URL` automatically so they do not require a real database connection just to instantiate `PrismaService`.
+
 ## Demo Seed
 
 The seed creates demo users and patients.

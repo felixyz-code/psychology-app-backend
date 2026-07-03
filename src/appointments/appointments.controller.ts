@@ -141,4 +141,3 @@ export class AppointmentsController {
     return this.appointmentsService.remove(id, user);
   }
 }
-

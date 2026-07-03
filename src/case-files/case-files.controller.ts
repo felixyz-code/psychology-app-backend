@@ -28,6 +28,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import type { AuthenticatedUser } from '../auth/types/authenticated-user.type';
 import { CaseFilesService } from './case-files.service';
+import { CaseFileWorkspaceResponseDto } from './dto/case-file-workspace-response.dto';
 import { CreateCaseFileDto } from './dto/create-case-file.dto';
 import { UpdateCaseFileDto } from './dto/update-case-file.dto';
 
@@ -86,6 +87,27 @@ export class CaseFilesController {
     return this.caseFilesService.findByPatientId(patientId, user);
   }
 
+  @Get(':id/workspace')
+  @ApiOperation({ summary: 'Get a clinical workspace by case file ID' })
+  @ApiParam({
+    name: 'id',
+    description: 'Case file ID',
+    format: 'uuid',
+    example: '550e8400-e29b-41d4-a716-446655440000',
+  })
+  @ApiOkResponse({
+    description: 'Clinical workspace retrieved successfully',
+    type: CaseFileWorkspaceResponseDto,
+  })
+  @ApiBadRequestResponse({ description: 'Invalid case file ID' })
+  @ApiNotFoundResponse({ description: 'Case file not found' })
+  findWorkspace(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.caseFilesService.findWorkspace(id, user);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get a case file by ID' })
   @ApiParam({
@@ -124,4 +146,3 @@ export class CaseFilesController {
     return this.caseFilesService.update(id, updateCaseFileDto, user);
   }
 }
-
