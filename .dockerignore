@@ -1,10 +1,34 @@
+# Dependencies
 node_modules
+
+# Build output
 dist
 coverage
+
+# Git
 .git
+
+# IDEs
+.vscode
+.idea
+
+# AI / tooling
 .agents
 .codex
+
+# Environment
 .env
+.env.*
+
+# Logs
+*.log
 npm-debug.log*
-uploads
+yarn-debug.log*
+yarn-error.log*
+
+# OS
 .DS_Store
+Thumbs.db
+
+# Runtime data
+uploads
