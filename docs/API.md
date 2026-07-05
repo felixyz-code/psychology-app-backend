@@ -114,6 +114,25 @@ Hello World!
 
 ---
 
+## `GET /health`
+
+Returns a minimal health payload for infrastructure checks.
+
+### Authentication
+
+Public endpoint.
+
+### Response
+
+```json
+{
+  "status": "UP",
+  "version": "1.0.0"
+}
+```
+
+---
+
 # Patients
 
 ## `POST /patients`
@@ -1245,7 +1264,7 @@ The following items should be reviewed in future backend sprints:
 * Add search/filter query parameters.
 * Decide whether `POST /documents` should remain available.
 * Decide whether `DELETE /documents/:id` should also delete the physical file.
-* Replace root `GET /` response with a health or API status endpoint.
+* Decide whether `GET /` should remain a legacy greeting or be replaced by the health/status payload in a future release.
 
 # References
 
