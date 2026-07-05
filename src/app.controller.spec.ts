@@ -19,4 +19,13 @@ describe('AppController', () => {
       expect(appController.getHello()).toBe('Hello World!');
     });
   });
+
+  describe('health', () => {
+    it('should return the health payload', () => {
+      expect(appController.getHealth()).toEqual({
+        status: 'UP',
+        version: '1.0.0',
+      });
+    });
+  });
 });
