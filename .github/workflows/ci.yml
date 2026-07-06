@@ -1,0 +1,23 @@
+name: Backend CI
+
+on:
+  push:
+    branches:
+      - master
+      - main
+  pull_request:
+    branches:
+      - master
+      - main
+  workflow_dispatch:
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout backend
+        uses: actions/checkout@v4
+
+      - name: Build backend Docker image
+        run: docker build -t psychology-app-backend-ci .
