@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import { UserRole } from '@prisma/client';
 import { AuthenticatedUser } from '../auth/types/authenticated-user.type';
+import { AppConfigService } from '../config/configuration';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateDocumentDto } from './dto/create-document.dto';
 import { UpdateDocumentDto } from './dto/update-document.dto';
@@ -21,7 +22,10 @@ const allowedInlineMimeTypes = new Set([
 
 @Injectable()
 export class DocumentsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly config: AppConfigService,
+  ) {}
 
   async create(createDocumentDto: CreateDocumentDto, user: AuthenticatedUser) {
     await this.getAccessibleCaseFileOrThrow(createDocumentDto.caseFileId, user);
@@ -56,7 +60,7 @@ export class DocumentsService {
 
     const extension = extname(file.originalname).toLowerCase();
     const safeFileName = `${randomUUID()}${extension}`;
-    const uploadRoot = process.env.UPLOADS_PATH ?? 'uploads';
+    const uploadRoot = this.config.uploadsPath;
     const absoluteUploadRoot = isAbsolute(uploadRoot)
       ? uploadRoot
       : join(process.cwd(), uploadRoot);
@@ -231,7 +235,7 @@ export class DocumentsService {
   }
 
   private getUploadsRoot() {
-    const uploadRoot = process.env.UPLOADS_PATH ?? 'uploads';
+    const uploadRoot = this.config.uploadsPath;
 
     return isAbsolute(uploadRoot)
       ? resolve(uploadRoot)

@@ -95,17 +95,38 @@ Use `POST /auth/login` to obtain a JWT and then use Swagger `Authorize` with Bea
 
 ## Environment Variables
 
-Main variables used by the backend:
+The backend validates runtime configuration during startup. Errors mention the
+invalid variable name but must not print secret values.
 
 ```env
-DATABASE_URL=
-JWT_SECRET=
-JWT_EXPIRES_IN=
-UPLOADS_PATH=
-PORT=
+DATABASE_URL="postgresql://<user>:<password>@<host>:5432/<database>?schema=public"
+JWT_SECRET="replace-with-strong-random-secret-minimum-32-characters"
+JWT_EXPIRES_IN="1d"
+PORT=3000
+NODE_ENV="development"
+UPLOADS_PATH="uploads"
+CORS_ORIGIN="http://localhost:4200,http://localhost:4201"
+SWAGGER_ENABLED="true"
 ```
 
-`DATABASE_URL` is required by Prisma tooling and by `PrismaService`.
+Required variables:
+
+- `DATABASE_URL`: PostgreSQL connection string used by Prisma at runtime.
+- `JWT_SECRET`: signing secret for JWT access tokens. Use a strong value with at least 32 characters.
+
+Optional variables:
+
+- `JWT_EXPIRES_IN`: JWT duration accepted by the JWT library, such as `15m`, `1h` or `1d`. Default: `1d`.
+- `PORT`: HTTP port. Default: `3000`.
+- `NODE_ENV`: `development`, `test` or `production`. Default: `development`.
+- `UPLOADS_PATH`: local filesystem upload root. Default: `uploads`; Infra can provide `/app/uploads`.
+- `CORS_ORIGIN`: comma-separated allowed origins. Default: `http://localhost:4200,http://localhost:4201`.
+- `SWAGGER_ENABLED`: `true` or `false`. Default: `true`, preserving the current `/api/docs` behavior.
+
+Do not use placeholder values from `.env.example` as real secrets.
+
+`DATABASE_URL` is also required by Prisma tooling through `prisma.config.ts`.
+This remains separate from NestJS runtime validation.
 
 Examples for local Prisma commands:
 

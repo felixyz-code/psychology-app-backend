@@ -397,11 +397,17 @@ Current security features include:
 - JwtAuthGuard
 - RolesGuard
 - Ownership filtering
+- Centralized runtime configuration validation
 - DTO validation
 - UUID validation
 - MIME validation
 - Upload size restrictions
 - Path traversal protection
+
+Runtime configuration is centralized in the backend configuration module.
+Startup validation requires `DATABASE_URL` and `JWT_SECRET`, applies safe
+defaults for documented optional variables, and reports invalid variable names
+without printing secret values.
 
 Current MVP intentionally does not include:
 

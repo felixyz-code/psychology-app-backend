@@ -88,7 +88,10 @@ UPLOADS_PATH
 
 # Environment Variables
 
-Current container variables:
+Runtime configuration is validated by the backend before the HTTP server starts.
+Production values are supplied by Infra using the same variable names.
+
+Current Compose variables:
 
 ```env
 DATABASE_URL=postgresql://psychology_user:psychology_password@postgres:5432/psychology_app?schema=public
@@ -98,7 +101,22 @@ UPLOADS_PATH=/app/uploads
 PORT=3000
 ```
 
-These values may differ in production environments.
+The Compose `JWT_SECRET` value is a local placeholder and is not a production
+secret. Real deployments must provide a strong `JWT_SECRET` with at least 32
+characters. The backend does not provide a JWT secret fallback.
+
+Supported runtime variables:
+
+```env
+DATABASE_URL=postgresql://user:password@host:5432/database?schema=public
+JWT_SECRET=<strong-secret>
+JWT_EXPIRES_IN=1d
+PORT=3000
+NODE_ENV=production
+UPLOADS_PATH=/app/uploads
+CORS_ORIGIN=http://localhost:4200,http://localhost:4201
+SWAGGER_ENABLED=true
+```
 
 `DATABASE_URL` is also required by `prisma.config.ts`, so local Prisma CLI commands such as `prisma generate` must run with that variable available.
 

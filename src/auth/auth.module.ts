@@ -2,6 +2,8 @@ import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import type { StringValue } from 'ms';
+import { AppConfigModule } from '../config/config.module';
+import { AppConfigService } from '../config/configuration';
 import { PrismaModule } from '../prisma/prisma.module';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
@@ -10,13 +12,18 @@ import { JwtStrategy } from './strategies/jwt.strategy';
 
 @Module({
   imports: [
+    AppConfigModule,
     PrismaModule,
     PassportModule,
-    JwtModule.register({
-      secret: process.env.JWT_SECRET ?? 'change_me',
-      signOptions: {
-        expiresIn: (process.env.JWT_EXPIRES_IN ?? '1d') as StringValue,
-      },
+    JwtModule.registerAsync({
+      imports: [AppConfigModule],
+      inject: [AppConfigService],
+      useFactory: (config: AppConfigService) => ({
+        secret: config.jwtSecret,
+        signOptions: {
+          expiresIn: config.jwtExpiresIn as StringValue,
+        },
+      }),
     }),
   ],
   controllers: [AuthController],

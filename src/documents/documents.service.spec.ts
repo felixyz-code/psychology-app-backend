@@ -3,6 +3,7 @@ import { UserRole } from '@prisma/client';
 import { rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { AuthenticatedUser } from '../auth/types/authenticated-user.type';
+import { AppConfigService } from '../config/configuration';
 import { PrismaService } from '../prisma/prisma.service';
 import { DocumentsService } from './documents.service';
 import { UploadDocumentDto } from './dto/upload-document.dto';
@@ -62,11 +63,8 @@ function createFile(): Express.Multer.File {
 describe('DocumentsService', () => {
   let service: DocumentsService;
   let prisma: PrismaMock;
-  const previousUploadsPath = process.env.UPLOADS_PATH;
 
   beforeEach(() => {
-    process.env.UPLOADS_PATH = uploadRoot;
-
     prisma = {
       caseFile: {
         findFirst: jest.fn(),
@@ -85,7 +83,10 @@ describe('DocumentsService', () => {
       },
     };
 
-    service = new DocumentsService(prisma as unknown as PrismaService);
+    service = new DocumentsService(
+      prisma as unknown as PrismaService,
+      { uploadsPath: uploadRoot } as AppConfigService,
+    );
   });
 
   function getDocumentCreateArgs() {
@@ -101,12 +102,6 @@ describe('DocumentsService', () => {
   }
 
   afterEach(async () => {
-    if (previousUploadsPath === undefined) {
-      delete process.env.UPLOADS_PATH;
-    } else {
-      process.env.UPLOADS_PATH = previousUploadsPath;
-    }
-
     await rm(join(process.cwd(), '.tmp-tests'), {
       recursive: true,
       force: true,
