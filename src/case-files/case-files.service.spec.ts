@@ -234,4 +234,56 @@ describe('CaseFilesService', () => {
     );
     expect(prisma.caseFile.findFirst).not.toHaveBeenCalled();
   });
+
+  it('prevents psychologist A from creating a case file for patient B', async () => {
+    prisma.patient.findFirst.mockResolvedValue(null);
+
+    await expect(
+      service.create({ patientId: 'patient-b-id' }, psychologist),
+    ).rejects.toThrow(NotFoundException);
+
+    expect(prisma.patient.findFirst).toHaveBeenCalledWith({
+      where: { id: 'patient-b-id', psychologistId: psychologist.id },
+    });
+    expect(prisma.caseFile.create).not.toHaveBeenCalled();
+  });
+
+  it('filters lists through the owning patient relation', async () => {
+    prisma.caseFile.findMany.mockResolvedValue([]);
+
+    await service.findAll(psychologist);
+
+    expect(prisma.caseFile.findMany).toHaveBeenCalledWith({
+      where: { patient: { psychologistId: psychologist.id } },
+      orderBy: { createdAt: 'desc' },
+    });
+  });
+
+  it('returns 404 and does not update a case file B', async () => {
+    prisma.caseFile.findFirst.mockResolvedValue(null);
+
+    await expect(
+      service.findOne('case-file-b-id', psychologist),
+    ).rejects.toThrow(NotFoundException);
+    await expect(
+      service.update('case-file-b-id', { diagnosis: 'changed' }, psychologist),
+    ).rejects.toThrow(NotFoundException);
+
+    expect(prisma.caseFile.findFirst).toHaveBeenCalledWith({
+      where: {
+        id: 'case-file-b-id',
+        patient: { psychologistId: psychologist.id },
+      },
+    });
+    expect(prisma.caseFile.update).not.toHaveBeenCalled();
+  });
+
+  it('validates patient ownership before resolving the case file by patient ID', async () => {
+    prisma.patient.findFirst.mockResolvedValue(null);
+
+    await expect(
+      service.findByPatientId('patient-b-id', psychologist),
+    ).rejects.toThrow(NotFoundException);
+    expect(prisma.caseFile.findUnique).not.toHaveBeenCalled();
+  });
 });

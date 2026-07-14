@@ -1,12 +1,24 @@
 import { NotFoundException } from '@nestjs/common';
 import { UserRole } from '@prisma/client';
-import { rm } from 'node:fs/promises';
+import { access, mkdir, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { AuthenticatedUser } from '../auth/types/authenticated-user.type';
 import { AppConfigService } from '../config/configuration';
 import { PrismaService } from '../prisma/prisma.service';
 import { DocumentsService } from './documents.service';
 import { UploadDocumentDto } from './dto/upload-document.dto';
+
+jest.mock('node:fs/promises', () => {
+  const actual =
+    jest.requireActual<typeof import('node:fs/promises')>('node:fs/promises');
+
+  return {
+    ...actual,
+    access: jest.fn(),
+    mkdir: jest.fn(),
+    writeFile: jest.fn(),
+  };
+});
 
 type PrismaMock = {
   caseFile: {
@@ -65,6 +77,7 @@ describe('DocumentsService', () => {
   let prisma: PrismaMock;
 
   beforeEach(() => {
+    jest.clearAllMocks();
     prisma = {
       caseFile: {
         findFirst: jest.fn(),
@@ -161,5 +174,104 @@ describe('DocumentsService', () => {
     ).rejects.toThrow(NotFoundException);
 
     expect(prisma.document.create).not.toHaveBeenCalled();
+  });
+
+  it('does not touch the filesystem or metadata when psychologist A uploads under case file B', async () => {
+    prisma.caseFile.findFirst.mockResolvedValue(null);
+
+    await expect(
+      service.upload(
+        { caseFileId: 'case-file-b-id' },
+        createFile(),
+        psychologist,
+      ),
+    ).rejects.toThrow(NotFoundException);
+
+    expect(mkdir).not.toHaveBeenCalled();
+    expect(writeFile).not.toHaveBeenCalled();
+    expect(prisma.document.create).not.toHaveBeenCalled();
+  });
+
+  it('does not create metadata under a foreign case file', async () => {
+    prisma.caseFile.findFirst.mockResolvedValue(null);
+
+    await expect(
+      service.create(
+        {
+          caseFileId: 'case-file-b-id',
+          uploadedById: 'psychologist-b-id',
+          fileName: 'foreign.pdf',
+          filePath: 'uploads/patients/patient-b-id/foreign.pdf',
+        },
+        psychologist,
+      ),
+    ).rejects.toThrow(NotFoundException);
+
+    expect(prisma.document.create).not.toHaveBeenCalled();
+  });
+
+  it('filters lists and metadata reads through the owning patient relation', async () => {
+    prisma.document.findMany.mockResolvedValue([]);
+    prisma.document.findFirst.mockResolvedValue(null);
+
+    await service.findAll(psychologist);
+    await expect(
+      service.findOne('document-b-id', psychologist),
+    ).rejects.toThrow(NotFoundException);
+
+    expect(prisma.document.findMany).toHaveBeenCalledWith({
+      where: {
+        caseFile: { patient: { psychologistId: psychologist.id } },
+      },
+      orderBy: { uploadedAt: 'desc' },
+    });
+    expect(prisma.document.findFirst).toHaveBeenCalledWith({
+      where: {
+        id: 'document-b-id',
+        caseFile: { patient: { psychologistId: psychologist.id } },
+      },
+    });
+  });
+
+  it('blocks foreign download and view before filesystem access', async () => {
+    prisma.document.findFirst.mockResolvedValue(null);
+
+    await expect(
+      service.getDownloadFile('document-b-id', psychologist),
+    ).rejects.toThrow(NotFoundException);
+    await expect(
+      service.getViewFile('document-b-id', psychologist),
+    ).rejects.toThrow(NotFoundException);
+
+    expect(access).not.toHaveBeenCalled();
+  });
+
+  it('blocks foreign metadata update and delete before mutations', async () => {
+    prisma.document.findFirst.mockResolvedValue(null);
+
+    await expect(
+      service.update(
+        'document-b-id',
+        { fileName: 'changed.pdf' },
+        psychologist,
+      ),
+    ).rejects.toThrow(NotFoundException);
+    await expect(service.remove('document-b-id', psychologist)).rejects.toThrow(
+      NotFoundException,
+    );
+
+    expect(prisma.document.update).not.toHaveBeenCalled();
+    expect(prisma.document.delete).not.toHaveBeenCalled();
+  });
+
+  it('keeps admin global access to document metadata', async () => {
+    prisma.document.findUnique.mockResolvedValue({ id: 'document-b-id' });
+
+    await expect(service.findOne('document-b-id', admin)).resolves.toEqual({
+      id: 'document-b-id',
+    });
+    expect(prisma.document.findUnique).toHaveBeenCalledWith({
+      where: { id: 'document-b-id' },
+    });
   });
 });
