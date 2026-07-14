@@ -1,5 +1,6 @@
 import "dotenv/config";
 import * as bcrypt from "bcrypt";
+import { requireDemoSeedPassword } from "./seed-demo-password";
 import { PrismaPg } from "@prisma/adapter-pg";
 import {
   AppointmentStatus,
@@ -21,7 +22,6 @@ if (!connectionString) {
 const adapter = new PrismaPg(connectionString);
 const prisma = new PrismaClient({ adapter });
 
-const DEFAULT_PASSWORD = "ChangeMe123!";
 const DEMO_TAG = "[demo-seed]";
 
 const ADMIN_USER_ID = "1b5d4d7c-b7e6-4d8b-9b3d-a3b12f1e1001";
@@ -1465,13 +1465,14 @@ async function seedDemoClinicalData(psychologistId: string) {
 }
 
 async function main() {
-  const defaultPasswordHash = await bcrypt.hash(DEFAULT_PASSWORD, 10);
+  const demoPassword = requireDemoSeedPassword();
+  const demoPasswordHash = await bcrypt.hash(demoPassword, 10);
 
   const admin = await upsertUser({
     id: ADMIN_USER_ID,
     name: "Enrique Felix",
     email: "admin@psychology-app.local",
-    passwordHash: defaultPasswordHash,
+    passwordHash: demoPasswordHash,
     role: UserRole.ADMIN,
   });
 
@@ -1479,7 +1480,7 @@ async function main() {
     id: PSYCHOLOGIST_USER_ID,
     name: "Demo Psychologist",
     email: "psychologist@psychology-app.local",
-    passwordHash: defaultPasswordHash,
+    passwordHash: demoPasswordHash,
     role: UserRole.PSYCHOLOGIST,
   });
 
@@ -1487,7 +1488,7 @@ async function main() {
   const seedSummary = await seedDemoClinicalData(psychologist.id);
 
   console.log("Seed completed successfully.");
-  console.log(`Demo password: ${DEFAULT_PASSWORD}`);
+  console.log("Demo credentials were supplied through the environment.");
   console.log(`Admin user: ${admin.email}`);
   console.log(`Psychologist user: ${psychologist.email}`);
   console.log(`Patients seeded: ${seedSummary.patients}`);
