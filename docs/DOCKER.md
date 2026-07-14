@@ -48,6 +48,11 @@ Responsibilities:
 * Starts the backend using `node dist/main`.
 * Exposes port `3000`.
 
+The image uses Node 20, which remains inside the backend contract when the
+resolved image is Node 20.19 or newer. The Dockerfile continues to install
+dependencies with `npm ci`; BE.2.5 does not change the Docker image, startup
+command or Compose contract.
+
 ---
 
 ## postgres
@@ -169,6 +174,24 @@ docker compose logs -f backend
 ```bash
 docker compose exec backend npm run seed
 ```
+
+---
+
+## Quality commands
+
+Local backend quality gates:
+
+```bash
+npm run build
+npm run typecheck
+npm run lint
+npm run format:check
+npm test -- --runInBand
+```
+
+`lint`, `format:check` and `typecheck` are read-only. `lint:fix` and `format`
+may rewrite files. These commands are available for a future CI update; this
+document does not imply that CI workflows have already changed.
 
 ---
 

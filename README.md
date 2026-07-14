@@ -47,6 +47,15 @@ docs/ROADMAP.md
 
 ## Local Development
 
+Supported toolchain:
+
+- Node.js `^20.19 || >=22.12 <23`
+- npm `>=10 <11`
+- Package manager metadata: `npm@10.9.8`
+
+Docker continues to use Node 20. Local development may use Node 20.19+ or
+Node 22.12+ inside the supported range.
+
 Install dependencies:
 
 ```bash
@@ -58,6 +67,23 @@ Run backend locally:
 ```bash
 npm run start:dev
 ```
+
+Run quality checks:
+
+```bash
+npm run build
+npm run typecheck
+npm run lint
+npm run format:check
+npm test -- --runInBand
+```
+
+`lint`, `format:check` and `typecheck` are read-only quality gates. `lint:fix`
+and `format` may rewrite files and should be used intentionally during local
+development.
+
+These commands are prepared for future CI quality gates, but CI workflows have
+not been changed yet.
 
 Run with Docker Compose:
 

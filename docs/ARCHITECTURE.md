@@ -48,6 +48,8 @@ The application follows a modular architecture where business logic resides in s
 
 Current backend technologies:
 
+- Node.js `^20.19 || >=22.12 <23`
+- npm `>=10 <11`
 - NestJS
 - TypeScript
 - Prisma ORM
@@ -55,6 +57,12 @@ Current backend technologies:
 - JWT
 - Swagger
 - Docker Compose
+
+Quality scripts separate read-only gates from mutating helpers. `build`,
+`typecheck`, `lint`, `format:check` and tests are safe for validation workflows.
+`lint:fix` and `format` may rewrite files and are intended for local
+remediation. These scripts are prepared for future CI reuse; CI workflows have
+not been modified yet.
 
 ---
 
