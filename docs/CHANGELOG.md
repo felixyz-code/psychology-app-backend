@@ -4,6 +4,37 @@
 
 ---
 
+# BE.2.6 Dependency Risk Remediation
+
+## Changed
+
+* Updated `@nestjs/platform-express` from `11.1.27` to `11.1.28`, which updates the productive `multer` path used by `FileInterceptor` to `multer@2.2.0`.
+* Updated `@nestjs/swagger` from `11.4.4` to `11.4.5`, which replaces its vulnerable `js-yaml@4.1.1` dependency with `js-yaml@4.3.0`.
+
+## Added
+
+* Regression tests for `POST /documents/upload` covering the multipart `file` field, `caseFileId`, missing file rejection, unsupported MIME/extension rejection and the 10 MB upload limit.
+
+## Security Notes
+
+* Closed the productive `multer` denial-of-service advisories reported through `@nestjs/platform-express`.
+* Closed the productive `js-yaml` advisory reported through `@nestjs/swagger`.
+* Accepted temporary residual risk for the Prisma CLI chain `prisma@7.8.0 -> @prisma/dev@0.24.3 -> @hono/node-server@1.19.11` because npm only proposes a breaking downgrade to `prisma@6.19.3`; no stable Prisma 7 parent update is available.
+* Accepted temporary development-only residual risk for `js-yaml@3.14.2` through `@istanbuljs/load-nyc-config`; no compatible parent release is available in that dependency line.
+* Docker build still uses Node 20 and completes successfully. The build logs an `EBADENGINE` warning for Prisma's transitive `@prisma/streams-local@0.1.2` package under Node 20; this remains a follow-up compatibility item and did not change the Docker contract.
+
+## Validation
+
+* `npm ci --ignore-scripts` completed from `package-lock.json`; as expected, it does not generate Prisma Client.
+* `npx --no-install prisma generate` was required after `npm ci --ignore-scripts` and completed without a database connection.
+* `npm run build`, `npm run typecheck`, `npm run lint`, `npm run format:check`, `npm test -- --runInBand`, `npm ls --depth=0` and local `docker build` completed successfully after regeneration.
+
+## Compatibility
+
+* No API routes, DTOs, authentication, authorization, ownership filtering, upload field names, upload metadata, Dockerfile, Compose services, CI workflows, Prisma schema, migrations, seeds, Frontend or Infra files were changed.
+
+---
+
 # Sprint 9.5
 
 ## Added
