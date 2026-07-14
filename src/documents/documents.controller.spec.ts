@@ -1,10 +1,9 @@
 import { ExecutionContext, INestApplication } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
 import { Test, TestingModule } from '@nestjs/testing';
 import { UserRole } from '@prisma/client';
 import request from 'supertest';
 import { App } from 'supertest/types';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { RolesGuard } from '../auth/guards/roles.guard';
 import { AuthenticatedUser } from '../auth/types/authenticated-user.type';
 import { DocumentsController } from './documents.controller';
 import { DocumentsService } from './documents.service';
@@ -49,13 +48,16 @@ describe('DocumentsController', () => {
           provide: DocumentsService,
           useValue: documentsService,
         },
+        {
+          provide: APP_GUARD,
+          useValue: authGuard,
+        },
+        {
+          provide: APP_GUARD,
+          useValue: { canActivate: () => true },
+        },
       ],
-    })
-      .overrideGuard(JwtAuthGuard)
-      .useValue(authGuard)
-      .overrideGuard(RolesGuard)
-      .useValue({ canActivate: () => true })
-      .compile();
+    }).compile();
 
     app = moduleRef.createNestApplication();
     await app.init();

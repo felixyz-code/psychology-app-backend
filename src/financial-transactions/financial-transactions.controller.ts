@@ -18,15 +18,12 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
-  UseGuards,
   UsePipes,
   ValidationPipe,
 } from '@nestjs/common';
 import { UserRole } from '@prisma/client';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { RolesGuard } from '../auth/guards/roles.guard';
 import type { AuthenticatedUser } from '../auth/types/authenticated-user.type';
 import { CreateFinancialTransactionDto } from './dto/create-financial-transaction.dto';
 import { FindFinancialTransactionsQueryDto } from './dto/find-financial-transactions-query.dto';
@@ -37,7 +34,6 @@ import { FinancialTransactionsService } from './financial-transactions.service';
 @ApiTags('financial-transactions')
 @ApiBearerAuth('bearer')
 @Controller('financial-transactions')
-@UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(UserRole.ADMIN, UserRole.PSYCHOLOGIST)
 @UsePipes(
   new ValidationPipe({
