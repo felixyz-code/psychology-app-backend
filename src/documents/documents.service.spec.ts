@@ -1,8 +1,4 @@
-import {
-  BadRequestException,
-  InternalServerErrorException,
-  NotFoundException,
-} from '@nestjs/common';
+import { BadRequestException, Logger, NotFoundException } from '@nestjs/common';
 import { UserRole } from '@prisma/client';
 import {
   access,
@@ -96,6 +92,7 @@ describe('DocumentsService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    jest.spyOn(Logger.prototype, 'error').mockImplementation();
     jest
       .mocked(realpath)
       .mockImplementation((filePath) => Promise.resolve(filePath.toString()));
@@ -163,6 +160,25 @@ describe('DocumentsService', () => {
       fileName: 'consent.pdf',
       mimeType: 'application/pdf',
     });
+  });
+
+  it('removes the newly written file when metadata persistence fails', async () => {
+    prisma.caseFile.findUnique.mockResolvedValue({
+      id: 'case-file-id',
+      patientId: 'patient-id',
+    });
+    prisma.document.create.mockRejectedValue(new Error('database unavailable'));
+
+    await expect(
+      service.upload({ caseFileId: 'case-file-id' }, createFile(), admin),
+    ).rejects.toThrow('database unavailable');
+
+    expect(writeFile).toHaveBeenCalledWith(
+      expect.stringContaining('patients'),
+      expect.any(Buffer),
+      { flag: 'wx' },
+    );
+    expect(unlink).toHaveBeenCalledTimes(1);
   });
 
   it.each([
@@ -381,7 +397,7 @@ describe('DocumentsService', () => {
     expect(unlink).not.toHaveBeenCalled();
   });
 
-  it('deletes a confined physical file before its metadata', async () => {
+  it('deletes metadata before best-effort physical cleanup', async () => {
     const absoluteFilePath = join(
       uploadRoot,
       'patients',
@@ -409,7 +425,7 @@ describe('DocumentsService', () => {
     expect(prisma.document.delete).toHaveBeenCalledWith({
       where: { id: document.id },
     });
-    expect(deletionOrder).toEqual(['file', 'metadata']);
+    expect(deletionOrder).toEqual(['metadata', 'file']);
   });
 
   it('deletes metadata when the physical file is already absent', async () => {
@@ -429,21 +445,38 @@ describe('DocumentsService', () => {
     });
   });
 
-  it('rejects an out-of-root document path without deleting metadata', async () => {
+  it('does not delete the physical file when metadata deletion fails', async () => {
+    const document = {
+      id: 'document-id',
+      filePath: relative(process.cwd(), join(uploadRoot, 'document-id.pdf')),
+    };
+    prisma.document.findUnique.mockResolvedValue(document);
+    prisma.document.delete.mockRejectedValue(new Error('database unavailable'));
+
+    await expect(service.remove(document.id, admin)).rejects.toThrow(
+      'database unavailable',
+    );
+
+    expect(unlink).not.toHaveBeenCalled();
+  });
+
+  it('preserves the successful metadata delete when cleanup rejects an out-of-root path', async () => {
     prisma.document.findUnique.mockResolvedValue({
       id: 'document-id',
       filePath: join(process.cwd(), 'outside.pdf'),
     });
 
-    await expect(service.remove('document-id', admin)).rejects.toBeInstanceOf(
-      NotFoundException,
-    );
+    prisma.document.delete.mockResolvedValue({ id: 'document-id' });
+
+    await expect(service.remove('document-id', admin)).resolves.toEqual({
+      id: 'document-id',
+    });
 
     expect(unlink).not.toHaveBeenCalled();
-    expect(prisma.document.delete).not.toHaveBeenCalled();
+    expect(prisma.document.delete).toHaveBeenCalled();
   });
 
-  it('rejects a symlink-resolved path outside uploads without deleting metadata', async () => {
+  it('preserves the successful metadata delete when cleanup detects a symlink escape', async () => {
     const absoluteFilePath = join(uploadRoot, 'linked.pdf');
     prisma.document.findUnique.mockResolvedValue({
       id: 'document-id',
@@ -459,15 +492,17 @@ describe('DocumentsService', () => {
         ),
       );
 
-    await expect(service.remove('document-id', admin)).rejects.toBeInstanceOf(
-      NotFoundException,
-    );
+    prisma.document.delete.mockResolvedValue({ id: 'document-id' });
+
+    await expect(service.remove('document-id', admin)).resolves.toEqual({
+      id: 'document-id',
+    });
 
     expect(unlink).not.toHaveBeenCalled();
-    expect(prisma.document.delete).not.toHaveBeenCalled();
+    expect(prisma.document.delete).toHaveBeenCalled();
   });
 
-  it('preserves metadata when filesystem deletion fails unexpectedly', async () => {
+  it('preserves the successful metadata delete when filesystem cleanup fails unexpectedly', async () => {
     const absoluteFilePath = join(uploadRoot, 'protected.pdf');
     prisma.document.findUnique.mockResolvedValue({
       id: 'document-id',
@@ -475,11 +510,13 @@ describe('DocumentsService', () => {
     });
     jest.mocked(unlink).mockRejectedValue({ code: 'EACCES' });
 
-    await expect(service.remove('document-id', admin)).rejects.toBeInstanceOf(
-      InternalServerErrorException,
-    );
+    prisma.document.delete.mockResolvedValue({ id: 'document-id' });
 
-    expect(prisma.document.delete).not.toHaveBeenCalled();
+    await expect(service.remove('document-id', admin)).resolves.toEqual({
+      id: 'document-id',
+    });
+
+    expect(prisma.document.delete).toHaveBeenCalled();
   });
 
   it('keeps admin global access to document metadata', async () => {

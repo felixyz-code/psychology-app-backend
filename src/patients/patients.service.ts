@@ -1,13 +1,17 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { UserRole } from '@prisma/client';
 import { AuthenticatedUser } from '../auth/types/authenticated-user.type';
+import { DocumentsService } from '../documents/documents.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreatePatientDto } from './dto/create-patient.dto';
 import { UpdatePatientDto } from './dto/update-patient.dto';
 
 @Injectable()
 export class PatientsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly documentsService: DocumentsService,
+  ) {}
 
   async create(createPatientDto: CreatePatientDto, user: AuthenticatedUser) {
     const psychologistId = this.isAdmin(user)
@@ -78,10 +82,24 @@ export class PatientsService {
 
   async remove(id: string, user: AuthenticatedUser) {
     await this.findOne(id, user);
+    const documents = await this.prisma.document.findMany({
+      where: {
+        caseFile: {
+          patientId: id,
+        },
+      },
+      select: { filePath: true },
+    });
 
-    return this.prisma.patient.delete({
+    const deletedPatient = await this.prisma.patient.delete({
       where: { id },
     });
+
+    await this.documentsService.cleanupDocumentFiles(
+      documents.map((document) => document.filePath),
+    );
+
+    return deletedPatient;
   }
 
   private isAdmin(user: AuthenticatedUser) {

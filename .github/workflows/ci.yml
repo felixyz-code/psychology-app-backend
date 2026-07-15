@@ -18,7 +18,22 @@ jobs:
   backend:
     runs-on: ubuntu-latest
     env:
-      DATABASE_URL: postgresql://ci_user:ci_password@localhost:5432/psychology_app?schema=public
+      DATABASE_URL: postgresql://ci_user:ci_password@localhost:5432/psychology_app_test?schema=public
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: ci_user
+          POSTGRES_PASSWORD: ci_password
+          POSTGRES_DB: psychology_app_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ci_user -d psychology_app_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
 
     steps:
       - name: Checkout backend
@@ -35,6 +50,25 @@ jobs:
 
       - name: Generate Prisma Client
         run: npx prisma generate
+
+      - name: Replay migrations on an empty PostgreSQL database
+        run: npx prisma migrate deploy
+
+      - name: Verify migration status
+        run: npx prisma migrate status
+
+      - name: Seed disposable PostgreSQL database twice
+        run: |
+          npm run seed
+          npm run seed
+        env:
+          NODE_ENV: test
+          SEED_DEMO_PASSWORD: ci-temporary-demo-password
+
+      - name: Run PostgreSQL persistence integration tests
+        run: npm test -- --runInBand prisma/persistence.integration.spec.ts
+        env:
+          RUN_PERSISTENCE_TESTS: "true"
 
       - name: Typecheck
         run: npm run typecheck

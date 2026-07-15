@@ -5,6 +5,7 @@ import {
   BadRequestException,
   Injectable,
   InternalServerErrorException,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { UserRole } from '@prisma/client';
@@ -24,6 +25,8 @@ const allowedInlineMimeTypes = new Set([
 
 @Injectable()
 export class DocumentsService {
+  private readonly logger = new Logger(DocumentsService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly config: AppConfigService,
@@ -75,17 +78,22 @@ export class DocumentsService {
     const absoluteFilePath = join(patientDirectory, safeFileName);
 
     await mkdir(patientDirectory, { recursive: true });
-    await writeFile(absoluteFilePath, file.buffer);
+    await writeFile(absoluteFilePath, file.buffer, { flag: 'wx' });
 
-    return this.prisma.document.create({
-      data: {
-        caseFileId: uploadDocumentDto.caseFileId,
-        uploadedById,
-        fileName: file.originalname,
-        filePath: this.toRelativePath(absoluteFilePath),
-        mimeType: file.mimetype,
-      },
-    });
+    try {
+      return await this.prisma.document.create({
+        data: {
+          caseFileId: uploadDocumentDto.caseFileId,
+          uploadedById,
+          fileName: file.originalname,
+          filePath: this.toRelativePath(absoluteFilePath),
+          mimeType: file.mimetype,
+        },
+      });
+    } catch (error) {
+      await this.cleanupDocumentFiles([this.toRelativePath(absoluteFilePath)]);
+      throw error;
+    }
   }
 
   findAll(user: AuthenticatedUser) {
@@ -135,11 +143,26 @@ export class DocumentsService {
 
   async remove(id: string, user: AuthenticatedUser) {
     const document = await this.findOne(id, user);
-    await this.removeDocumentFile(document.filePath);
-
-    return this.prisma.document.delete({
+    const deletedDocument = await this.prisma.document.delete({
       where: { id },
     });
+
+    await this.cleanupDocumentFiles([document.filePath]);
+
+    return deletedDocument;
+  }
+
+  async cleanupDocumentFiles(filePaths: string[]) {
+    for (const filePath of filePaths) {
+      try {
+        await this.removeDocumentFile(filePath);
+      } catch (error) {
+        this.logger.error(
+          'Document file cleanup failed after database deletion',
+          error instanceof Error ? error.stack : undefined,
+        );
+      }
+    }
   }
 
   async getDownloadFile(id: string, user: AuthenticatedUser) {

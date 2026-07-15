@@ -11,6 +11,7 @@ type PrismaMock = {
     findFirst: jest.Mock;
     findMany: jest.Mock;
     findUnique: jest.Mock;
+    groupBy: jest.Mock;
     update: jest.Mock;
   };
   patient: { findFirst: jest.Mock; findUnique: jest.Mock };
@@ -43,6 +44,7 @@ describe('FinancialTransactionsService ownership', () => {
         findFirst: jest.fn(),
         findMany: jest.fn(),
         findUnique: jest.fn(),
+        groupBy: jest.fn(),
         update: jest.fn(),
       },
       patient: { findFirst: jest.fn(), findUnique: jest.fn() },
@@ -220,14 +222,16 @@ describe('FinancialTransactionsService ownership', () => {
   });
 
   it('calculates summaries from the same visibility-filtered transaction query', async () => {
-    prisma.financialTransaction.findMany.mockResolvedValue([
+    prisma.financialTransaction.groupBy.mockResolvedValue([
       {
         type: FinancialTransactionType.INCOME,
-        amount: { toNumber: () => 100 },
+        _sum: { amount: { toNumber: () => 100 } },
+        _count: { _all: 1 },
       },
       {
         type: FinancialTransactionType.EXPENSE,
-        amount: { toNumber: () => 25 },
+        _sum: { amount: { toNumber: () => 25 } },
+        _count: { _all: 1 },
       },
     ]);
 
@@ -239,18 +243,22 @@ describe('FinancialTransactionsService ownership', () => {
       netTotal: 75,
       transactionCount: 2,
     });
-    const summaryQueryCalls = prisma.financialTransaction.findMany.mock
+    const summaryQueryCalls = prisma.financialTransaction.groupBy.mock
       .calls as unknown as [
       [
         {
           where: { AND: unknown[] };
-          select: { type: boolean; amount: boolean };
+          by: string[];
+          _sum: { amount: boolean };
+          _count: { _all: boolean };
         },
       ],
     ];
     const summaryQuery = summaryQueryCalls[0][0];
     expect(summaryQuery.where.AND).toEqual(expect.any(Array));
-    expect(summaryQuery.select).toEqual({ type: true, amount: true });
+    expect(summaryQuery.by).toEqual(['type']);
+    expect(summaryQuery._sum).toEqual({ amount: true });
+    expect(summaryQuery._count).toEqual({ _all: true });
   });
 
   it('keeps admin global: no ownership filter is added', async () => {

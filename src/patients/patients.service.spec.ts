@@ -1,6 +1,7 @@
 import { NotFoundException } from '@nestjs/common';
 import { UserRole } from '@prisma/client';
 import { AuthenticatedUser } from '../auth/types/authenticated-user.type';
+import { DocumentsService } from '../documents/documents.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { PatientsService } from './patients.service';
 
@@ -13,6 +14,7 @@ type PrismaMock = {
     findUnique: jest.Mock;
     update: jest.Mock;
   };
+  document: { findMany: jest.Mock };
   user: { findUnique: jest.Mock };
 };
 
@@ -32,6 +34,7 @@ const psychologistA: AuthenticatedUser = {
 describe('PatientsService ownership', () => {
   let service: PatientsService;
   let prisma: PrismaMock;
+  let documentsService: Pick<DocumentsService, 'cleanupDocumentFiles'>;
 
   beforeEach(() => {
     prisma = {
@@ -43,9 +46,14 @@ describe('PatientsService ownership', () => {
         findUnique: jest.fn(),
         update: jest.fn(),
       },
+      document: { findMany: jest.fn() },
       user: { findUnique: jest.fn() },
     };
-    service = new PatientsService(prisma as unknown as PrismaService);
+    documentsService = { cleanupDocumentFiles: jest.fn() };
+    service = new PatientsService(
+      prisma as unknown as PrismaService,
+      documentsService as DocumentsService,
+    );
   });
 
   it('lists only patients owned by psychologist A', async () => {
@@ -141,5 +149,25 @@ describe('PatientsService ownership', () => {
     expect(adminPatientCreateCalls[0][0].data.psychologistId).toBe(
       'psychologist-b-id',
     );
+  });
+
+  it('cleans document files only after the patient cascade succeeds', async () => {
+    prisma.patient.findUnique.mockResolvedValue({ id: 'patient-a-id' });
+    prisma.document.findMany.mockResolvedValue([
+      { filePath: 'uploads/patients/patient-a-id/one.pdf' },
+      { filePath: 'uploads/patients/patient-a-id/two.pdf' },
+    ]);
+    prisma.patient.delete.mockResolvedValue({ id: 'patient-a-id' });
+
+    await service.remove('patient-a-id', admin);
+
+    expect(prisma.document.findMany).toHaveBeenCalledWith({
+      where: { caseFile: { patientId: 'patient-a-id' } },
+      select: { filePath: true },
+    });
+    expect(documentsService.cleanupDocumentFiles).toHaveBeenCalledWith([
+      'uploads/patients/patient-a-id/one.pdf',
+      'uploads/patients/patient-a-id/two.pdf',
+    ]);
   });
 });
