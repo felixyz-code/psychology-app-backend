@@ -2,11 +2,14 @@ import {
   ApiBearerAuth,
   ApiBadRequestResponse,
   ApiBody,
+  ApiCreatedResponse,
+  ApiForbiddenResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
   ApiParam,
   ApiTags,
+  ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import {
   Body,
@@ -27,9 +30,16 @@ import type { AuthenticatedUser } from '../auth/types/authenticated-user.type';
 import { AppointmentsService } from './appointments.service';
 import { CreateAppointmentDto } from './dto/create-appointment.dto';
 import { UpdateAppointmentDto } from './dto/update-appointment.dto';
+import { AppointmentResponseDto } from './dto/appointment-response.dto';
 
 @ApiTags('appointments')
 @ApiBearerAuth('bearer')
+@ApiUnauthorizedResponse({
+  description: 'Missing, invalid, or expired Bearer JWT',
+})
+@ApiForbiddenResponse({
+  description: 'Authenticated user lacks a permitted role',
+})
 @Controller('appointments')
 @Roles(UserRole.ADMIN, UserRole.PSYCHOLOGIST)
 @UsePipes(
@@ -44,7 +54,10 @@ export class AppointmentsController {
   @Post()
   @ApiOperation({ summary: 'Create an appointment' })
   @ApiBody({ type: CreateAppointmentDto })
-  @ApiOkResponse({ description: 'Appointment created successfully' })
+  @ApiCreatedResponse({
+    description: 'Appointment created successfully',
+    type: AppointmentResponseDto,
+  })
   @ApiBadRequestResponse({ description: 'Invalid appointment payload' })
   @ApiNotFoundResponse({ description: 'Patient or psychologist not found' })
   create(
@@ -56,7 +69,11 @@ export class AppointmentsController {
 
   @Get()
   @ApiOperation({ summary: 'List all appointments' })
-  @ApiOkResponse({ description: 'Appointments retrieved successfully' })
+  @ApiOkResponse({
+    description: 'Appointments retrieved successfully',
+    type: AppointmentResponseDto,
+    isArray: true,
+  })
   findAll(@CurrentUser() user: AuthenticatedUser) {
     return this.appointmentsService.findAll(user);
   }
@@ -69,7 +86,11 @@ export class AppointmentsController {
     format: 'uuid',
     example: '550e8400-e29b-41d4-a716-446655440000',
   })
-  @ApiOkResponse({ description: 'Appointments retrieved successfully' })
+  @ApiOkResponse({
+    description: 'Appointments retrieved successfully',
+    type: AppointmentResponseDto,
+    isArray: true,
+  })
   @ApiBadRequestResponse({ description: 'Invalid patient ID' })
   @ApiNotFoundResponse({ description: 'Patient not found' })
   findByPatientId(
@@ -87,7 +108,10 @@ export class AppointmentsController {
     format: 'uuid',
     example: '550e8400-e29b-41d4-a716-446655440000',
   })
-  @ApiOkResponse({ description: 'Appointment retrieved successfully' })
+  @ApiOkResponse({
+    description: 'Appointment retrieved successfully',
+    type: AppointmentResponseDto,
+  })
   @ApiBadRequestResponse({ description: 'Invalid appointment ID' })
   @ApiNotFoundResponse({ description: 'Appointment not found' })
   findOne(
@@ -106,7 +130,10 @@ export class AppointmentsController {
     example: '550e8400-e29b-41d4-a716-446655440000',
   })
   @ApiBody({ type: UpdateAppointmentDto })
-  @ApiOkResponse({ description: 'Appointment updated successfully' })
+  @ApiOkResponse({
+    description: 'Appointment updated successfully',
+    type: AppointmentResponseDto,
+  })
   @ApiBadRequestResponse({ description: 'Invalid appointment payload or ID' })
   @ApiNotFoundResponse({
     description: 'Appointment, patient, or psychologist not found',
@@ -127,7 +154,10 @@ export class AppointmentsController {
     format: 'uuid',
     example: '550e8400-e29b-41d4-a716-446655440000',
   })
-  @ApiOkResponse({ description: 'Appointment deleted successfully' })
+  @ApiOkResponse({
+    description: 'Appointment deleted successfully',
+    type: AppointmentResponseDto,
+  })
   @ApiBadRequestResponse({ description: 'Invalid appointment ID' })
   @ApiNotFoundResponse({ description: 'Appointment not found' })
   remove(

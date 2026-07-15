@@ -4,13 +4,17 @@ import {
   ApiBearerAuth,
   ApiBadRequestResponse,
   ApiBody,
+  ApiCreatedResponse,
+  ApiForbiddenResponse,
   ApiConsumes,
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
   ApiParam,
+  ApiPayloadTooLargeResponse,
   ApiResponse,
   ApiTags,
+  ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import {
   BadRequestException,
@@ -38,6 +42,7 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import type { AuthenticatedUser } from '../auth/types/authenticated-user.type';
 import { CreateDocumentDto } from './dto/create-document.dto';
 import { UpdateDocumentDto } from './dto/update-document.dto';
+import { DocumentResponseDto } from './dto/document-response.dto';
 import { UploadDocumentDto } from './dto/upload-document.dto';
 import { DocumentsService } from './documents.service';
 
@@ -51,6 +56,12 @@ const allowedExtensions = new Set(['.pdf', '.jpg', '.jpeg', '.png']);
 
 @ApiTags('documents')
 @ApiBearerAuth('bearer')
+@ApiUnauthorizedResponse({
+  description: 'Missing, invalid, or expired Bearer JWT',
+})
+@ApiForbiddenResponse({
+  description: 'Authenticated user lacks a permitted role',
+})
 @Controller('documents')
 @Roles(UserRole.ADMIN, UserRole.PSYCHOLOGIST)
 @UsePipes(
@@ -107,12 +118,18 @@ export class DocumentsController {
       },
     },
   })
-  @ApiOkResponse({ description: 'Document uploaded successfully' })
+  @ApiCreatedResponse({
+    description: 'Document uploaded successfully',
+    type: DocumentResponseDto,
+  })
   @ApiBadRequestResponse({
     description:
-      'Missing file, invalid payload, unsupported type, or file too large',
+      'Missing file, invalid multipart metadata, or unsupported file type or extension',
   })
   @ApiNotFoundResponse({ description: 'Case file or user not found' })
+  @ApiPayloadTooLargeResponse({
+    description: 'Uploaded file exceeds the 10 MB limit',
+  })
   upload(
     @Body() uploadDocumentDto: UploadDocumentDto,
     @UploadedFile() file: Express.Multer.File | undefined,
@@ -128,7 +145,10 @@ export class DocumentsController {
   @Post()
   @ApiOperation({ summary: 'Create document metadata' })
   @ApiBody({ type: CreateDocumentDto })
-  @ApiOkResponse({ description: 'Document metadata created successfully' })
+  @ApiCreatedResponse({
+    description: 'Document metadata created successfully',
+    type: DocumentResponseDto,
+  })
   @ApiBadRequestResponse({ description: 'Invalid document payload' })
   @ApiNotFoundResponse({ description: 'Case file or user not found' })
   create(
@@ -140,7 +160,11 @@ export class DocumentsController {
 
   @Get()
   @ApiOperation({ summary: 'List all documents metadata' })
-  @ApiOkResponse({ description: 'Documents retrieved successfully' })
+  @ApiOkResponse({
+    description: 'Documents retrieved successfully',
+    type: DocumentResponseDto,
+    isArray: true,
+  })
   findAll(@CurrentUser() user: AuthenticatedUser) {
     return this.documentsService.findAll(user);
   }
@@ -153,7 +177,11 @@ export class DocumentsController {
     format: 'uuid',
     example: '550e8400-e29b-41d4-a716-446655440000',
   })
-  @ApiOkResponse({ description: 'Documents retrieved successfully' })
+  @ApiOkResponse({
+    description: 'Documents retrieved successfully',
+    type: DocumentResponseDto,
+    isArray: true,
+  })
   @ApiBadRequestResponse({ description: 'Invalid case file ID' })
   @ApiNotFoundResponse({ description: 'Case file not found' })
   findByCaseFileId(
@@ -252,7 +280,10 @@ export class DocumentsController {
     format: 'uuid',
     example: '550e8400-e29b-41d4-a716-446655440000',
   })
-  @ApiOkResponse({ description: 'Document retrieved successfully' })
+  @ApiOkResponse({
+    description: 'Document retrieved successfully',
+    type: DocumentResponseDto,
+  })
   @ApiBadRequestResponse({ description: 'Invalid document ID' })
   @ApiNotFoundResponse({ description: 'Document not found' })
   findOne(
@@ -271,7 +302,10 @@ export class DocumentsController {
     example: '550e8400-e29b-41d4-a716-446655440000',
   })
   @ApiBody({ type: UpdateDocumentDto })
-  @ApiOkResponse({ description: 'Document updated successfully' })
+  @ApiOkResponse({
+    description: 'Document updated successfully',
+    type: DocumentResponseDto,
+  })
   @ApiBadRequestResponse({ description: 'Invalid document payload or ID' })
   @ApiNotFoundResponse({ description: 'Document not found' })
   update(
@@ -290,7 +324,10 @@ export class DocumentsController {
     format: 'uuid',
     example: '550e8400-e29b-41d4-a716-446655440000',
   })
-  @ApiOkResponse({ description: 'Document deleted successfully' })
+  @ApiOkResponse({
+    description: 'Document deleted successfully',
+    type: DocumentResponseDto,
+  })
   @ApiBadRequestResponse({ description: 'Invalid document ID' })
   @ApiNotFoundResponse({ description: 'Document not found' })
   remove(

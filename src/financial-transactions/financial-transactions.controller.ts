@@ -2,11 +2,14 @@ import {
   ApiBearerAuth,
   ApiBadRequestResponse,
   ApiBody,
+  ApiCreatedResponse,
+  ApiForbiddenResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
   ApiParam,
   ApiTags,
+  ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import {
   Body,
@@ -28,11 +31,18 @@ import type { AuthenticatedUser } from '../auth/types/authenticated-user.type';
 import { CreateFinancialTransactionDto } from './dto/create-financial-transaction.dto';
 import { FindFinancialTransactionsQueryDto } from './dto/find-financial-transactions-query.dto';
 import { FinancialTransactionSummaryDto } from './dto/financial-transaction-summary.dto';
+import { FinancialTransactionResponseDto } from './dto/financial-transaction-response.dto';
 import { UpdateFinancialTransactionDto } from './dto/update-financial-transaction.dto';
 import { FinancialTransactionsService } from './financial-transactions.service';
 
 @ApiTags('financial-transactions')
 @ApiBearerAuth('bearer')
+@ApiUnauthorizedResponse({
+  description: 'Missing, invalid, or expired Bearer JWT',
+})
+@ApiForbiddenResponse({
+  description: 'Authenticated user lacks a permitted role',
+})
 @Controller('financial-transactions')
 @Roles(UserRole.ADMIN, UserRole.PSYCHOLOGIST)
 @UsePipes(
@@ -49,7 +59,10 @@ export class FinancialTransactionsController {
   @Post()
   @ApiOperation({ summary: 'Create a financial transaction' })
   @ApiBody({ type: CreateFinancialTransactionDto })
-  @ApiOkResponse({ description: 'Financial transaction created successfully' })
+  @ApiCreatedResponse({
+    description: 'Financial transaction created successfully',
+    type: FinancialTransactionResponseDto,
+  })
   @ApiBadRequestResponse({
     description: 'Invalid financial transaction payload',
   })
@@ -70,6 +83,8 @@ export class FinancialTransactionsController {
   @ApiOperation({ summary: 'List all financial transactions' })
   @ApiOkResponse({
     description: 'Financial transactions retrieved successfully',
+    type: FinancialTransactionResponseDto,
+    isArray: true,
   })
   findAll(
     @CurrentUser() user: AuthenticatedUser,
@@ -101,6 +116,7 @@ export class FinancialTransactionsController {
   })
   @ApiOkResponse({
     description: 'Financial transaction retrieved successfully',
+    type: FinancialTransactionResponseDto,
   })
   @ApiBadRequestResponse({ description: 'Invalid financial transaction ID' })
   @ApiNotFoundResponse({ description: 'Financial transaction not found' })
@@ -122,6 +138,7 @@ export class FinancialTransactionsController {
   @ApiBody({ type: UpdateFinancialTransactionDto })
   @ApiOkResponse({
     description: 'Financial transaction updated successfully',
+    type: FinancialTransactionResponseDto,
   })
   @ApiBadRequestResponse({
     description: 'Invalid financial transaction payload or ID',
@@ -152,6 +169,7 @@ export class FinancialTransactionsController {
   })
   @ApiOkResponse({
     description: 'Financial transaction deleted successfully',
+    type: FinancialTransactionResponseDto,
   })
   @ApiBadRequestResponse({ description: 'Invalid financial transaction ID' })
   @ApiNotFoundResponse({ description: 'Financial transaction not found' })
