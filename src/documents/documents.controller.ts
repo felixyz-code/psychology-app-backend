@@ -1,4 +1,3 @@
-import { extname } from 'node:path';
 import { createReadStream } from 'node:fs';
 import {
   ApiBearerAuth,
@@ -44,15 +43,8 @@ import { CreateDocumentDto } from './dto/create-document.dto';
 import { UpdateDocumentDto } from './dto/update-document.dto';
 import { DocumentResponseDto } from './dto/document-response.dto';
 import { UploadDocumentDto } from './dto/upload-document.dto';
+import { hasAllowedDocumentMetadata } from './document-file.validation';
 import { DocumentsService } from './documents.service';
-
-const allowedMimeTypes = new Set([
-  'application/pdf',
-  'image/jpeg',
-  'image/png',
-]);
-
-const allowedExtensions = new Set(['.pdf', '.jpg', '.jpeg', '.png']);
 
 @ApiTags('documents')
 @ApiBearerAuth('bearer')
@@ -81,11 +73,7 @@ export class DocumentsController {
         fileSize: 10 * 1024 * 1024,
       },
       fileFilter: (_request, file, callback) => {
-        const extension = extname(file.originalname).toLowerCase();
-        const isAllowedType = allowedMimeTypes.has(file.mimetype);
-        const isAllowedExtension = allowedExtensions.has(extension);
-
-        if (!isAllowedType || !isAllowedExtension) {
+        if (!hasAllowedDocumentMetadata(file)) {
           callback(
             new BadRequestException(
               'Only PDF, JPG, JPEG and PNG files are allowed',

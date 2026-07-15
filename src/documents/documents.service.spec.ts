@@ -1,7 +1,18 @@
-import { NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  InternalServerErrorException,
+  NotFoundException,
+} from '@nestjs/common';
 import { UserRole } from '@prisma/client';
-import { access, mkdir, rm, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import {
+  access,
+  mkdir,
+  realpath,
+  rm,
+  unlink,
+  writeFile,
+} from 'node:fs/promises';
+import { join, relative } from 'node:path';
 import { AuthenticatedUser } from '../auth/types/authenticated-user.type';
 import { AppConfigService } from '../config/configuration';
 import { PrismaService } from '../prisma/prisma.service';
@@ -16,6 +27,8 @@ jest.mock('node:fs/promises', () => {
     ...actual,
     access: jest.fn(),
     mkdir: jest.fn(),
+    realpath: jest.fn(),
+    unlink: jest.fn(),
     writeFile: jest.fn(),
   };
 });
@@ -64,11 +77,16 @@ const psychologist: AuthenticatedUser = {
 
 const uploadRoot = join(process.cwd(), '.tmp-tests', 'documents-service');
 
-function createFile(): Express.Multer.File {
+function createFile(
+  overrides: Partial<
+    Pick<Express.Multer.File, 'buffer' | 'mimetype' | 'originalname'>
+  > = {},
+): Express.Multer.File {
   return {
     originalname: 'consent.pdf',
     mimetype: 'application/pdf',
-    buffer: Buffer.from('test-file'),
+    buffer: Buffer.from('%PDF-1.7'),
+    ...overrides,
   } as Express.Multer.File;
 }
 
@@ -78,6 +96,10 @@ describe('DocumentsService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    jest
+      .mocked(realpath)
+      .mockImplementation((filePath) => Promise.resolve(filePath.toString()));
+    jest.mocked(unlink).mockResolvedValue(undefined);
     prisma = {
       caseFile: {
         findFirst: jest.fn(),
@@ -141,6 +163,100 @@ describe('DocumentsService', () => {
       fileName: 'consent.pdf',
       mimeType: 'application/pdf',
     });
+  });
+
+  it.each([
+    [
+      'PDF',
+      createFile({
+        originalname: 'consent.pdf',
+        mimetype: 'application/pdf',
+        buffer: Buffer.from('%PDF-1.7'),
+      }),
+    ],
+    [
+      'JPEG',
+      createFile({
+        originalname: 'photo.jpg',
+        mimetype: 'image/jpeg',
+        buffer: Buffer.from([0xff, 0xd8, 0xff, 0xe0]),
+      }),
+    ],
+    [
+      'PNG',
+      createFile({
+        originalname: 'scan.png',
+        mimetype: 'image/png',
+        buffer: Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+      }),
+    ],
+  ])('accepts a %s file with a valid signature', async (_format, file) => {
+    prisma.caseFile.findUnique.mockResolvedValue({
+      id: 'case-file-id',
+      patientId: 'patient-id',
+    });
+    prisma.document.create.mockResolvedValue({ id: 'document-id' });
+
+    await expect(
+      service.upload({ caseFileId: 'case-file-id' }, file, admin),
+    ).resolves.toEqual({ id: 'document-id' });
+  });
+
+  it('rejects a PDF extension whose content is not a PDF before persistence', async () => {
+    prisma.caseFile.findUnique.mockResolvedValue({
+      id: 'case-file-id',
+      patientId: 'patient-id',
+    });
+
+    await expect(
+      service.upload(
+        { caseFileId: 'case-file-id' },
+        createFile({ buffer: Buffer.from('not a document') }),
+        admin,
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
+
+    expect(mkdir).not.toHaveBeenCalled();
+    expect(writeFile).not.toHaveBeenCalled();
+    expect(prisma.document.create).not.toHaveBeenCalled();
+  });
+
+  it('rejects a declared PDF MIME type when the content is PNG', async () => {
+    prisma.caseFile.findUnique.mockResolvedValue({
+      id: 'case-file-id',
+      patientId: 'patient-id',
+    });
+
+    await expect(
+      service.upload(
+        { caseFileId: 'case-file-id' },
+        createFile({
+          buffer: Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+        }),
+        admin,
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
+
+    expect(prisma.document.create).not.toHaveBeenCalled();
+  });
+
+  it('rejects a file shorter than every accepted signature', async () => {
+    prisma.caseFile.findUnique.mockResolvedValue({
+      id: 'case-file-id',
+      patientId: 'patient-id',
+    });
+
+    await expect(
+      service.upload(
+        { caseFileId: 'case-file-id' },
+        createFile({ buffer: Buffer.from('%PD') }),
+        admin,
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
+
+    expect(mkdir).not.toHaveBeenCalled();
+    expect(writeFile).not.toHaveBeenCalled();
+    expect(prisma.document.create).not.toHaveBeenCalled();
   });
 
   it('ignores a legacy uploadedById field when it is still sent', async () => {
@@ -261,6 +377,108 @@ describe('DocumentsService', () => {
     );
 
     expect(prisma.document.update).not.toHaveBeenCalled();
+    expect(prisma.document.delete).not.toHaveBeenCalled();
+    expect(unlink).not.toHaveBeenCalled();
+  });
+
+  it('deletes a confined physical file before its metadata', async () => {
+    const absoluteFilePath = join(
+      uploadRoot,
+      'patients',
+      'patient-id',
+      'document-id.pdf',
+    );
+    const document = {
+      id: 'document-id',
+      filePath: relative(process.cwd(), absoluteFilePath),
+    };
+    const deletionOrder: string[] = [];
+    prisma.document.findUnique.mockResolvedValue(document);
+    prisma.document.delete.mockImplementation(() => {
+      deletionOrder.push('metadata');
+      return Promise.resolve(document);
+    });
+    jest.mocked(unlink).mockImplementation(() => {
+      deletionOrder.push('file');
+      return Promise.resolve();
+    });
+
+    await expect(service.remove(document.id, admin)).resolves.toEqual(document);
+
+    expect(unlink).toHaveBeenCalledWith(absoluteFilePath);
+    expect(prisma.document.delete).toHaveBeenCalledWith({
+      where: { id: document.id },
+    });
+    expect(deletionOrder).toEqual(['file', 'metadata']);
+  });
+
+  it('deletes metadata when the physical file is already absent', async () => {
+    const absoluteFilePath = join(uploadRoot, 'missing.pdf');
+    const document = {
+      id: 'document-id',
+      filePath: relative(process.cwd(), absoluteFilePath),
+    };
+    prisma.document.findUnique.mockResolvedValue(document);
+    prisma.document.delete.mockResolvedValue(document);
+    jest.mocked(unlink).mockRejectedValue({ code: 'ENOENT' });
+
+    await expect(service.remove(document.id, admin)).resolves.toEqual(document);
+
+    expect(prisma.document.delete).toHaveBeenCalledWith({
+      where: { id: document.id },
+    });
+  });
+
+  it('rejects an out-of-root document path without deleting metadata', async () => {
+    prisma.document.findUnique.mockResolvedValue({
+      id: 'document-id',
+      filePath: join(process.cwd(), 'outside.pdf'),
+    });
+
+    await expect(service.remove('document-id', admin)).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+
+    expect(unlink).not.toHaveBeenCalled();
+    expect(prisma.document.delete).not.toHaveBeenCalled();
+  });
+
+  it('rejects a symlink-resolved path outside uploads without deleting metadata', async () => {
+    const absoluteFilePath = join(uploadRoot, 'linked.pdf');
+    prisma.document.findUnique.mockResolvedValue({
+      id: 'document-id',
+      filePath: relative(process.cwd(), absoluteFilePath),
+    });
+    jest
+      .mocked(realpath)
+      .mockImplementation((filePath) =>
+        Promise.resolve(
+          filePath === uploadRoot
+            ? uploadRoot
+            : join(process.cwd(), 'outside-target.pdf'),
+        ),
+      );
+
+    await expect(service.remove('document-id', admin)).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+
+    expect(unlink).not.toHaveBeenCalled();
+    expect(prisma.document.delete).not.toHaveBeenCalled();
+  });
+
+  it('preserves metadata when filesystem deletion fails unexpectedly', async () => {
+    const absoluteFilePath = join(uploadRoot, 'protected.pdf');
+    prisma.document.findUnique.mockResolvedValue({
+      id: 'document-id',
+      filePath: relative(process.cwd(), absoluteFilePath),
+    });
+    jest.mocked(unlink).mockRejectedValue({ code: 'EACCES' });
+
+    await expect(service.remove('document-id', admin)).rejects.toBeInstanceOf(
+      InternalServerErrorException,
+    );
+
     expect(prisma.document.delete).not.toHaveBeenCalled();
   });
 

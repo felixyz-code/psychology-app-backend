@@ -123,6 +123,11 @@ CORS_ORIGIN=http://localhost:4200,http://localhost:4201
 SWAGGER_ENABLED=true
 ```
 
+`SWAGGER_ENABLED` is optional. It defaults to `true` in `development` and
+`test`, and to `false` when `NODE_ENV=production`. Production deployments must
+declare `NODE_ENV=production`; they may explicitly enable Swagger only when
+that exposure is intentional.
+
 `DATABASE_URL` is also required by `prisma.config.ts`, so local Prisma CLI commands such as `prisma generate` must run with that variable available.
 
 Example in PowerShell:

@@ -30,6 +30,7 @@ export function validateRuntimeEnv(env: NodeJS.ProcessEnv): RuntimeConfig {
     readOptional(env, 'SWAGGER_ENABLED'),
     'SWAGGER_ENABLED',
     errors,
+    nodeEnv,
   );
   const port = parsePort(readOptional(env, 'PORT'), errors);
 
@@ -143,9 +144,10 @@ function parseOptionalBoolean(
   value: string | undefined,
   key: string,
   errors: string[],
+  nodeEnv: string,
 ) {
   if (value === undefined) {
-    return true;
+    return nodeEnv !== 'production';
   }
 
   if (value === 'true') {

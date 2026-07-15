@@ -95,4 +95,34 @@ describe('validateRuntimeEnv', () => {
 
     expect(config.uploadsPath).toBe('uploads');
   });
+
+  it('disables Swagger by default in production', () => {
+    const config = validateRuntimeEnv(
+      createValidEnv({ NODE_ENV: 'production' }),
+    );
+
+    expect(config.swaggerEnabled).toBe(false);
+  });
+
+  it('enables Swagger by default outside production', () => {
+    const config = validateRuntimeEnv(
+      createValidEnv({ NODE_ENV: 'development' }),
+    );
+
+    expect(config.swaggerEnabled).toBe(true);
+  });
+
+  it.each([
+    ['true', true],
+    ['false', false],
+  ])('uses the explicit SWAGGER_ENABLED=%s override', (value, expected) => {
+    const config = validateRuntimeEnv(
+      createValidEnv({
+        NODE_ENV: 'production',
+        SWAGGER_ENABLED: value,
+      }),
+    );
+
+    expect(config.swaggerEnabled).toBe(expected);
+  });
 });

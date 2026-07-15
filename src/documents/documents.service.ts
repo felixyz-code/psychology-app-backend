@@ -1,9 +1,10 @@
 import { randomUUID } from 'node:crypto';
-import { access, mkdir, writeFile } from 'node:fs/promises';
+import { access, mkdir, realpath, unlink, writeFile } from 'node:fs/promises';
 import { extname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import {
   BadRequestException,
   Injectable,
+  InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common';
 import { UserRole } from '@prisma/client';
@@ -13,6 +14,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateDocumentDto } from './dto/create-document.dto';
 import { UpdateDocumentDto } from './dto/update-document.dto';
 import { UploadDocumentDto } from './dto/upload-document.dto';
+import { validateDocumentFileContent } from './document-file.validation';
 
 const allowedInlineMimeTypes = new Set([
   'application/pdf',
@@ -55,6 +57,7 @@ export class DocumentsService {
       uploadDocumentDto.caseFileId,
       user,
     );
+    validateDocumentFileContent(file);
 
     const uploadedById = user.id;
 
@@ -131,7 +134,8 @@ export class DocumentsService {
   }
 
   async remove(id: string, user: AuthenticatedUser) {
-    await this.findOne(id, user);
+    const document = await this.findOne(id, user);
+    await this.removeDocumentFile(document.filePath);
 
     return this.prisma.document.delete({
       where: { id },
@@ -243,6 +247,23 @@ export class DocumentsService {
   }
 
   private async resolveDocumentFilePath(filePath: string) {
+    const { uploadsRoot, candidatePath } =
+      this.getConfinedDocumentPath(filePath);
+
+    try {
+      await access(candidatePath);
+      await this.assertResolvedPathIsWithinUploadsRoot(
+        uploadsRoot,
+        candidatePath,
+      );
+    } catch {
+      throw new NotFoundException('Document file not found');
+    }
+
+    return candidatePath;
+  }
+
+  private getConfinedDocumentPath(filePath: string) {
     const uploadsRoot = this.getUploadsRoot();
     const candidatePath = isAbsolute(filePath)
       ? resolve(filePath)
@@ -256,12 +277,58 @@ export class DocumentsService {
       throw new NotFoundException('Document file not found');
     }
 
+    return { uploadsRoot, candidatePath };
+  }
+
+  private async removeDocumentFile(filePath: string) {
+    const { uploadsRoot, candidatePath } =
+      this.getConfinedDocumentPath(filePath);
+
     try {
-      await access(candidatePath);
-    } catch {
+      await this.assertResolvedPathIsWithinUploadsRoot(
+        uploadsRoot,
+        candidatePath,
+      );
+      await unlink(candidatePath);
+    } catch (error) {
+      if (getFileSystemErrorCode(error) === 'ENOENT') {
+        return;
+      }
+
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+
+      throw new InternalServerErrorException('Unable to delete document file');
+    }
+  }
+
+  private async assertResolvedPathIsWithinUploadsRoot(
+    uploadsRoot: string,
+    candidatePath: string,
+  ) {
+    const [resolvedUploadsRoot, resolvedCandidatePath] = await Promise.all([
+      realpath(uploadsRoot),
+      realpath(candidatePath),
+    ]);
+    const relativeToResolvedUploadsRoot = relative(
+      resolvedUploadsRoot,
+      resolvedCandidatePath,
+    );
+
+    if (
+      relativeToResolvedUploadsRoot.startsWith('..') ||
+      isAbsolute(relativeToResolvedUploadsRoot)
+    ) {
       throw new NotFoundException('Document file not found');
     }
-
-    return candidatePath;
   }
+}
+
+function getFileSystemErrorCode(error: unknown) {
+  if (error && typeof error === 'object' && 'code' in error) {
+    return error.code;
+  }
+
+  return undefined;
 }

@@ -407,8 +407,10 @@ Current security features include:
 - Ownership filtering
 - Centralized runtime configuration validation
 - DTO validation
+- HTTP security headers through Helmet, without the Express `X-Powered-By` fingerprint
 - UUID validation
 - MIME validation
+- PDF, JPEG and PNG signature validation for uploads
 - Upload size restrictions
 - Path traversal protection
 
@@ -416,6 +418,12 @@ Runtime configuration is centralized in the backend configuration module.
 Startup validation requires `DATABASE_URL` and `JWT_SECRET`, applies safe
 defaults for documented optional variables, and reports invalid variable names
 without printing secret values.
+
+Helmet supplies the standard application-level security headers, including
+`X-Content-Type-Options`, frame protection and `Referrer-Policy`. The Content
+Security Policy allows the same-origin Swagger UI's required inline setup and
+styles, while `upgrade-insecure-requests` is disabled in the backend. HTTPS
+and HSTS belong to the reverse proxy deployment layer.
 
 Current MVP intentionally does not include:
 
