@@ -61,11 +61,14 @@ export class FinancialTransactionsService {
     user: AuthenticatedUser,
     query: FindFinancialTransactionsQueryDto,
   ) {
-    const transactions = await this.prisma.financialTransaction.findMany({
+    const transactions = await this.prisma.financialTransaction.groupBy({
       where: this.buildFindManyWhere(user, query),
-      select: {
-        type: true,
+      by: ['type'],
+      _sum: {
         amount: true,
+      },
+      _count: {
+        _all: true,
       },
     });
 
@@ -75,11 +78,12 @@ export class FinancialTransactionsService {
       adjustmentTotal: 0,
       refundTotal: 0,
       netTotal: 0,
-      transactionCount: transactions.length,
+      transactionCount: 0,
     };
 
     for (const transaction of transactions) {
-      const amount = transaction.amount.toNumber();
+      const amount = transaction._sum.amount?.toNumber() ?? 0;
+      summary.transactionCount += transaction._count._all;
 
       switch (transaction.type) {
         case FinancialTransactionType.INCOME:

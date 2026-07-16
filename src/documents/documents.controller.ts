@@ -1,16 +1,19 @@
-import { extname } from 'node:path';
 import { createReadStream } from 'node:fs';
 import {
   ApiBearerAuth,
   ApiBadRequestResponse,
   ApiBody,
+  ApiCreatedResponse,
+  ApiForbiddenResponse,
   ApiConsumes,
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
   ApiParam,
+  ApiPayloadTooLargeResponse,
   ApiResponse,
   ApiTags,
+  ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import {
   BadRequestException,
@@ -25,7 +28,6 @@ import {
   Res,
   StreamableFile,
   UploadedFile,
-  UseGuards,
   UseInterceptors,
   UsePipes,
   ValidationPipe,
@@ -36,26 +38,23 @@ import type { Response } from 'express';
 import { memoryStorage } from 'multer';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { RolesGuard } from '../auth/guards/roles.guard';
 import type { AuthenticatedUser } from '../auth/types/authenticated-user.type';
 import { CreateDocumentDto } from './dto/create-document.dto';
 import { UpdateDocumentDto } from './dto/update-document.dto';
+import { DocumentResponseDto } from './dto/document-response.dto';
 import { UploadDocumentDto } from './dto/upload-document.dto';
+import { hasAllowedDocumentMetadata } from './document-file.validation';
 import { DocumentsService } from './documents.service';
-
-const allowedMimeTypes = new Set([
-  'application/pdf',
-  'image/jpeg',
-  'image/png',
-]);
-
-const allowedExtensions = new Set(['.pdf', '.jpg', '.jpeg', '.png']);
 
 @ApiTags('documents')
 @ApiBearerAuth('bearer')
+@ApiUnauthorizedResponse({
+  description: 'Missing, invalid, or expired Bearer JWT',
+})
+@ApiForbiddenResponse({
+  description: 'Authenticated user lacks a permitted role',
+})
 @Controller('documents')
-@UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(UserRole.ADMIN, UserRole.PSYCHOLOGIST)
 @UsePipes(
   new ValidationPipe({
@@ -74,11 +73,7 @@ export class DocumentsController {
         fileSize: 10 * 1024 * 1024,
       },
       fileFilter: (_request, file, callback) => {
-        const extension = extname(file.originalname).toLowerCase();
-        const isAllowedType = allowedMimeTypes.has(file.mimetype);
-        const isAllowedExtension = allowedExtensions.has(extension);
-
-        if (!isAllowedType || !isAllowedExtension) {
+        if (!hasAllowedDocumentMetadata(file)) {
           callback(
             new BadRequestException(
               'Only PDF, JPG, JPEG and PNG files are allowed',
@@ -111,12 +106,18 @@ export class DocumentsController {
       },
     },
   })
-  @ApiOkResponse({ description: 'Document uploaded successfully' })
+  @ApiCreatedResponse({
+    description: 'Document uploaded successfully',
+    type: DocumentResponseDto,
+  })
   @ApiBadRequestResponse({
     description:
-      'Missing file, invalid payload, unsupported type, or file too large',
+      'Missing file, invalid multipart metadata, or unsupported file type or extension',
   })
   @ApiNotFoundResponse({ description: 'Case file or user not found' })
+  @ApiPayloadTooLargeResponse({
+    description: 'Uploaded file exceeds the 10 MB limit',
+  })
   upload(
     @Body() uploadDocumentDto: UploadDocumentDto,
     @UploadedFile() file: Express.Multer.File | undefined,
@@ -132,7 +133,10 @@ export class DocumentsController {
   @Post()
   @ApiOperation({ summary: 'Create document metadata' })
   @ApiBody({ type: CreateDocumentDto })
-  @ApiOkResponse({ description: 'Document metadata created successfully' })
+  @ApiCreatedResponse({
+    description: 'Document metadata created successfully',
+    type: DocumentResponseDto,
+  })
   @ApiBadRequestResponse({ description: 'Invalid document payload' })
   @ApiNotFoundResponse({ description: 'Case file or user not found' })
   create(
@@ -144,7 +148,11 @@ export class DocumentsController {
 
   @Get()
   @ApiOperation({ summary: 'List all documents metadata' })
-  @ApiOkResponse({ description: 'Documents retrieved successfully' })
+  @ApiOkResponse({
+    description: 'Documents retrieved successfully',
+    type: DocumentResponseDto,
+    isArray: true,
+  })
   findAll(@CurrentUser() user: AuthenticatedUser) {
     return this.documentsService.findAll(user);
   }
@@ -157,7 +165,11 @@ export class DocumentsController {
     format: 'uuid',
     example: '550e8400-e29b-41d4-a716-446655440000',
   })
-  @ApiOkResponse({ description: 'Documents retrieved successfully' })
+  @ApiOkResponse({
+    description: 'Documents retrieved successfully',
+    type: DocumentResponseDto,
+    isArray: true,
+  })
   @ApiBadRequestResponse({ description: 'Invalid case file ID' })
   @ApiNotFoundResponse({ description: 'Case file not found' })
   findByCaseFileId(
@@ -256,7 +268,10 @@ export class DocumentsController {
     format: 'uuid',
     example: '550e8400-e29b-41d4-a716-446655440000',
   })
-  @ApiOkResponse({ description: 'Document retrieved successfully' })
+  @ApiOkResponse({
+    description: 'Document retrieved successfully',
+    type: DocumentResponseDto,
+  })
   @ApiBadRequestResponse({ description: 'Invalid document ID' })
   @ApiNotFoundResponse({ description: 'Document not found' })
   findOne(
@@ -275,7 +290,10 @@ export class DocumentsController {
     example: '550e8400-e29b-41d4-a716-446655440000',
   })
   @ApiBody({ type: UpdateDocumentDto })
-  @ApiOkResponse({ description: 'Document updated successfully' })
+  @ApiOkResponse({
+    description: 'Document updated successfully',
+    type: DocumentResponseDto,
+  })
   @ApiBadRequestResponse({ description: 'Invalid document payload or ID' })
   @ApiNotFoundResponse({ description: 'Document not found' })
   update(
@@ -294,7 +312,10 @@ export class DocumentsController {
     format: 'uuid',
     example: '550e8400-e29b-41d4-a716-446655440000',
   })
-  @ApiOkResponse({ description: 'Document deleted successfully' })
+  @ApiOkResponse({
+    description: 'Document deleted successfully',
+    type: DocumentResponseDto,
+  })
   @ApiBadRequestResponse({ description: 'Invalid document ID' })
   @ApiNotFoundResponse({ description: 'Document not found' })
   remove(

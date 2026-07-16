@@ -47,6 +47,15 @@ docs/ROADMAP.md
 
 ## Local Development
 
+Supported toolchain:
+
+- Node.js `^20.19 || >=22.12 <23`
+- npm `>=10 <11`
+- Package manager metadata: `npm@10.9.8`
+
+Docker continues to use Node 20. Local development may use Node 20.19+ or
+Node 22.12+ inside the supported range.
+
 Install dependencies:
 
 ```bash
@@ -58,6 +67,23 @@ Run backend locally:
 ```bash
 npm run start:dev
 ```
+
+Run quality checks:
+
+```bash
+npm run build
+npm run typecheck
+npm run lint
+npm run format:check
+npm test -- --runInBand
+```
+
+`lint`, `format:check` and `typecheck` are read-only quality gates. `lint:fix`
+and `format` may rewrite files and should be used intentionally during local
+development.
+
+The Backend CI workflow runs these quality gates alongside Prisma migration,
+PostgreSQL integration and Docker image-build checks.
 
 Run with Docker Compose:
 
@@ -95,17 +121,40 @@ Use `POST /auth/login` to obtain a JWT and then use Swagger `Authorize` with Bea
 
 ## Environment Variables
 
-Main variables used by the backend:
+The backend validates runtime configuration during startup. Errors mention the
+invalid variable name but must not print secret values.
 
 ```env
-DATABASE_URL=
-JWT_SECRET=
-JWT_EXPIRES_IN=
-UPLOADS_PATH=
-PORT=
+DATABASE_URL="postgresql://<user>:<password>@<host>:5432/<database>?schema=public"
+JWT_SECRET="replace-with-strong-random-secret-minimum-32-characters"
+JWT_EXPIRES_IN="1d"
+PORT=3000
+NODE_ENV="development"
+UPLOADS_PATH="uploads"
+CORS_ORIGIN="http://localhost:4200,http://localhost:4201"
+SWAGGER_ENABLED="true"
+TRUST_PROXY_HOPS=0
 ```
 
-`DATABASE_URL` is required by Prisma tooling and by `PrismaService`.
+Required variables:
+
+- `DATABASE_URL`: PostgreSQL connection string used by Prisma at runtime.
+- `JWT_SECRET`: signing secret for JWT access tokens. Use a strong value with at least 32 characters.
+
+Optional variables:
+
+- `JWT_EXPIRES_IN`: JWT duration accepted by the JWT library, such as `15m`, `1h` or `1d`. Default: `1d`.
+- `PORT`: HTTP port. Default: `3000`.
+- `NODE_ENV`: `development`, `test` or `production`. Default: `development`.
+- `UPLOADS_PATH`: local filesystem upload root. Default: `uploads`. Production requires an explicit absolute path such as `/app/uploads`.
+- `CORS_ORIGIN`: comma-separated allowed origins. Default: `http://localhost:4200,http://localhost:4201`; production requires an explicit value.
+- `SWAGGER_ENABLED`: `true` or `false`. Defaults to `false` in production and `true` otherwise. Production exposure requires an explicit `true`.
+- `TRUST_PROXY_HOPS`: number of explicitly trusted reverse-proxy hops (`0`, `1` or `2`). Default: `0`; do not enable it without an Infra-defined proxy topology.
+
+Do not use placeholder values from `.env.example` as real secrets.
+
+`DATABASE_URL` is also required by Prisma tooling through `prisma.config.ts`.
+This remains separate from NestJS runtime validation.
 
 Examples for local Prisma commands:
 

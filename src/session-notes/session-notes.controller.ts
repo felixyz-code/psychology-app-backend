@@ -2,11 +2,14 @@ import {
   ApiBearerAuth,
   ApiBadRequestResponse,
   ApiBody,
+  ApiCreatedResponse,
+  ApiForbiddenResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
   ApiParam,
   ApiTags,
+  ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import {
   Body,
@@ -17,24 +20,27 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
-  UseGuards,
   UsePipes,
   ValidationPipe,
 } from '@nestjs/common';
 import { UserRole } from '@prisma/client';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { RolesGuard } from '../auth/guards/roles.guard';
 import type { AuthenticatedUser } from '../auth/types/authenticated-user.type';
 import { CreateSessionNoteDto } from './dto/create-session-note.dto';
 import { UpdateSessionNoteDto } from './dto/update-session-note.dto';
+import { SessionNoteResponseDto } from './dto/session-note-response.dto';
 import { SessionNotesService } from './session-notes.service';
 
 @ApiTags('session-notes')
 @ApiBearerAuth('bearer')
+@ApiUnauthorizedResponse({
+  description: 'Missing, invalid, or expired Bearer JWT',
+})
+@ApiForbiddenResponse({
+  description: 'Authenticated user lacks a permitted role',
+})
 @Controller('session-notes')
-@UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(UserRole.ADMIN, UserRole.PSYCHOLOGIST)
 @UsePipes(
   new ValidationPipe({
@@ -48,7 +54,10 @@ export class SessionNotesController {
   @Post()
   @ApiOperation({ summary: 'Create a session note' })
   @ApiBody({ type: CreateSessionNoteDto })
-  @ApiOkResponse({ description: 'Session note created successfully' })
+  @ApiCreatedResponse({
+    description: 'Session note created successfully',
+    type: SessionNoteResponseDto,
+  })
   @ApiBadRequestResponse({ description: 'Invalid session note payload' })
   @ApiNotFoundResponse({ description: 'Case file or author not found' })
   create(
@@ -60,7 +69,11 @@ export class SessionNotesController {
 
   @Get()
   @ApiOperation({ summary: 'List all session notes' })
-  @ApiOkResponse({ description: 'Session notes retrieved successfully' })
+  @ApiOkResponse({
+    description: 'Session notes retrieved successfully',
+    type: SessionNoteResponseDto,
+    isArray: true,
+  })
   findAll(@CurrentUser() user: AuthenticatedUser) {
     return this.sessionNotesService.findAll(user);
   }
@@ -73,7 +86,11 @@ export class SessionNotesController {
     format: 'uuid',
     example: '550e8400-e29b-41d4-a716-446655440000',
   })
-  @ApiOkResponse({ description: 'Session notes retrieved successfully' })
+  @ApiOkResponse({
+    description: 'Session notes retrieved successfully',
+    type: SessionNoteResponseDto,
+    isArray: true,
+  })
   @ApiBadRequestResponse({ description: 'Invalid case file ID' })
   @ApiNotFoundResponse({ description: 'Case file not found' })
   findByCaseFileId(
@@ -91,7 +108,10 @@ export class SessionNotesController {
     format: 'uuid',
     example: '550e8400-e29b-41d4-a716-446655440000',
   })
-  @ApiOkResponse({ description: 'Session note retrieved successfully' })
+  @ApiOkResponse({
+    description: 'Session note retrieved successfully',
+    type: SessionNoteResponseDto,
+  })
   @ApiBadRequestResponse({ description: 'Invalid session note ID' })
   @ApiNotFoundResponse({ description: 'Session note not found' })
   findOne(
@@ -110,7 +130,10 @@ export class SessionNotesController {
     example: '550e8400-e29b-41d4-a716-446655440000',
   })
   @ApiBody({ type: UpdateSessionNoteDto })
-  @ApiOkResponse({ description: 'Session note updated successfully' })
+  @ApiOkResponse({
+    description: 'Session note updated successfully',
+    type: SessionNoteResponseDto,
+  })
   @ApiBadRequestResponse({ description: 'Invalid session note payload or ID' })
   @ApiNotFoundResponse({ description: 'Session note not found' })
   update(
@@ -129,7 +152,10 @@ export class SessionNotesController {
     format: 'uuid',
     example: '550e8400-e29b-41d4-a716-446655440000',
   })
-  @ApiOkResponse({ description: 'Session note deleted successfully' })
+  @ApiOkResponse({
+    description: 'Session note deleted successfully',
+    type: SessionNoteResponseDto,
+  })
   @ApiBadRequestResponse({ description: 'Invalid session note ID' })
   @ApiNotFoundResponse({ description: 'Session note not found' })
   remove(

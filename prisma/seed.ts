@@ -1,5 +1,8 @@
 import "dotenv/config";
 import * as bcrypt from "bcrypt";
+import { realpath, unlink } from "node:fs/promises";
+import { isAbsolute, relative, resolve } from "node:path";
+import { requireDemoSeedPassword } from "./seed-demo-password";
 import { PrismaPg } from "@prisma/adapter-pg";
 import {
   AppointmentStatus,
@@ -18,10 +21,13 @@ if (!connectionString) {
   throw new Error("DATABASE_URL is not defined.");
 }
 
+if (process.env.NODE_ENV === "production") {
+  throw new Error("The demo seed must not run with NODE_ENV=production.");
+}
+
 const adapter = new PrismaPg(connectionString);
 const prisma = new PrismaClient({ adapter });
 
-const DEFAULT_PASSWORD = "ChangeMe123!";
 const DEMO_TAG = "[demo-seed]";
 
 const ADMIN_USER_ID = "1b5d4d7c-b7e6-4d8b-9b3d-a3b12f1e1001";
@@ -1039,20 +1045,6 @@ function buildSessionNotes(psychologistId: string) {
   );
 }
 
-function buildDocuments(psychologistId: string) {
-  return patientBlueprints.flatMap((patient) =>
-    (patient.documents ?? []).map((document, index) => ({
-      id: demoUuid(40000000 + patient.code, index + 1),
-      caseFileId: demoUuid(20000000, patient.code),
-      uploadedById: psychologistId,
-      fileName: document.fileName,
-      filePath: `uploads/patients/${demoUuid(10000000, patient.code)}/${document.fileName}`,
-      mimeType: document.mimeType,
-      uploadedAt: dateFromNow(-document.daysAgo, 9 + index, 0),
-    })),
-  );
-}
-
 function buildAppointments(psychologistId: string) {
   return patientBlueprints.flatMap((patient) =>
     patient.appointments.map((appointment, index) => ({
@@ -1313,6 +1305,9 @@ async function resetDemoClinicalData() {
       caseFile: {
         select: {
           id: true,
+          documents: {
+            select: { filePath: true },
+          },
         },
       },
       appointments: {
@@ -1329,6 +1324,9 @@ async function resetDemoClinicalData() {
     .filter((id): id is string => Boolean(id));
   const demoAppointmentIds = demoPatients.flatMap((patient) =>
     patient.appointments.map((appointment) => appointment.id),
+  );
+  const demoDocumentPaths = demoPatients.flatMap((patient) =>
+    patient.caseFile?.documents.map((document) => document.filePath) ?? [],
   );
 
   await prisma.$transaction([
@@ -1358,6 +1356,60 @@ async function resetDemoClinicalData() {
       where: { id: { in: demoPatientIds } },
     }),
   ]);
+
+  await cleanupSeedDocumentFiles(demoDocumentPaths);
+}
+
+async function cleanupSeedDocumentFiles(filePaths: string[]) {
+  const uploadsRoot = resolve(
+    process.cwd(),
+    process.env.UPLOADS_PATH ?? "uploads",
+  );
+
+  for (const filePath of filePaths) {
+    const candidatePath = isAbsolute(filePath)
+      ? resolve(filePath)
+      : resolve(process.cwd(), filePath);
+    const relativePath = relative(uploadsRoot, candidatePath);
+
+    if (relativePath.startsWith("..") || isAbsolute(relativePath)) {
+      console.warn("Skipped demo document cleanup outside UPLOADS_PATH.");
+      continue;
+    }
+
+    try {
+      const [resolvedUploadsRoot, resolvedCandidatePath] = await Promise.all([
+        realpath(uploadsRoot),
+        realpath(candidatePath),
+      ]);
+      const resolvedRelativePath = relative(
+        resolvedUploadsRoot,
+        resolvedCandidatePath,
+      );
+
+      if (
+        resolvedRelativePath.startsWith("..") ||
+        isAbsolute(resolvedRelativePath)
+      ) {
+        console.warn("Skipped demo document cleanup outside UPLOADS_PATH.");
+        continue;
+      }
+
+      await unlink(candidatePath);
+    } catch (error) {
+      if (getFileSystemErrorCode(error) !== "ENOENT") {
+        console.warn("Demo document cleanup failed after metadata deletion.");
+      }
+    }
+  }
+}
+
+function getFileSystemErrorCode(error: unknown) {
+  if (error && typeof error === "object" && "code" in error) {
+    return error.code;
+  }
+
+  return undefined;
 }
 
 function countFinancialTransactionsBy<K extends string>(
@@ -1395,7 +1447,6 @@ async function seedDemoClinicalData(psychologistId: string) {
   const patients = buildPatients(psychologistId);
   const caseFiles = buildCaseFiles();
   const sessionNotes = buildSessionNotes(psychologistId);
-  const documents = buildDocuments(psychologistId);
   const appointments = buildAppointments(psychologistId).map(
     ({
       patientCode,
@@ -1412,14 +1463,12 @@ async function seedDemoClinicalData(psychologistId: string) {
     patientsInsert,
     caseFilesInsert,
     sessionNotesInsert,
-    documentsInsert,
     appointmentsInsert,
     financialTransactionsInsert,
   ] = await prisma.$transaction([
     prisma.patient.createMany({ data: patients }),
     prisma.caseFile.createMany({ data: caseFiles }),
     prisma.sessionNote.createMany({ data: sessionNotes }),
-    prisma.document.createMany({ data: documents }),
     prisma.appointment.createMany({ data: appointments }),
     prisma.financialTransaction.createMany({ data: financialTransactions }),
   ]);
@@ -1439,7 +1488,7 @@ async function seedDemoClinicalData(psychologistId: string) {
     patients: patients.length,
     caseFiles: caseFiles.length,
     sessionNotes: sessionNotes.length,
-    documents: documents.length,
+    documents: 0,
     appointments: appointments.length,
     scheduledAppointments: scheduledAppointments.length,
     financialTransactions: financialTransactions.length,
@@ -1451,7 +1500,7 @@ async function seedDemoClinicalData(psychologistId: string) {
       patients: patientsInsert.count,
       caseFiles: caseFilesInsert.count,
       sessionNotes: sessionNotesInsert.count,
-      documents: documentsInsert.count,
+      documents: 0,
       appointments: appointmentsInsert.count,
       financialTransactions: financialTransactionsInsert.count,
     },
@@ -1465,13 +1514,14 @@ async function seedDemoClinicalData(psychologistId: string) {
 }
 
 async function main() {
-  const defaultPasswordHash = await bcrypt.hash(DEFAULT_PASSWORD, 10);
+  const demoPassword = requireDemoSeedPassword();
+  const demoPasswordHash = await bcrypt.hash(demoPassword, 10);
 
   const admin = await upsertUser({
     id: ADMIN_USER_ID,
     name: "Enrique Felix",
     email: "admin@psychology-app.local",
-    passwordHash: defaultPasswordHash,
+    passwordHash: demoPasswordHash,
     role: UserRole.ADMIN,
   });
 
@@ -1479,7 +1529,7 @@ async function main() {
     id: PSYCHOLOGIST_USER_ID,
     name: "Demo Psychologist",
     email: "psychologist@psychology-app.local",
-    passwordHash: defaultPasswordHash,
+    passwordHash: demoPasswordHash,
     role: UserRole.PSYCHOLOGIST,
   });
 
@@ -1487,7 +1537,7 @@ async function main() {
   const seedSummary = await seedDemoClinicalData(psychologist.id);
 
   console.log("Seed completed successfully.");
-  console.log(`Demo password: ${DEFAULT_PASSWORD}`);
+  console.log("Demo credentials were supplied through the environment.");
   console.log(`Admin user: ${admin.email}`);
   console.log(`Psychologist user: ${psychologist.email}`);
   console.log(`Patients seeded: ${seedSummary.patients}`);

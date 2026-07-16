@@ -3,11 +3,14 @@ import {
   ApiBadRequestResponse,
   ApiBody,
   ApiConflictResponse,
+  ApiCreatedResponse,
+  ApiForbiddenResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
   ApiParam,
   ApiTags,
+  ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import {
   Body,
@@ -17,25 +20,28 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
-  UseGuards,
   UsePipes,
   ValidationPipe,
 } from '@nestjs/common';
 import { UserRole } from '@prisma/client';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { RolesGuard } from '../auth/guards/roles.guard';
 import type { AuthenticatedUser } from '../auth/types/authenticated-user.type';
 import { CaseFilesService } from './case-files.service';
 import { CaseFileWorkspaceResponseDto } from './dto/case-file-workspace-response.dto';
 import { CreateCaseFileDto } from './dto/create-case-file.dto';
 import { UpdateCaseFileDto } from './dto/update-case-file.dto';
+import { CaseFileResponseDto } from './dto/case-file-response.dto';
 
 @ApiTags('case-files')
 @ApiBearerAuth('bearer')
+@ApiUnauthorizedResponse({
+  description: 'Missing, invalid, or expired Bearer JWT',
+})
+@ApiForbiddenResponse({
+  description: 'Authenticated user lacks a permitted role',
+})
 @Controller('case-files')
-@UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(UserRole.ADMIN, UserRole.PSYCHOLOGIST)
 @UsePipes(
   new ValidationPipe({
@@ -49,7 +55,10 @@ export class CaseFilesController {
   @Post()
   @ApiOperation({ summary: 'Create a case file' })
   @ApiBody({ type: CreateCaseFileDto })
-  @ApiOkResponse({ description: 'Case file created successfully' })
+  @ApiCreatedResponse({
+    description: 'Case file created successfully',
+    type: CaseFileResponseDto,
+  })
   @ApiBadRequestResponse({ description: 'Invalid case file payload' })
   @ApiConflictResponse({
     description: 'The patient already has an existing case file',
@@ -64,7 +73,11 @@ export class CaseFilesController {
 
   @Get()
   @ApiOperation({ summary: 'List all case files' })
-  @ApiOkResponse({ description: 'Case files retrieved successfully' })
+  @ApiOkResponse({
+    description: 'Case files retrieved successfully',
+    type: CaseFileResponseDto,
+    isArray: true,
+  })
   findAll(@CurrentUser() user: AuthenticatedUser) {
     return this.caseFilesService.findAll(user);
   }
@@ -77,7 +90,10 @@ export class CaseFilesController {
     format: 'uuid',
     example: '550e8400-e29b-41d4-a716-446655440000',
   })
-  @ApiOkResponse({ description: 'Case file retrieved successfully' })
+  @ApiOkResponse({
+    description: 'Case file retrieved successfully',
+    type: CaseFileResponseDto,
+  })
   @ApiBadRequestResponse({ description: 'Invalid patient ID' })
   @ApiNotFoundResponse({ description: 'Patient or case file not found' })
   findByPatientId(
@@ -116,7 +132,10 @@ export class CaseFilesController {
     format: 'uuid',
     example: '550e8400-e29b-41d4-a716-446655440000',
   })
-  @ApiOkResponse({ description: 'Case file retrieved successfully' })
+  @ApiOkResponse({
+    description: 'Case file retrieved successfully',
+    type: CaseFileResponseDto,
+  })
   @ApiBadRequestResponse({ description: 'Invalid case file ID' })
   @ApiNotFoundResponse({ description: 'Case file not found' })
   findOne(
@@ -135,7 +154,10 @@ export class CaseFilesController {
     example: '550e8400-e29b-41d4-a716-446655440000',
   })
   @ApiBody({ type: UpdateCaseFileDto })
-  @ApiOkResponse({ description: 'Case file updated successfully' })
+  @ApiOkResponse({
+    description: 'Case file updated successfully',
+    type: CaseFileResponseDto,
+  })
   @ApiBadRequestResponse({ description: 'Invalid case file payload or ID' })
   @ApiNotFoundResponse({ description: 'Case file not found' })
   update(

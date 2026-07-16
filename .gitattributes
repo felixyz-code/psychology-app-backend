@@ -1,0 +1,2 @@
+# Keep text files reproducible across Windows, Linux, and Docker.
+* text=auto eol=lf

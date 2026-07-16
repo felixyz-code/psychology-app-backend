@@ -48,6 +48,8 @@ The application follows a modular architecture where business logic resides in s
 
 Current backend technologies:
 
+- Node.js `^20.19 || >=22.12 <23`
+- npm `>=10 <11`
 - NestJS
 - TypeScript
 - Prisma ORM
@@ -55,6 +57,12 @@ Current backend technologies:
 - JWT
 - Swagger
 - Docker Compose
+
+Quality scripts separate read-only gates from mutating helpers. `build`,
+`typecheck`, `lint`, `format:check` and tests are safe for validation workflows.
+`lint:fix` and `format` may rewrite files and are intended for local
+remediation. The Backend CI workflow runs these quality gates together with
+Prisma migration, PostgreSQL integration and Docker image-build checks.
 
 ---
 
@@ -397,11 +405,57 @@ Current security features include:
 - JwtAuthGuard
 - RolesGuard
 - Ownership filtering
+- Centralized runtime configuration validation
 - DTO validation
+- HTTP security headers through Helmet, without the Express `X-Powered-By` fingerprint
 - UUID validation
 - MIME validation
+- PDF, JPEG and PNG signature validation for uploads
 - Upload size restrictions
 - Path traversal protection
+
+Runtime configuration is centralized in the backend configuration module.
+Startup validation runs before the server accepts traffic. It requires
+`DATABASE_URL` and `JWT_SECRET`, restricts `NODE_ENV` to `development`, `test`
+or `production`, and reports invalid variable names without printing secret
+values. Production additionally requires an explicit `CORS_ORIGIN` and an
+absolute `UPLOADS_PATH`; Swagger is disabled unless explicitly enabled.
+
+Helmet supplies the standard application-level security headers, including
+`X-Content-Type-Options`, frame protection and `Referrer-Policy`. The Content
+Security Policy allows the same-origin Swagger UI's required inline setup and
+styles, while `upgrade-insecure-requests` and HSTS are disabled in the
+backend. HTTPS redirect and HSTS belong to the TLS-terminating reverse proxy
+deployment layer and must be configured by Infra.
+
+`trust proxy` remains disabled by default. Infra may set
+`TRUST_PROXY_HOPS` to `1` or `2` only after documenting the exact proxy chain;
+the backend never trusts forwarded headers indiscriminately.
+
+Rate limiting is an Infra responsibility for this MVP. The reverse proxy/WAF
+must enforce route-specific controls for login, authenticated API routes,
+uploads, downloads and reports. It must exclude `/health/live` and
+`/health/ready`, which are deliberately unauthenticated probe endpoints.
+
+## Production Operations
+
+Container startup validates configuration, optionally applies versioned Prisma
+migrations when `MIGRATE_ON_START=true`, and then starts the Node process as
+the unprivileged `node` user. Production web containers keep
+`MIGRATE_ON_START=false`; a one-shot deployment job runs `prisma migrate deploy`
+before the web container starts. The production entrypoint runs
+`prisma migrate status` as an operational guard and refuses to start if the
+migration history is not reconciled.
+
+This guard does not reconcile a database, replace backups, or compare deployed
+and expected schemas. It complements the BE.7.2P reconciliation process rather
+than replacing it, and never runs `prisma migrate resolve` or `prisma db push`.
+
+Structured application logs provide request latency and HTTP status signals,
+including `429` when produced by an application layer. Prisma request errors
+and post-delete document-cleanup failures emit sanitized event names and error
+codes/types only. Infra must collect reverse-proxy `429` signals, container
+restarts, readiness/liveness probe failures and PostgreSQL availability.
 
 Current MVP intentionally does not include:
 
