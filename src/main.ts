@@ -9,6 +9,7 @@ async function bootstrap() {
 
   configureHttpApp(app, config);
   configureSwagger(app, config.swaggerEnabled);
+  app.enableShutdownHooks(['SIGTERM', 'SIGINT']);
 
   await app.listen(config.port);
 }

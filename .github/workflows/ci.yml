@@ -70,6 +70,11 @@ jobs:
         env:
           RUN_PERSISTENCE_TESTS: "true"
 
+      - name: Run health readiness integration tests
+        run: npm test -- --runInBand health/health.integration.spec.ts
+        env:
+          RUN_HEALTH_INTEGRATION_TESTS: "true"
+
       - name: Typecheck
         run: npm run typecheck
 

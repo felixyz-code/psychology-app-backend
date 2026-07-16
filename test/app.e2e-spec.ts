@@ -23,6 +23,18 @@ describe('AppController (e2e)', () => {
       .expect('Hello World!');
   });
 
+  it('/health/live (GET) is public and returns a request identifier', () => {
+    return request(app.getHttpServer())
+      .get('/health/live')
+      .expect(200)
+      .expect((response) => {
+        expect(response.headers['x-request-id']).toMatch(
+          /^[A-Za-z0-9_-]{8,128}$/,
+        );
+      })
+      .expect({ status: 'UP' });
+  });
+
   afterEach(async () => {
     await app.close();
   });

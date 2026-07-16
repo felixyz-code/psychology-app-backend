@@ -44,7 +44,7 @@ describe('OpenAPI document', () => {
   it('documents every certified route and the Bearer security scheme', () => {
     const document = createDocument(app);
 
-    expect(Object.keys(document.paths)).toHaveLength(24);
+    expect(Object.keys(document.paths)).toHaveLength(26);
     expect(document.components?.securitySchemes?.bearer).toEqual({
       type: 'http',
       scheme: 'bearer',
@@ -53,6 +53,8 @@ describe('OpenAPI document', () => {
     });
     expect(document.paths['/auth/login'].post?.security).toBeUndefined();
     expect(document.paths['/health'].get?.security).toBeUndefined();
+    expect(document.paths['/health/live'].get?.security).toBeUndefined();
+    expect(document.paths['/health/ready'].get?.security).toBeUndefined();
     expect(document.paths['/patients'].get?.security).toEqual([{ bearer: [] }]);
     expect(document.paths['/patients'].get?.responses).toHaveProperty('401');
     expect(document.paths['/patients'].get?.responses).toHaveProperty('403');

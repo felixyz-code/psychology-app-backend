@@ -25,4 +25,17 @@ describe('PrismaService', () => {
   it('should be defined', () => {
     expect(service).toBeDefined();
   });
+
+  it('does not disconnect twice during shutdown', async () => {
+    jest.spyOn(service, '$connect').mockResolvedValue(undefined);
+    const disconnect = jest
+      .spyOn(service, '$disconnect')
+      .mockResolvedValue(undefined);
+
+    await service.onModuleInit();
+    await service.onModuleDestroy();
+    await service.onModuleDestroy();
+
+    expect(disconnect).toHaveBeenCalledTimes(1);
+  });
 });
