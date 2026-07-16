@@ -1,0 +1,137 @@
+name: Dispatch production release
+
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+    inputs:
+      backend_sha:
+        description: Optional Backend master commit SHA to release
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      BACKEND_REPOSITORY: felixyz-code/psychology-app-backend
+      FRONTEND_REPOSITORY: felixyz-code/psychology-app-frontend
+      INFRA_REPOSITORY: felixyz-code/psychology-app-infra
+      EVENT_NAME: ${{ github.event_name }}
+      EVENT_REF: ${{ github.ref }}
+      BACKEND_SHA: ${{ inputs.backend_sha || github.sha }}
+      SOURCE_REPOSITORY: ${{ github.repository }}
+      SOURCE_RUN_ID: ${{ github.run_id }}
+      SOURCE_ACTOR: ${{ github.actor }}
+
+    steps:
+      - name: Validate the Backend release source
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          validate_sha() {
+            local value="$1"
+            local label="$2"
+
+            [[ "$value" =~ ^[0-9a-f]{40}$ ]] || {
+              echo "::error::$label must be a 40-character lowercase hexadecimal SHA."
+              exit 1
+            }
+          }
+
+          [[ "$EVENT_NAME" = "push" || "$EVENT_NAME" = "workflow_dispatch" ]] || {
+            echo "::error::Unsupported event type: $EVENT_NAME"
+            exit 1
+          }
+          [[ "$EVENT_REF" = "refs/heads/master" ]] || {
+            echo "::error::Production releases must be dispatched from Backend master."
+            exit 1
+          }
+          [[ "$SOURCE_REPOSITORY" = "$BACKEND_REPOSITORY" ]] || {
+            echo "::error::Unexpected Backend source repository."
+            exit 1
+          }
+          [[ "$SOURCE_RUN_ID" =~ ^[0-9]+$ ]] || {
+            echo "::error::Invalid source run identifier."
+            exit 1
+          }
+          [[ "$SOURCE_ACTOR" =~ ^[A-Za-z0-9-]+$ ]] || {
+            echo "::error::Invalid source actor."
+            exit 1
+          }
+
+          validate_sha "$BACKEND_SHA" "BACKEND_SHA"
+
+          status="$(gh api "repos/$BACKEND_REPOSITORY/compare/$BACKEND_SHA...master" --jq .status)"
+          case "$status" in
+            ahead|identical) ;;
+            *)
+              echo "::error::BACKEND_SHA is not reachable from Backend master (status: $status)."
+              exit 1
+              ;;
+          esac
+
+      - name: Resolve public release SHAs
+        id: release_refs
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          validate_sha() {
+            local value="$1"
+            local label="$2"
+
+            [[ "$value" =~ ^[0-9a-f]{40}$ ]] || {
+              echo "::error::$label must be a 40-character lowercase hexadecimal SHA."
+              exit 1
+            }
+          }
+
+          frontend_sha="$(gh api "repos/$FRONTEND_REPOSITORY/git/ref/heads/master" --jq .object.sha)"
+          infra_sha="$(gh api "repos/$INFRA_REPOSITORY/git/ref/heads/main" --jq .object.sha)"
+
+          validate_sha "$frontend_sha" "FRONTEND_SHA"
+          validate_sha "$infra_sha" "INFRA_SHA"
+
+          {
+            echo "frontend_sha=$frontend_sha"
+            echo "infra_sha=$infra_sha"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Dispatch Infra release
+        env:
+          GH_TOKEN: ${{ secrets.INFRA_DISPATCH_TOKEN }}
+          FRONTEND_SHA: ${{ steps.release_refs.outputs.frontend_sha }}
+          INFRA_SHA: ${{ steps.release_refs.outputs.infra_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          [[ -n "$GH_TOKEN" ]] || {
+            echo "::error::INFRA_DISPATCH_TOKEN is required to request a release in Infra."
+            exit 1
+          }
+
+          gh api --method POST "repos/$INFRA_REPOSITORY/dispatches" \
+            --raw-field event_type=production_release_requested \
+            --raw-field "client_payload[backend_sha]=$BACKEND_SHA" \
+            --raw-field "client_payload[frontend_sha]=$FRONTEND_SHA" \
+            --raw-field "client_payload[infra_sha]=$INFRA_SHA" \
+            --raw-field "client_payload[source_repository]=$SOURCE_REPOSITORY" \
+            --raw-field "client_payload[source_run_id]=$SOURCE_RUN_ID" \
+            --raw-field "client_payload[source_actor]=$SOURCE_ACTOR"
+
+          {
+            echo "## Production release requested"
+            echo "- Backend: \`$BACKEND_SHA\`"
+            echo "- Frontend: \`$FRONTEND_SHA\`"
+            echo "- Infra: \`$INFRA_SHA\`"
+          } >> "$GITHUB_STEP_SUMMARY"
