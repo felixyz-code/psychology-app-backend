@@ -207,8 +207,8 @@ npm test -- --runInBand
 ```
 
 `lint`, `format:check` and `typecheck` are read-only. `lint:fix` and `format`
-may rewrite files. These commands are available for a future CI update; this
-document does not imply that CI workflows have already changed.
+may rewrite files. Backend CI runs the quality gates together with Prisma
+migration, PostgreSQL integration and Docker image-build checks.
 
 ---
 

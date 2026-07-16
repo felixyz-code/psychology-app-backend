@@ -61,8 +61,8 @@ Current backend technologies:
 Quality scripts separate read-only gates from mutating helpers. `build`,
 `typecheck`, `lint`, `format:check` and tests are safe for validation workflows.
 `lint:fix` and `format` may rewrite files and are intended for local
-remediation. These scripts are prepared for future CI reuse; CI workflows have
-not been modified yet.
+remediation. The Backend CI workflow runs these quality gates together with
+Prisma migration, PostgreSQL integration and Docker image-build checks.
 
 ---
 

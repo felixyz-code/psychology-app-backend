@@ -82,8 +82,8 @@ npm test -- --runInBand
 and `format` may rewrite files and should be used intentionally during local
 development.
 
-These commands are prepared for future CI quality gates, but CI workflows have
-not been changed yet.
+The Backend CI workflow runs these quality gates alongside Prisma migration,
+PostgreSQL integration and Docker image-build checks.
 
 Run with Docker Compose:
 
