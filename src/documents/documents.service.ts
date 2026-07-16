@@ -158,8 +158,10 @@ export class DocumentsService {
         await this.removeDocumentFile(filePath);
       } catch (error) {
         this.logger.error(
-          'Document file cleanup failed after database deletion',
-          error instanceof Error ? error.stack : undefined,
+          JSON.stringify({
+            event: 'document_cleanup_failed',
+            errorType: error instanceof Error ? error.name : 'UnknownError',
+          }),
         );
       }
     }

@@ -3,6 +3,7 @@ import {
   Catch,
   ConflictException,
   ExceptionFilter,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { BaseExceptionFilter } from '@nestjs/core';
@@ -14,6 +15,8 @@ export class PrismaExceptionFilter
   extends BaseExceptionFilter
   implements ExceptionFilter
 {
+  private readonly logger = new Logger(PrismaExceptionFilter.name);
+
   catch(exception: Prisma.PrismaClientKnownRequestError, host: ArgumentsHost) {
     const response = host.switchToHttp().getResponse<Response>();
     const mappedException = this.mapKnownError(exception.code);
@@ -24,6 +27,14 @@ export class PrismaExceptionFilter
     }
 
     const status = mappedException.getStatus();
+
+    this.logger.warn(
+      JSON.stringify({
+        event: 'prisma_request_error',
+        code: exception.code,
+        statusCode: status,
+      }),
+    );
 
     response.status(status).json({
       statusCode: status,

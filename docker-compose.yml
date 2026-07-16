@@ -27,10 +27,13 @@ services:
         condition: service_healthy
     environment:
       DATABASE_URL: postgresql://psychology_user:psychology_password@postgres:5432/psychology_app?schema=public
-      JWT_SECRET: change_me
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set in the Compose environment}
       JWT_EXPIRES_IN: 1d
+      NODE_ENV: development
       UPLOADS_PATH: /app/uploads
       PORT: 3000
+      CORS_ORIGIN: http://localhost:4200,http://localhost:4201
+      MIGRATE_ON_START: "true"
     ports:
       - "3000:3000"
     volumes:

@@ -133,6 +133,7 @@ NODE_ENV="development"
 UPLOADS_PATH="uploads"
 CORS_ORIGIN="http://localhost:4200,http://localhost:4201"
 SWAGGER_ENABLED="true"
+TRUST_PROXY_HOPS=0
 ```
 
 Required variables:
@@ -145,9 +146,10 @@ Optional variables:
 - `JWT_EXPIRES_IN`: JWT duration accepted by the JWT library, such as `15m`, `1h` or `1d`. Default: `1d`.
 - `PORT`: HTTP port. Default: `3000`.
 - `NODE_ENV`: `development`, `test` or `production`. Default: `development`.
-- `UPLOADS_PATH`: local filesystem upload root. Default: `uploads`; Infra can provide `/app/uploads`.
-- `CORS_ORIGIN`: comma-separated allowed origins. Default: `http://localhost:4200,http://localhost:4201`.
-- `SWAGGER_ENABLED`: `true` or `false`. Default: `true`, preserving the current `/api/docs` behavior.
+- `UPLOADS_PATH`: local filesystem upload root. Default: `uploads`. Production requires an explicit absolute path such as `/app/uploads`.
+- `CORS_ORIGIN`: comma-separated allowed origins. Default: `http://localhost:4200,http://localhost:4201`; production requires an explicit value.
+- `SWAGGER_ENABLED`: `true` or `false`. Defaults to `false` in production and `true` otherwise. Production exposure requires an explicit `true`.
+- `TRUST_PROXY_HOPS`: number of explicitly trusted reverse-proxy hops (`0`, `1` or `2`). Default: `0`; do not enable it without an Infra-defined proxy topology.
 
 Do not use placeholder values from `.env.example` as real secrets.
 

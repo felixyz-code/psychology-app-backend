@@ -35,6 +35,7 @@ describe('validateRuntimeEnv', () => {
       uploadsPath: 'uploads',
       corsOrigins: ['http://localhost:4200', 'http://localhost:4201'],
       swaggerEnabled: true,
+      trustProxyHops: 0,
     });
   });
 
@@ -98,7 +99,11 @@ describe('validateRuntimeEnv', () => {
 
   it('disables Swagger by default in production', () => {
     const config = validateRuntimeEnv(
-      createValidEnv({ NODE_ENV: 'production' }),
+      createValidEnv({
+        NODE_ENV: 'production',
+        UPLOADS_PATH: '/app/uploads',
+        CORS_ORIGIN: 'https://app.example.test',
+      }),
     );
 
     expect(config.swaggerEnabled).toBe(false);
@@ -119,10 +124,37 @@ describe('validateRuntimeEnv', () => {
     const config = validateRuntimeEnv(
       createValidEnv({
         NODE_ENV: 'production',
+        UPLOADS_PATH: '/app/uploads',
+        CORS_ORIGIN: 'https://app.example.test',
         SWAGGER_ENABLED: value,
       }),
     );
 
     expect(config.swaggerEnabled).toBe(expected);
+  });
+
+  it('requires explicit CORS and uploads configuration in production', () => {
+    expect(() =>
+      validateRuntimeEnv(createValidEnv({ NODE_ENV: 'production' })),
+    ).toThrow('CORS_ORIGIN is required in production');
+
+    expect(() =>
+      validateRuntimeEnv(
+        createValidEnv({
+          NODE_ENV: 'production',
+          CORS_ORIGIN: 'https://app.example.test',
+        }),
+      ),
+    ).toThrow('UPLOADS_PATH is required in production');
+  });
+
+  it('accepts only an explicit bounded proxy-hop count', () => {
+    expect(
+      validateRuntimeEnv(createValidEnv({ TRUST_PROXY_HOPS: '1' }))
+        .trustProxyHops,
+    ).toBe(1);
+    expect(() =>
+      validateRuntimeEnv(createValidEnv({ TRUST_PROXY_HOPS: '3' })),
+    ).toThrow('TRUST_PROXY_HOPS must be an integer between 0 and 2');
   });
 });

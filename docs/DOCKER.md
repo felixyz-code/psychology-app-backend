@@ -44,14 +44,17 @@ The Docker environment is intended for:
 Responsibilities:
 
 * Builds the NestJS application.
-* Executes `prisma db push` during startup.
-* Starts the backend using `node dist/main`.
+* Runs as the unprivileged `node` user after preparing the mounted uploads volume.
+* Starts the backend using `node dist/main` through a signal-safe entrypoint.
+* Optionally executes `prisma migrate deploy` only when `MIGRATE_ON_START=true`.
+* In production, executes `prisma migrate status` before starting the web process.
 * Exposes port `3000`.
+* Uses `/health/ready` as its Docker healthcheck.
 
 The image uses Node 20, which remains inside the backend contract when the
-resolved image is Node 20.19 or newer. The Dockerfile continues to install
-dependencies with `npm ci`; BE.2.5 does not change the Docker image, startup
-command or Compose contract.
+resolved image is Node 20.19 or newer. The Dockerfile installs dependencies
+with `npm ci` and uses `exec` in its entrypoint so Node receives termination
+signals directly.
 
 ---
 
@@ -100,15 +103,15 @@ Current Compose variables:
 
 ```env
 DATABASE_URL=postgresql://psychology_user:psychology_password@postgres:5432/psychology_app?schema=public
-JWT_SECRET=change_me
+JWT_SECRET=<provided-by-your-local-environment>
 JWT_EXPIRES_IN=1d
 UPLOADS_PATH=/app/uploads
 PORT=3000
 ```
 
-The Compose `JWT_SECRET` value is a local placeholder and is not a production
-secret. Real deployments must provide a strong `JWT_SECRET` with at least 32
-characters. The backend does not provide a JWT secret fallback.
+Compose requires `JWT_SECRET` from its environment; it has no fallback.
+Use a non-placeholder local value with at least 32 characters. Real deployments
+must provide the secret through the approved secret mechanism.
 
 Supported runtime variables:
 
@@ -121,12 +124,21 @@ NODE_ENV=production
 UPLOADS_PATH=/app/uploads
 CORS_ORIGIN=http://localhost:4200,http://localhost:4201
 SWAGGER_ENABLED=true
+TRUST_PROXY_HOPS=0
+MIGRATE_ON_START=false
 ```
 
 `SWAGGER_ENABLED` is optional. It defaults to `true` in `development` and
 `test`, and to `false` when `NODE_ENV=production`. Production deployments must
-declare `NODE_ENV=production`; they may explicitly enable Swagger only when
-that exposure is intentional.
+declare `NODE_ENV=production`, an explicit `CORS_ORIGIN`, and an absolute
+`UPLOADS_PATH`; they may explicitly enable Swagger only when that exposure is
+intentional. `TRUST_PROXY_HOPS` defaults to `0` and must only be configured
+after Infra has verified the proxy topology.
+
+`MIGRATE_ON_START` is consumed by the Docker entrypoint, not by NestJS. The
+development Compose service sets it to `true` for an empty disposable database.
+Production web services keep it `false` and require a separate, one-shot
+`prisma migrate deploy` step before startup.
 
 `DATABASE_URL` is also required by `prisma.config.ts`, so local Prisma CLI commands such as `prisma generate` must run with that variable available.
 
@@ -248,11 +260,40 @@ To keep local environments consistent across developers.
 
 ---
 
-## Why `prisma db push`?
+## Production startup and migrations
 
-The current MVP provisions new databases using the Prisma schema.
+`prisma db push` is prohibited for deployment and is not executed by the
+Docker image. The repository contains versioned Prisma migrations.
 
-Versioned Prisma migrations are planned for future releases.
+For a production release:
+
+1. Verify the deployment has a current backup and the approved database target.
+2. Run a one-shot container/job with `npx prisma migrate deploy` and the same
+   `DATABASE_URL` used by the release.
+3. Start the web container with `NODE_ENV=production` and
+   `MIGRATE_ON_START=false`.
+4. The entrypoint runs `npx prisma migrate status`; startup fails if migration
+   history is not reconciled.
+5. Validate `/health/live` and `/health/ready` through the reverse proxy.
+
+Do not use `prisma migrate resolve` as a deployment shortcut. Migration status
+does not reconcile a database, replace backups, or replace schema comparison.
+
+Rollback is an approved operational decision: roll back the application image
+only when its release is compatible with the already-applied schema. Restoring
+schema or data requires the verified backup and change procedure; neither
+`prisma db push` nor `prisma migrate resolve` is a rollback mechanism.
+
+## Backend and Infrastructure responsibilities
+
+Backend owns configuration validation, non-root container execution, graceful
+shutdown, readiness/liveness endpoints, sanitized structured logs and the
+Docker healthcheck.
+
+Infra owns TLS termination, HTTPS redirect, HSTS, the explicit proxy topology,
+route-specific rate limits and observability/alerting for reverse-proxy 429s,
+container restarts, probe failures and PostgreSQL availability. `/health/live`
+and `/health/ready` must never be rate-limited.
 
 ---
 

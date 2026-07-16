@@ -9,4 +9,5 @@ export type RuntimeConfig = {
   uploadsPath: string;
   corsOrigins: string[];
   swaggerEnabled: boolean;
+  trustProxyHops: number;
 };

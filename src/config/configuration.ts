@@ -42,4 +42,8 @@ export class AppConfigService {
   get swaggerEnabled() {
     return this.runtimeConfig.swaggerEnabled;
   }
+
+  get trustProxyHops() {
+    return this.runtimeConfig.trustProxyHops;
+  }
 }

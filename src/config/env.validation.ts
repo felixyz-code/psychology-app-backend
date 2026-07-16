@@ -20,11 +20,12 @@ export function validateRuntimeEnv(env: NodeJS.ProcessEnv): RuntimeConfig {
   const databaseUrl = readRequired(env, 'DATABASE_URL', errors);
   const jwtSecret = readRequired(env, 'JWT_SECRET', errors);
   const jwtExpiresIn = readOptional(env, 'JWT_EXPIRES_IN') ?? '1d';
-  const uploadsPath = readOptional(env, 'UPLOADS_PATH') ?? 'uploads';
   const nodeEnv = readOptional(env, 'NODE_ENV') ?? 'development';
+  const uploadsPath = readOptional(env, 'UPLOADS_PATH') ?? 'uploads';
   const corsOrigins = parseCorsOrigins(
     readOptional(env, 'CORS_ORIGIN'),
     errors,
+    nodeEnv,
   );
   const swaggerEnabled = parseOptionalBoolean(
     readOptional(env, 'SWAGGER_ENABLED'),
@@ -33,6 +34,10 @@ export function validateRuntimeEnv(env: NodeJS.ProcessEnv): RuntimeConfig {
     nodeEnv,
   );
   const port = parsePort(readOptional(env, 'PORT'), errors);
+  const trustProxyHops = parseTrustProxyHops(
+    readOptional(env, 'TRUST_PROXY_HOPS'),
+    errors,
+  );
 
   if (databaseUrl && !isPostgresConnectionString(databaseUrl)) {
     errors.push('DATABASE_URL must be a PostgreSQL connection string');
@@ -58,6 +63,14 @@ export function validateRuntimeEnv(env: NodeJS.ProcessEnv): RuntimeConfig {
     errors.push('NODE_ENV must be development, test or production');
   }
 
+  if (nodeEnv === 'production') {
+    if (!readOptional(env, 'UPLOADS_PATH')) {
+      errors.push('UPLOADS_PATH is required in production');
+    } else if (!isAbsolutePath(uploadsPath)) {
+      errors.push('UPLOADS_PATH must be an absolute path in production');
+    }
+  }
+
   if (errors.length > 0) {
     throw new RuntimeConfigValidationError(errors);
   }
@@ -71,6 +84,7 @@ export function validateRuntimeEnv(env: NodeJS.ProcessEnv): RuntimeConfig {
     uploadsPath,
     corsOrigins,
     swaggerEnabled,
+    trustProxyHops,
   };
 }
 
@@ -106,8 +120,15 @@ function parsePort(value: string | undefined, errors: string[]) {
   return port;
 }
 
-function parseCorsOrigins(value: string | undefined, errors: string[]) {
+function parseCorsOrigins(
+  value: string | undefined,
+  errors: string[],
+  nodeEnv: string,
+) {
   if (!value) {
+    if (nodeEnv === 'production') {
+      errors.push('CORS_ORIGIN is required in production');
+    }
     return defaultCorsOrigins;
   }
 
@@ -138,6 +159,25 @@ function parseCorsOrigins(value: string | undefined, errors: string[]) {
   }
 
   return origins;
+}
+
+function parseTrustProxyHops(value: string | undefined, errors: string[]) {
+  if (!value) {
+    return 0;
+  }
+
+  const hops = Number(value);
+
+  if (!Number.isInteger(hops) || hops < 0 || hops > 2) {
+    errors.push('TRUST_PROXY_HOPS must be an integer between 0 and 2');
+    return 0;
+  }
+
+  return hops;
+}
+
+function isAbsolutePath(value: string) {
+  return value.startsWith('/') || /^[A-Za-z]:[\\/]/.test(value);
 }
 
 function parseOptionalBoolean(

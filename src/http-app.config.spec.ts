@@ -23,6 +23,7 @@ describe('HTTP application configuration', () => {
     app = moduleRef.createNestApplication();
     configureHttpApp(app, {
       corsOrigins: ['http://localhost:4200'],
+      trustProxyHops: 0,
     });
     configureSwagger(app, true);
     await app.init();
@@ -60,6 +61,14 @@ describe('HTTP application configuration', () => {
     expect(deniedResponse.headers).not.toHaveProperty(
       'access-control-allow-origin',
     );
+  });
+
+  it('does not trust forwarded headers unless configured explicitly', () => {
+    const expressApp = app.getHttpAdapter().getInstance() as {
+      get: (setting: string) => unknown;
+    };
+
+    expect(expressApp.get('trust proxy')).toBe(false);
   });
 
   it('continues to serve Swagger UI with the configured CSP', async () => {

@@ -4,12 +4,15 @@ import type { Express } from 'express';
 import helmet from 'helmet';
 import { AppConfigService } from './config/configuration';
 
-type HttpAppConfig = Pick<AppConfigService, 'corsOrigins'>;
+type HttpAppConfig = Pick<AppConfigService, 'corsOrigins' | 'trustProxyHops'>;
 
 export function configureHttpApp(app: INestApplication, config: HttpAppConfig) {
   const expressApp = app.getHttpAdapter().getInstance() as Express;
 
   expressApp.disable('x-powered-by');
+  if (config.trustProxyHops > 0) {
+    expressApp.set('trust proxy', config.trustProxyHops);
+  }
   app.use(
     helmet({
       contentSecurityPolicy: {
