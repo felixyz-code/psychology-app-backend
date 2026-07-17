@@ -81,6 +81,9 @@ jobs:
 
       - name: Resolve public release SHAs
         id: release_refs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          INFRA_GH_TOKEN: ${{ secrets.INFRA_DISPATCH_TOKEN }}
         shell: bash
         run: |
           set -euo pipefail
@@ -96,7 +99,11 @@ jobs:
           }
 
           frontend_sha="$(gh api "repos/$FRONTEND_REPOSITORY/git/ref/heads/master" --jq .object.sha)"
-          infra_sha="$(gh api "repos/$INFRA_REPOSITORY/git/ref/heads/main" --jq .object.sha)"
+          [[ -n "$INFRA_GH_TOKEN" ]] || {
+            echo "::error::INFRA_DISPATCH_TOKEN is required to resolve the Infra main SHA."
+            exit 1
+          }
+          infra_sha="$(GH_TOKEN="$INFRA_GH_TOKEN" gh api "repos/$INFRA_REPOSITORY/git/ref/heads/main" --jq .object.sha)"
 
           validate_sha "$frontend_sha" "FRONTEND_SHA"
           validate_sha "$infra_sha" "INFRA_SHA"
