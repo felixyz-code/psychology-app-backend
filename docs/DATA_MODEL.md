@@ -512,6 +512,42 @@ Ownership must be inferred through related entities when they exist, and only fa
 
 ---
 
+# Additive SaaS Foundation
+
+The SaaS foundation is additive and does not yet make the application
+multi-tenant. It introduces `Organization`, `OrganizationMembership`,
+`PsychologistProfile`, organization settings/branding, inactive invitation
+storage and `PatientAssignment` persistence without public API flows or tenant
+authorization enforcement.
+
+`Patient`, `CaseFile`, `SessionNote`, `Document`, `Appointment` and
+`FinancialTransaction` now expose a nullable `organizationId`. Existing
+`psychologistId`, global `User.role` and all legacy ownership behaviour remain
+the runtime source of truth until a later backfill and enforcement phase.
+
+The additive migration intentionally does not create a Legacy Organization,
+infer an OWNER, populate memberships or assignments, move uploads, or make any
+legacy column mandatory. Cross-tenant composite constraints, a partial unique
+index for active primary assignments, soft-delete, audit events and tenant
+filters are deferred until data has been backfilled and validated.
+
+`OrganizationMembership` is unique per organization and user. A
+`PsychologistProfile` is one-to-one with a user but grants neither membership
+nor clinical access. `PatientAssignment` is stored for future historical
+professional assignment; it is not yet populated or used by authorization.
+
+### POST-GO-LIVE.1.4 validation
+
+The additive migration was validated against disposable PostgreSQL 16.14
+databases both from an empty schema and from a representative legacy schema.
+The legacy validation preserved row counts, `User.role`, `Patient.psychologistId`
+and null `organizationId` values, while creating no Organization, Membership or
+Profile automatically. Prisma migration status and `migrate diff` reported no
+drift. This confirms N/N+1 schema compatibility only; it does not activate
+tenant enforcement or complete the later backfill phase.
+
+---
+
 # Future Evolution
 
 Possible future additions:

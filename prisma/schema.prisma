@@ -51,25 +51,173 @@ enum PaymentMethod {
   OTHER
 }
 
+enum OrganizationStatus {
+  PROVISIONING
+  ACTIVE
+  SUSPENDED
+  ARCHIVED
+}
+
+enum MembershipRole {
+  OWNER
+  ADMIN
+  PSYCHOLOGIST
+  RECEPTIONIST
+  BILLING
+  AUDITOR
+  READ_ONLY
+}
+
+enum MembershipStatus {
+  INVITED
+  ACTIVE
+  SUSPENDED
+  REVOKED
+}
+
+enum PsychologistProfileStatus {
+  LEGACY_UNVERIFIED
+  ACTIVE
+  SUSPENDED
+}
+
+enum PatientAssignmentRole {
+  PRIMARY
+  COLLABORATOR
+  CONSULTING
+}
+
+enum PatientAssignmentStatus {
+  ACTIVE
+  ENDED
+  REVOKED
+}
+
 model User {
-  id                String         @id @default(uuid()) @db.Uuid
-  name              String         @db.VarChar(150)
-  email             String         @unique @db.VarChar(255)
-  passwordHash      String         @map("password") @db.VarChar(255)
-  role              UserRole
-  patients          Patient[]
-  sessionNotes      SessionNote[]
-  uploadedDocuments Document[]
-  appointments      Appointment[]
+  id                    String                   @id @default(uuid()) @db.Uuid
+  name                  String                   @db.VarChar(150)
+  email                 String                   @unique @db.VarChar(255)
+  passwordHash          String                   @map("password") @db.VarChar(255)
+  role                  UserRole
+  patients              Patient[]
+  sessionNotes          SessionNote[]
+  uploadedDocuments     Document[]
+  appointments          Appointment[]
   financialTransactions FinancialTransaction[]
-  createdAt         DateTime       @default(now())
-  updatedAt         DateTime       @updatedAt
+  memberships           OrganizationMembership[]
+  psychologistProfile   PsychologistProfile?
+  createdAt             DateTime                 @default(now())
+  updatedAt             DateTime                 @updatedAt
 
   @@map("users")
 }
 
+model Organization {
+  id           String                   @id @default(uuid()) @db.Uuid
+  slug         String                   @unique @db.VarChar(100)
+  legalName    String                   @db.VarChar(255)
+  displayName  String                   @db.VarChar(150)
+  status       OrganizationStatus       @default(PROVISIONING)
+  timezone     String                   @default("UTC") @db.VarChar(100)
+  locale       String                   @default("es-MX") @db.VarChar(20)
+  currency     String                   @default("MXN") @db.Char(3)
+  memberships  OrganizationMembership[]
+  invitations  OrganizationInvitation[]
+  settings     OrganizationSettings?
+  branding     OrganizationBranding?
+  patients     Patient[]
+  caseFiles    CaseFile[]
+  sessionNotes SessionNote[]
+  documents    Document[]
+  appointments Appointment[]
+  transactions FinancialTransaction[]
+  assignments  PatientAssignment[]
+  createdAt    DateTime                 @default(now()) @db.Timestamptz(3)
+  updatedAt    DateTime                 @updatedAt @db.Timestamptz(3)
+
+  @@map("organizations")
+}
+
+model OrganizationMembership {
+  id                      String              @id @default(uuid()) @db.Uuid
+  organizationId          String              @db.Uuid
+  userId                  String              @db.Uuid
+  role                    MembershipRole
+  status                  MembershipStatus    @default(INVITED)
+  joinedAt                DateTime?           @db.Timestamptz(3)
+  suspendedAt             DateTime?           @db.Timestamptz(3)
+  revokedAt               DateTime?           @db.Timestamptz(3)
+  organization            Organization        @relation(fields: [organizationId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  user                    User                @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  professionalAssignments PatientAssignment[] @relation("PatientAssignmentProfessional")
+  createdAssignments      PatientAssignment[] @relation("PatientAssignmentCreatedBy")
+  closedAssignments       PatientAssignment[] @relation("PatientAssignmentClosedBy")
+  createdAt               DateTime            @default(now()) @db.Timestamptz(3)
+  updatedAt               DateTime            @updatedAt @db.Timestamptz(3)
+
+  @@unique([organizationId, userId])
+  @@index([organizationId, status, role])
+  @@index([userId, status])
+  @@map("organization_memberships")
+}
+
+model PsychologistProfile {
+  id               String                    @id @default(uuid()) @db.Uuid
+  userId           String                    @unique @db.Uuid
+  professionalName String                    @db.VarChar(150)
+  licenseNumber    String?                   @db.VarChar(100)
+  status           PsychologistProfileStatus @default(LEGACY_UNVERIFIED)
+  verifiedAt       DateTime?                 @db.Timestamptz(3)
+  user             User                      @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  createdAt        DateTime                  @default(now()) @db.Timestamptz(3)
+  updatedAt        DateTime                  @updatedAt @db.Timestamptz(3)
+
+  @@map("psychologist_profiles")
+}
+
+model OrganizationSettings {
+  organizationId             String       @id @db.Uuid
+  weekStartsOn               Int          @default(1)
+  defaultAppointmentDuration Int?         @db.Integer
+  organization               Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  createdAt                  DateTime     @default(now()) @db.Timestamptz(3)
+  updatedAt                  DateTime     @updatedAt @db.Timestamptz(3)
+
+  @@map("organization_settings")
+}
+
+model OrganizationBranding {
+  organizationId String       @id @db.Uuid
+  visualName     String?      @db.VarChar(150)
+  primaryColor   String?      @db.VarChar(7)
+  accentColor    String?      @db.VarChar(7)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  createdAt      DateTime     @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime     @updatedAt @db.Timestamptz(3)
+
+  @@map("organization_branding")
+}
+
+model OrganizationInvitation {
+  id             String         @id @default(uuid()) @db.Uuid
+  organizationId String         @db.Uuid
+  email          String         @db.VarChar(255)
+  role           MembershipRole
+  tokenDigest    String         @unique @db.Char(64)
+  expiresAt      DateTime       @db.Timestamptz(3)
+  acceptedAt     DateTime?      @db.Timestamptz(3)
+  revokedAt      DateTime?      @db.Timestamptz(3)
+  organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  createdAt      DateTime       @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime       @updatedAt @db.Timestamptz(3)
+
+  @@index([organizationId, email])
+  @@map("organization_invitations")
+}
+
 model Patient {
   id                    String                 @id @default(uuid()) @db.Uuid
+  organizationId        String?                @db.Uuid
   psychologistId        String                 @db.Uuid
   firstName             String                 @db.VarChar(100)
   lastName              String                 @db.VarChar(100)
@@ -77,67 +225,80 @@ model Patient {
   email                 String?                @db.VarChar(255)
   birthDate             DateTime?              @db.Date
   psychologist          User                   @relation(fields: [psychologistId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  organization          Organization?          @relation(fields: [organizationId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   caseFile              CaseFile?
   appointments          Appointment[]
   financialTransactions FinancialTransaction[]
+  assignments           PatientAssignment[]
   createdAt             DateTime               @default(now())
   updatedAt             DateTime               @updatedAt
 
   @@index([psychologistId])
+  @@index([organizationId, createdAt])
   @@map("patients")
 }
 
 model CaseFile {
-  id            String        @id @default(uuid()) @db.Uuid
-  patientId     String        @unique @db.Uuid
-  diagnosis     String?       @db.Text
-  treatmentPlan String?       @db.Text
-  patient       Patient       @relation(fields: [patientId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  sessionNotes  SessionNote[]
-  documents     Document[]
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+  id             String        @id @default(uuid()) @db.Uuid
+  organizationId String?       @db.Uuid
+  patientId      String        @unique @db.Uuid
+  diagnosis      String?       @db.Text
+  treatmentPlan  String?       @db.Text
+  patient        Patient       @relation(fields: [patientId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  sessionNotes   SessionNote[]
+  documents      Document[]
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
 
+  @@index([organizationId, createdAt])
   @@map("case_files")
 }
 
 model SessionNote {
-  id          String   @id @default(uuid()) @db.Uuid
-  caseFileId  String   @db.Uuid
-  authorId    String   @db.Uuid
-  sessionDate DateTime
-  title       String?  @db.VarChar(150)
-  content     String   @db.Text
-  caseFile    CaseFile @relation(fields: [caseFileId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  author      User     @relation(fields: [authorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id             String        @id @default(uuid()) @db.Uuid
+  organizationId String?       @db.Uuid
+  caseFileId     String        @db.Uuid
+  authorId       String        @db.Uuid
+  sessionDate    DateTime
+  title          String?       @db.VarChar(150)
+  content        String        @db.Text
+  caseFile       CaseFile      @relation(fields: [caseFileId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  author         User          @relation(fields: [authorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
 
   @@index([caseFileId])
   @@index([authorId])
   @@index([sessionDate])
+  @@index([organizationId, sessionDate])
   @@map("session_notes")
 }
 
 model Document {
-  id           String   @id @default(uuid()) @db.Uuid
-  caseFileId   String   @db.Uuid
-  uploadedById String   @db.Uuid
-  fileName     String   @db.VarChar(255)
-  filePath     String   @db.Text
-  mimeType     String?  @db.VarChar(100)
-  caseFile     CaseFile @relation(fields: [caseFileId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  uploadedBy   User     @relation(fields: [uploadedById], references: [id], onDelete: Restrict, onUpdate: Cascade)
-  uploadedAt   DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id             String        @id @default(uuid()) @db.Uuid
+  organizationId String?       @db.Uuid
+  caseFileId     String        @db.Uuid
+  uploadedById   String        @db.Uuid
+  fileName       String        @db.VarChar(255)
+  filePath       String        @db.Text
+  mimeType       String?       @db.VarChar(100)
+  caseFile       CaseFile      @relation(fields: [caseFileId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  uploadedBy     User          @relation(fields: [uploadedById], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  uploadedAt     DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
 
   @@index([caseFileId])
   @@index([uploadedById])
+  @@index([organizationId, uploadedAt])
   @@map("documents")
 }
 
 model Appointment {
   id                    String                 @id @default(uuid()) @db.Uuid
+  organizationId        String?                @db.Uuid
   patientId             String                 @db.Uuid
   psychologistId        String                 @db.Uuid
   scheduledAt           DateTime
@@ -146,6 +307,7 @@ model Appointment {
   notes                 String?                @db.Text
   patient               Patient                @relation(fields: [patientId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   psychologist          User                   @relation(fields: [psychologistId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  organization          Organization?          @relation(fields: [organizationId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   financialTransactions FinancialTransaction[]
   createdAt             DateTime               @default(now())
   updatedAt             DateTime               @updatedAt
@@ -153,30 +315,33 @@ model Appointment {
   @@index([patientId])
   @@index([psychologistId])
   @@index([scheduledAt])
+  @@index([organizationId, scheduledAt])
   @@map("appointments")
 }
 
 model FinancialTransaction {
-  id            String                       @id @default(uuid()) @db.Uuid
-  type          FinancialTransactionType
-  status        FinancialTransactionStatus   @default(PENDING)
-  category      FinancialTransactionCategory @default(OTHER)
-  amount        Decimal                      @db.Decimal(10, 2)
-  currency      String                       @default("MXN") @db.VarChar(3)
-  concept       String                       @db.VarChar(255)
-  description   String?                      @db.Text
-  occurredAt    DateTime
-  dueDate       DateTime?
-  paymentMethod PaymentMethod?
-  notes         String?                      @db.Text
-  patientId     String?                      @db.Uuid
-  appointmentId String?                      @db.Uuid
-  createdById   String                       @db.Uuid
-  patient       Patient?                     @relation(fields: [patientId], references: [id], onDelete: SetNull, onUpdate: Cascade)
-  appointment   Appointment?                 @relation(fields: [appointmentId], references: [id], onDelete: SetNull, onUpdate: Cascade)
-  createdBy     User                         @relation(fields: [createdById], references: [id], onDelete: Restrict, onUpdate: Cascade)
-  createdAt     DateTime                     @default(now())
-  updatedAt     DateTime                     @updatedAt
+  id             String                       @id @default(uuid()) @db.Uuid
+  organizationId String?                      @db.Uuid
+  type           FinancialTransactionType
+  status         FinancialTransactionStatus   @default(PENDING)
+  category       FinancialTransactionCategory @default(OTHER)
+  amount         Decimal                      @db.Decimal(10, 2)
+  currency       String                       @default("MXN") @db.VarChar(3)
+  concept        String                       @db.VarChar(255)
+  description    String?                      @db.Text
+  occurredAt     DateTime
+  dueDate        DateTime?
+  paymentMethod  PaymentMethod?
+  notes          String?                      @db.Text
+  patientId      String?                      @db.Uuid
+  appointmentId  String?                      @db.Uuid
+  createdById    String                       @db.Uuid
+  patient        Patient?                     @relation(fields: [patientId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  appointment    Appointment?                 @relation(fields: [appointmentId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  createdBy      User                         @relation(fields: [createdById], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  organization   Organization?                @relation(fields: [organizationId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  createdAt      DateTime                     @default(now())
+  updatedAt      DateTime                     @updatedAt
 
   @@index([type])
   @@index([status])
@@ -185,5 +350,33 @@ model FinancialTransaction {
   @@index([patientId])
   @@index([appointmentId])
   @@index([createdById])
+  @@index([organizationId, occurredAt])
   @@map("financial_transactions")
+}
+
+model PatientAssignment {
+  id                    String                  @id @default(uuid()) @db.Uuid
+  organizationId        String                  @db.Uuid
+  patientId             String                  @db.Uuid
+  membershipId          String                  @db.Uuid
+  role                  PatientAssignmentRole
+  status                PatientAssignmentStatus @default(ACTIVE)
+  startedAt             DateTime                @default(now()) @db.Timestamptz(3)
+  endedAt               DateTime?               @db.Timestamptz(3)
+  creationReason        String?                 @db.VarChar(500)
+  closureReason         String?                 @db.VarChar(500)
+  createdByMembershipId String?                 @db.Uuid
+  closedByMembershipId  String?                 @db.Uuid
+  version               Int                     @default(1)
+  organization          Organization            @relation(fields: [organizationId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  patient               Patient                 @relation(fields: [patientId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  membership            OrganizationMembership  @relation("PatientAssignmentProfessional", fields: [membershipId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  createdByMembership   OrganizationMembership? @relation("PatientAssignmentCreatedBy", fields: [createdByMembershipId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  closedByMembership    OrganizationMembership? @relation("PatientAssignmentClosedBy", fields: [closedByMembershipId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  createdAt             DateTime                @default(now()) @db.Timestamptz(3)
+  updatedAt             DateTime                @updatedAt @db.Timestamptz(3)
+
+  @@index([organizationId, patientId, status])
+  @@index([organizationId, membershipId, status])
+  @@map("patient_assignments")
 }

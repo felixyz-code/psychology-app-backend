@@ -1,5 +1,6 @@
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '@prisma/client';
+import { randomUUID } from 'node:crypto';
 
 const runPersistenceTests =
   process.env.RUN_PERSISTENCE_TESTS === 'true' ? describe : describe.skip;
@@ -103,5 +104,131 @@ runPersistenceTests('PostgreSQL persistence integration', () => {
       35,
     );
     expect(groups.every((group) => group._sum.amount !== null)).toBe(true);
+  });
+
+  it('persists the additive SaaS foundation without changing legacy ownership', async () => {
+    const suffix = randomUUID();
+    const organizationAId = randomUUID();
+    const organizationBId = randomUUID();
+    const standaloneOrganizationId = randomUUID();
+    const memberUserId = randomUUID();
+    const profileOnlyUserId = randomUUID();
+
+    try {
+      await prisma.user.create({
+        data: {
+          id: memberUserId,
+          name: 'SaaS Membership Test User',
+          email: `saas-member-${suffix}@example.test`,
+          passwordHash: 'not-a-real-password',
+          role: 'PSYCHOLOGIST',
+        },
+      });
+      await prisma.user.create({
+        data: {
+          id: profileOnlyUserId,
+          name: 'SaaS Profile Test User',
+          email: `saas-profile-${suffix}@example.test`,
+          passwordHash: 'not-a-real-password',
+          role: 'PSYCHOLOGIST',
+        },
+      });
+
+      await prisma.organization.createMany({
+        data: [
+          {
+            id: organizationAId,
+            slug: `saas-a-${suffix}`,
+            legalName: 'SaaS Organization A',
+            displayName: 'SaaS A',
+            status: 'ACTIVE',
+          },
+          {
+            id: organizationBId,
+            slug: `saas-b-${suffix}`,
+            legalName: 'SaaS Organization B',
+            displayName: 'SaaS B',
+            status: 'ACTIVE',
+          },
+        ],
+      });
+
+      await prisma.organizationMembership.createMany({
+        data: [
+          {
+            organizationId: organizationAId,
+            userId: memberUserId,
+            role: 'PSYCHOLOGIST',
+            status: 'ACTIVE',
+            joinedAt: new Date(),
+          },
+          {
+            organizationId: organizationBId,
+            userId: memberUserId,
+            role: 'PSYCHOLOGIST',
+            status: 'ACTIVE',
+            joinedAt: new Date(),
+          },
+        ],
+      });
+
+      await expect(
+        prisma.organizationMembership.create({
+          data: {
+            organizationId: organizationAId,
+            userId: memberUserId,
+            role: 'PSYCHOLOGIST',
+          },
+        }),
+      ).rejects.toMatchObject({ code: 'P2002' });
+
+      await prisma.psychologistProfile.create({
+        data: {
+          userId: profileOnlyUserId,
+          professionalName: 'Profile Without Membership',
+        },
+      });
+      expect(
+        await prisma.organizationMembership.count({
+          where: { userId: profileOnlyUserId },
+        }),
+      ).toBe(0);
+
+      await prisma.organization.create({
+        data: {
+          id: standaloneOrganizationId,
+          slug: `saas-standalone-${suffix}`,
+          legalName: 'Standalone Organization',
+          displayName: 'Standalone',
+          settings: { create: {} },
+          branding: { create: { visualName: 'Standalone' } },
+        },
+      });
+      await prisma.organization.delete({
+        where: { id: standaloneOrganizationId },
+      });
+      expect(
+        await prisma.organizationSettings.findUnique({
+          where: { organizationId: standaloneOrganizationId },
+        }),
+      ).toBeNull();
+
+      expect(
+        await prisma.patient.count({ where: { organizationId: null } }),
+      ).toBe(16);
+    } finally {
+      await prisma.organizationMembership.deleteMany({
+        where: { userId: memberUserId },
+      });
+      await prisma.organization.deleteMany({
+        where: { id: { in: [organizationAId, organizationBId] } },
+      });
+      await prisma.psychologistProfile.deleteMany({
+        where: { userId: profileOnlyUserId },
+      });
+      await prisma.user.deleteMany({
+        where: { id: { in: [memberUserId, profileOnlyUserId] } },
+      });
+    }
   });
 });
