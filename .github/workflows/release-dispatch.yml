@@ -82,7 +82,6 @@ jobs:
       - name: Resolve public release SHAs
         id: release_refs
         env:
-          GH_TOKEN: ${{ github.token }}
           INFRA_GH_TOKEN: ${{ secrets.INFRA_DISPATCH_TOKEN }}
         shell: bash
         run: |
@@ -98,7 +97,12 @@ jobs:
             }
           }
 
-          frontend_sha="$(gh api "repos/$FRONTEND_REPOSITORY/git/ref/heads/master" --jq .object.sha)"
+          frontend_response="$(curl --fail-with-body --silent --show-error \
+            --header 'Accept: application/vnd.github+json' \
+            --header 'X-GitHub-Api-Version: 2022-11-28' \
+            --header 'User-Agent: psychology-release-dispatch' \
+            "https://api.github.com/repos/$FRONTEND_REPOSITORY/git/ref/heads/master")"
+          frontend_sha="$(jq -er '.object.sha' <<<"$frontend_response")"
           [[ -n "$INFRA_GH_TOKEN" ]] || {
             echo "::error::INFRA_DISPATCH_TOKEN is required to resolve the Infra main SHA."
             exit 1
