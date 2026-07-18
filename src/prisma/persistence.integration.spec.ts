@@ -2,6 +2,13 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
 
+import { parseLegacyBackfillManifest } from './legacy-backfill/manifest';
+import {
+  applyLegacyBackfill,
+  createLegacyBackfillPlan,
+  hasChanges,
+} from './legacy-backfill/legacy-backfill.service';
+
 const runPersistenceTests =
   process.env.RUN_PERSISTENCE_TESTS === 'true' ? describe : describe.skip;
 
@@ -229,6 +236,208 @@ runPersistenceTests('PostgreSQL persistence integration', () => {
       await prisma.user.deleteMany({
         where: { id: { in: [memberUserId, profileOnlyUserId] } },
       });
+    }
+  });
+
+  it('backfills a legacy database only through the explicit manifest and remains idempotent', async () => {
+    const owner = await prisma.user.findFirst({
+      where: { role: 'ADMIN' },
+      select: { id: true, role: true },
+    });
+    const psychologist = await prisma.user.findFirst({
+      where: { role: 'PSYCHOLOGIST' },
+      select: { id: true, role: true },
+    });
+    const additionalAdminId = randomUUID();
+
+    expect(owner).not.toBeNull();
+    expect(psychologist).not.toBeNull();
+
+    const preexistingPsychologistProfile =
+      await prisma.psychologistProfile.findUnique({
+        where: { userId: psychologist!.id },
+        select: { userId: true },
+      });
+    const profileCreatedForBackfillTest = !preexistingPsychologistProfile;
+    if (profileCreatedForBackfillTest) {
+      await prisma.psychologistProfile.create({
+        data: {
+          userId: psychologist!.id,
+          professionalName: 'Existing Licensed Psychologist',
+          licenseNumber: 'PERSIST-LICENSE',
+          status: 'ACTIVE',
+          verifiedAt: new Date(),
+        },
+      });
+    }
+
+    await prisma.user.create({
+      data: {
+        id: additionalAdminId,
+        name: 'Legacy administrative user',
+        email: `legacy-admin-${randomUUID()}@example.test`,
+        passwordHash: 'not-a-real-password',
+        role: 'ADMIN',
+      },
+    });
+
+    const manifest = parseLegacyBackfillManifest({
+      version: 1,
+      organization: {
+        slug: 'legacy-integration-test',
+        legalName: 'Legacy Integration Test Practice',
+        displayName: 'Legacy Integration Test',
+        status: 'ACTIVE',
+      },
+      owner: { userId: owner!.id },
+    });
+
+    try {
+      const dryRunPlan = await createLegacyBackfillPlan(prisma, manifest);
+      expect(dryRunPlan.blockers).toEqual([]);
+      expect(await prisma.organization.count()).toBe(0);
+      expect(
+        await prisma.patient.count({ where: { organizationId: null } }),
+      ).toBe(16);
+
+      const applied = await applyLegacyBackfill(prisma, manifest);
+      expect(applied.afterPlan.blockers).toEqual([]);
+      expect(hasChanges(applied.afterPlan)).toBe(false);
+
+      const organization = await prisma.organization.findUniqueOrThrow({
+        where: { slug: manifest.organization.slug },
+      });
+      expect(await prisma.organization.count()).toBe(1);
+      expect(
+        await prisma.patient.count({
+          where: { organizationId: organization.id },
+        }),
+      ).toBe(16);
+      expect(
+        await prisma.caseFile.count({
+          where: { organizationId: organization.id },
+        }),
+      ).toBe(14);
+      expect(
+        await prisma.sessionNote.count({
+          where: { organizationId: organization.id },
+        }),
+      ).toBe(30);
+      expect(
+        await prisma.document.count({
+          where: { organizationId: organization.id },
+        }),
+      ).toBe(0);
+      expect(
+        await prisma.appointment.count({
+          where: { organizationId: organization.id },
+        }),
+      ).toBe(39);
+      expect(
+        await prisma.financialTransaction.count({
+          where: { organizationId: organization.id },
+        }),
+      ).toBe(35);
+      expect(
+        await prisma.patientAssignment.count({
+          where: {
+            organizationId: organization.id,
+            role: 'PRIMARY',
+            status: 'ACTIVE',
+          },
+        }),
+      ).toBe(16);
+
+      expect(
+        await prisma.organizationMembership.findUniqueOrThrow({
+          where: {
+            organizationId_userId: {
+              organizationId: organization.id,
+              userId: owner!.id,
+            },
+          },
+        }),
+      ).toMatchObject({ role: 'OWNER', status: 'ACTIVE' });
+      expect(
+        await prisma.organizationMembership.findUniqueOrThrow({
+          where: {
+            organizationId_userId: {
+              organizationId: organization.id,
+              userId: additionalAdminId,
+            },
+          },
+        }),
+      ).toMatchObject({ role: 'ADMIN', status: 'ACTIVE' });
+      expect(
+        await prisma.psychologistProfile.findUniqueOrThrow({
+          where: { userId: psychologist!.id },
+        }),
+      ).toMatchObject({
+        status: 'ACTIVE',
+        licenseNumber: 'PERSIST-LICENSE',
+      });
+      expect(
+        await prisma.patient.count({
+          where: { psychologistId: psychologist!.id },
+        }),
+      ).toBe(16);
+
+      const secondRun = await applyLegacyBackfill(prisma, manifest);
+      expect(hasChanges(secondRun.plan)).toBe(false);
+      expect(await prisma.organization.count()).toBe(1);
+      expect(
+        await prisma.patientAssignment.count({
+          where: {
+            organizationId: organization.id,
+            role: 'PRIMARY',
+            status: 'ACTIVE',
+          },
+        }),
+      ).toBe(16);
+    } finally {
+      const organization = await prisma.organization.findUnique({
+        where: { slug: manifest.organization.slug },
+        select: { id: true },
+      });
+      if (organization) {
+        await prisma.patientAssignment.deleteMany({
+          where: { organizationId: organization.id },
+        });
+        await prisma.patient.updateMany({
+          where: { organizationId: organization.id },
+          data: { organizationId: null },
+        });
+        await prisma.caseFile.updateMany({
+          where: { organizationId: organization.id },
+          data: { organizationId: null },
+        });
+        await prisma.sessionNote.updateMany({
+          where: { organizationId: organization.id },
+          data: { organizationId: null },
+        });
+        await prisma.document.updateMany({
+          where: { organizationId: organization.id },
+          data: { organizationId: null },
+        });
+        await prisma.appointment.updateMany({
+          where: { organizationId: organization.id },
+          data: { organizationId: null },
+        });
+        await prisma.financialTransaction.updateMany({
+          where: { organizationId: organization.id },
+          data: { organizationId: null },
+        });
+        await prisma.organizationMembership.deleteMany({
+          where: { organizationId: organization.id },
+        });
+        await prisma.organization.delete({ where: { id: organization.id } });
+      }
+      if (profileCreatedForBackfillTest) {
+        await prisma.psychologistProfile.deleteMany({
+          where: { userId: psychologist!.id },
+        });
+      }
+      await prisma.user.delete({ where: { id: additionalAdminId } });
     }
   });
 });

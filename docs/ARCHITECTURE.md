@@ -515,6 +515,20 @@ Future architecture may include:
 
 These features should extend the current architecture without replacing it.
 
+## Legacy SaaS Backfill Boundary
+
+The manifest-driven `saas:legacy-backfill` command is an offline data
+preparation tool. It is intentionally outside the Nest request path and is not
+called by seed, startup or Prisma migration deployment. It does not introduce
+a TenantResolver, organization filtering or authorization changes. Existing
+ownership filtering continues to use `psychologistId` and global `User.role`
+until a later explicitly approved enforcement phase.
+
+Its serializable transaction, prevalidation and postvalidation protect the
+data-preparation operation without claiming to provide a business audit trail.
+Operational use, dry-run, apply confirmation and non-production rollback are
+documented in `SAAS_LEGACY_BACKFILL.md`.
+
 ---
 
 # References

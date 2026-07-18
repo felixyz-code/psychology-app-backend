@@ -83,6 +83,7 @@ Current development efforts include:
 * Clinical workflow validation
 * Documentation improvements
 * Financial transactions CRUD validation and basic reporting follow-up
+* Controlled legacy SaaS organization backfill validation before any tenant enforcement
 
 ---
 
@@ -155,6 +156,14 @@ Potential future features:
 * Advanced Permissions
 
 These features are intentionally outside the current MVP.
+
+## SaaS Transition Status
+
+POST-GO-LIVE.1.5 provides a manifest-driven, reversible-in-disposable-
+environments data backfill foundation. It is not tenant isolation: runtime
+ownership, APIs and nullable organization scopes remain legacy-compatible.
+The next SaaS decision must validate the backfill in PostgreSQL and approve
+future tenant enforcement and constraints separately.
 
 ---
 

@@ -546,6 +546,25 @@ Profile automatically. Prisma migration status and `migrate diff` reported no
 drift. This confirms N/N+1 schema compatibility only; it does not activate
 tenant enforcement or complete the later backfill phase.
 
+### POST-GO-LIVE.1.5 legacy backfill foundation
+
+The legacy backfill is an explicit operational command documented in
+`SAAS_LEGACY_BACKFILL.md`, not a Prisma migration or runtime behavior. It uses
+a versioned manifest to create or validate exactly one Legacy Organization and
+a manually selected OWNER. It preserves legacy row counts,
+`Patient.psychologistId` and global `User.role`.
+
+`Patient` receives its scope directly; clinical child entities derive theirs
+from the Patient relationship. Financial transactions derive from Patient,
+then Appointment's Patient, with a documented single-legacy fallback for
+unlinked operational transactions. The command creates one active PRIMARY
+`PatientAssignment` from each Patient's legacy `psychologistId` and matching
+membership. It remains idempotent and fails closed on conflicts.
+
+The active-PRIMARY partial unique index and cross-tenant composite foreign
+keys remain deferred until organization scopes are enforced and non-nullable
+where appropriate. No tenant filtering is active in this phase.
+
 ---
 
 # Future Evolution

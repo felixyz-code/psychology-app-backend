@@ -1,5 +1,33 @@
 # Changelog
 
+---
+
+# POST-GO-LIVE.1.5 Legacy Organization & Backfill Foundation
+
+## Added
+
+* A manifest-validated `npm run saas:legacy-backfill` operational command with
+  dry-run, explicit apply confirmation, structured redacted reports,
+  serializable transaction handling and idempotence checks.
+* Unit coverage for manifests, safety gates, role mapping, planning,
+  no-change second runs and report privacy.
+* Opt-in PostgreSQL coverage for the end-to-end legacy backfill path.
+* `docs/SAAS_LEGACY_BACKFILL.md` runbook, including rollback guidance.
+
+## Changed
+
+* No runtime NestJS routes, guards, authorization rules, ownership filtering
+  or API contracts changed.
+* No Prisma schema migration was added. The active-PRIMARY partial index and
+  cross-tenant constraints are deliberately deferred.
+
+## Security Notes
+
+* Apply rejects production-like database names, requires a dedicated
+  confirmation value and defaults to `_test` databases.
+* Reports avoid passwords, URLs with credentials, patient names, clinical
+  notes, documents and other PHI.
+
 > Backend change log for the Psychology Management System Backend.
 
 ---

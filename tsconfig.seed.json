@@ -4,5 +4,9 @@
     "module": "commonjs",
     "moduleResolution": "node"
   },
-  "include": ["prisma/seed.ts"]
+  "include": [
+    "prisma/seed.ts",
+    "prisma/backfill/**/*.ts",
+    "src/prisma/legacy-backfill/**/*.ts"
+  ]
 }
