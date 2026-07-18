@@ -2,6 +2,35 @@
 
 ---
 
+# POST-GO-LIVE.1.6 Tenant Context & Runtime Compatibility Foundation
+
+## Added
+
+* Request-isolated tenant context resolution from the authenticated user and
+  active PostgreSQL memberships, with safe explicit organization selection.
+* `@TenantRequired()` and `@CurrentTenant()` for gradual route adoption, plus
+  tenant-optional `GET /auth/context` for safe organization selection.
+* Unit, concurrency, and opt-in PostgreSQL integration coverage for tenant
+  resolution, cross-tenant rejection, and context isolation.
+
+## Changed
+
+* Existing authenticated routes are tenant-optional; public routes bypass
+  resolution. Legacy `User.role`, `psychologistId`, JWT format, and clinical
+  ownership queries are unchanged.
+* Structured HTTP logs may include only tenant/user/membership identifiers and
+  resolution mode; no headers, clinical data, names, emails, or tokens are
+  added.
+
+## Security Notes
+
+* `X-Organization-Id` is never trusted until matched to the authenticated
+  user's active membership and an active organization.
+* Ambiguous memberships are never resolved by order. Required routes return a
+  redacted conflict, and optional legacy routes receive no tenant context.
+
+---
+
 # POST-GO-LIVE.1.5 Legacy Organization & Backfill Foundation
 
 ## Added

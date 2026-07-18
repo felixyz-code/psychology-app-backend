@@ -2,6 +2,7 @@ import { MODULE_METADATA } from '@nestjs/common/constants';
 import { APP_GUARD } from '@nestjs/core';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { RolesGuard } from './auth/guards/roles.guard';
+import { TenantContextGuard } from './tenant-context/guards/tenant-context.guard';
 import { AppModule } from './app.module';
 
 type GlobalGuardProvider = {
@@ -10,7 +11,7 @@ type GlobalGuardProvider = {
 };
 
 describe('AppModule authorization guards', () => {
-  it('registers JWT before roles as global guards', () => {
+  it('registers JWT, tenant context, and roles as ordered global guards', () => {
     const providers = Reflect.getMetadata(
       MODULE_METADATA.PROVIDERS,
       AppModule,
@@ -21,6 +22,7 @@ describe('AppModule authorization guards', () => {
 
     expect(globalGuards).toEqual([
       { provide: APP_GUARD, useClass: JwtAuthGuard },
+      { provide: APP_GUARD, useClass: TenantContextGuard },
       { provide: APP_GUARD, useClass: RolesGuard },
     ]);
   });

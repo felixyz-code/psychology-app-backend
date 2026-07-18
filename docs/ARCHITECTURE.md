@@ -529,6 +529,47 @@ data-preparation operation without claiming to provide a business audit trail.
 Operational use, dry-run, apply confirmation and non-production rollback are
 documented in `SAAS_LEGACY_BACKFILL.md`.
 
+## Tenant Context Foundation (POST-GO-LIVE.1.6)
+
+Authenticated requests now pass through `TenantContextGuard` after JWT
+authentication and before legacy role authorization. The guard resolves active
+memberships from PostgreSQL, validates the selected organization is `ACTIVE`,
+and places one immutable context in the existing request `AsyncLocalStorage`.
+The same object is exposed on the request only for the `@CurrentTenant()`
+parameter decorator; neither path reads a client header after resolution.
+
+`X-Organization-Id` is an optional UUID selection request, not evidence of
+access. It is checked against the authenticated user's active membership on
+every request. Without the header, exactly one eligible membership resolves
+automatically; multiple eligible memberships deliberately remain unresolved;
+zero memberships preserve legacy compatibility for optional routes. No legacy
+clinical query has changed: `psychologistId` and global `User.role` remain the
+runtime ownership and authorization mechanisms.
+
+`LEGACY_COMPATIBILITY` is an absence of tenant context, not a virtual
+organization or membership and not tenant authorization. It never permits an
+organization ID from a header or request body to become authoritative.
+
+New organizational routes use `@TenantRequired()`; existing authenticated
+routes are tenant-optional by default, and `@Public()` routes bypass resolution.
+`GET /auth/context` is authenticated but tenant-optional to avoid a
+multi-membership bootstrap cycle: unresolved users receive only their own
+selectable memberships and can retry with `X-Organization-Id`. A later
+enforcement phase can opt clinical endpoints into `@TenantRequired()`
+individually.
+
+`@SkipTenantContext()` takes precedence over `@TenantRequired()` so explicit
+infrastructure or public bypasses cannot accidentally perform a membership
+query. The combination is reserved for intentional framework routes and is
+covered by guard tests.
+
+The membership query is `OrganizationMembership` filtered by `(userId,
+status=ACTIVE)`, backed by `organization_memberships_userId_status_idx`; the
+selected organization is joined in that same query. There is intentionally no
+cache, because revocation, role changes and organization suspension must take
+effect on the next request. Any future cache needs explicit invalidation for
+those mutations.
+
 ---
 
 # References

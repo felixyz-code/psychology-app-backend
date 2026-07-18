@@ -165,6 +165,12 @@ ownership, APIs and nullable organization scopes remain legacy-compatible.
 The next SaaS decision must validate the backfill in PostgreSQL and approve
 future tenant enforcement and constraints separately.
 
+POST-GO-LIVE.1.6 adds only tenant-context resolution and propagation. It does
+not enforce tenant filters in clinical repositories, replace `psychologistId`,
+or make nullable organization references mandatory. The next phase should move
+individual routes from optional to required context before changing query
+ownership semantics.
+
 ---
 
 # Known Technical Debt

@@ -3,6 +3,7 @@ import { UserRole } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
+import { TenantResolutionMode } from '../common/request-context/request-context.service';
 import { AuthService } from './auth.service';
 
 jest.mock('bcrypt', () => ({ compare: jest.fn() }));
@@ -10,6 +11,9 @@ jest.mock('bcrypt', () => ({ compare: jest.fn() }));
 type PrismaMock = {
   user: {
     findUnique: jest.Mock;
+  };
+  organizationMembership: {
+    findMany: jest.Mock;
   };
 };
 
@@ -44,6 +48,9 @@ describe('AuthService', () => {
     prisma = {
       user: {
         findUnique: jest.fn(),
+      },
+      organizationMembership: {
+        findMany: jest.fn(),
       },
     };
     jwtService = {
@@ -111,5 +118,78 @@ describe('AuthService', () => {
     );
 
     expect(jwtService.signAsync).not.toHaveBeenCalled();
+  });
+
+  it('returns only the current user selectable memberships when tenant resolution is ambiguous', async () => {
+    prisma.organizationMembership.findMany.mockResolvedValue([
+      {
+        id: 'membership-a',
+        role: 'OWNER',
+        status: 'ACTIVE',
+        organization: {
+          id: 'organization-a',
+          displayName: 'Organization A',
+          status: 'ACTIVE',
+        },
+      },
+      {
+        id: 'membership-b',
+        role: 'PSYCHOLOGIST',
+        status: 'ACTIVE',
+        organization: {
+          id: 'organization-b',
+          displayName: 'Organization B',
+          status: 'ACTIVE',
+        },
+      },
+    ]);
+
+    await expect(service.getTenantContext(user)).resolves.toEqual({
+      status: 'UNRESOLVED',
+      selectableMemberships: [
+        {
+          membershipId: 'membership-a',
+          organizationId: 'organization-a',
+          organizationDisplayName: 'Organization A',
+          organizationRole: 'OWNER',
+        },
+        {
+          membershipId: 'membership-b',
+          organizationId: 'organization-b',
+          organizationDisplayName: 'Organization B',
+          organizationRole: 'PSYCHOLOGIST',
+        },
+      ],
+    });
+    expect(prisma.organizationMembership.findMany).toHaveBeenCalledWith({
+      where: { userId: user.id },
+      select: {
+        id: true,
+        role: true,
+        status: true,
+        organization: {
+          select: { id: true, displayName: true, status: true },
+        },
+      },
+    });
+  });
+
+  it('does not query memberships again when a guard has already resolved context', async () => {
+    const tenantContext = {
+      userId: user.id,
+      organizationId: 'organization-a',
+      membershipId: 'membership-a',
+      organizationRole: 'OWNER' as const,
+      legacyUserRole: user.role,
+      resolutionMode: TenantResolutionMode.EXPLICIT,
+    };
+
+    await expect(
+      service.getTenantContext(user, tenantContext),
+    ).resolves.toEqual({
+      status: 'RESOLVED',
+      tenantContext,
+    });
+    expect(prisma.organizationMembership.findMany).not.toHaveBeenCalled();
   });
 });

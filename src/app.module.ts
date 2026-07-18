@@ -9,7 +9,6 @@ import { RolesGuard } from './auth/guards/roles.guard';
 import { CaseFilesModule } from './case-files/case-files.module';
 import { PrismaExceptionFilter } from './common/prisma-exception.filter';
 import { HttpLoggingInterceptor } from './common/observability/http-logging.interceptor';
-import { RequestContextService } from './common/request-context/request-context.service';
 import { RequestIdMiddleware } from './common/request-context/request-id.middleware';
 import { AppConfigModule } from './config/config.module';
 import { DocumentsModule } from './documents/documents.module';
@@ -18,6 +17,8 @@ import { HealthModule } from './health/health.module';
 import { PatientsModule } from './patients/patients.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { SessionNotesModule } from './session-notes/session-notes.module';
+import { TenantContextGuard } from './tenant-context/guards/tenant-context.guard';
+import { TenantContextModule } from './tenant-context/tenant-context.module';
 
 @Module({
   imports: [
@@ -31,11 +32,11 @@ import { SessionNotesModule } from './session-notes/session-notes.module';
     AppointmentsModule,
     FinancialTransactionsModule,
     HealthModule,
+    TenantContextModule,
   ],
   controllers: [AppController],
   providers: [
     AppService,
-    RequestContextService,
     RequestIdMiddleware,
     {
       provide: APP_INTERCEPTOR,
@@ -48,6 +49,10 @@ import { SessionNotesModule } from './session-notes/session-notes.module';
     {
       provide: APP_GUARD,
       useClass: JwtAuthGuard,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: TenantContextGuard,
     },
     {
       provide: APP_GUARD,

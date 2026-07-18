@@ -72,6 +72,10 @@ The workspace timeline is derived at request time from existing timestamps and d
 
 Defines authorization level inside the application.
 
+`User.role` remains the legacy runtime authorization role. It is deliberately
+separate from `OrganizationMembership.role`, which represents authority inside
+one organization and is carried independently in Tenant Context.
+
 ---
 
 ## AppointmentStatus

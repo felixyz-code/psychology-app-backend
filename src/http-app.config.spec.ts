@@ -63,6 +63,19 @@ describe('HTTP application configuration', () => {
     );
   });
 
+  it('allows the documented organization selection header in CORS preflight', async () => {
+    const response = await request(app.getHttpServer())
+      .options('/http-security-harness')
+      .set('Origin', 'http://localhost:4200')
+      .set('Access-Control-Request-Method', 'GET')
+      .set('Access-Control-Request-Headers', 'authorization,x-organization-id')
+      .expect(204);
+
+    expect(response.headers['access-control-allow-headers']).toContain(
+      'X-Organization-Id',
+    );
+  });
+
   it('does not trust forwarded headers unless configured explicitly', () => {
     const expressApp = app.getHttpAdapter().getInstance() as {
       get: (setting: string) => unknown;

@@ -1266,6 +1266,35 @@ The following items should be reviewed in future backend sprints:
 * Decide whether `DELETE /documents/:id` should also delete the physical file.
 * Decide whether `GET /` should remain a legacy greeting or be replaced by the health/status payload in a future release.
 
+## Tenant Context Selection
+
+Authenticated clients may send one `X-Organization-Id` header containing a UUID
+to select an organization for that request. It is a selection hint only: the
+server checks the authenticated user's `ACTIVE` membership and the
+organization's `ACTIVE` state in PostgreSQL. Empty, malformed, or repeated
+values return `400`; inaccessible, missing, inactive, or revoked selections
+return the same `403` response without revealing whether another organization
+exists.
+
+If no header is sent, a user with one eligible membership is resolved
+automatically. A user with several eligible memberships must make an explicit
+selection. Existing clinical endpoints remain tenant-optional in this phase and
+retain their legacy ownership behavior; new organization-aware endpoints may
+require a resolved context.
+
+### `GET /auth/context`
+
+Bearer Token required; tenant context optional.
+
+Returns `RESOLVED` plus the validated request context when resolution succeeds.
+For a multi-membership or otherwise unresolved request it returns `UNRESOLVED`
+and only the caller's selectable active memberships (`organizationId`,
+`membershipId`, organization display name and organization role), allowing the
+frontend to choose `X-Organization-Id` without a bootstrap cycle. A user with
+no memberships receives `LEGACY_COMPATIBILITY` and an empty list. It does not
+return organizations belonging to other users, clinical records, tokens, or
+persisted selection preferences.
+
 # References
 
 PROJECT.md
