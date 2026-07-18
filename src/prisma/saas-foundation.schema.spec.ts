@@ -19,13 +19,19 @@ describe('SaaS foundation schema contract', () => {
     expect(schema).toContain('model PatientAssignment {');
     expect(schema).toContain('organizationId        String?');
     expect(schema).toContain('@@unique([organizationId, userId])');
-    expect(schema).toContain('userId           String                    @unique');
+    expect(schema).toContain(
+      'userId           String                    @unique',
+    );
   });
 
   it('keeps the migration additive and free of legacy data mutation', () => {
     expect(migration).toContain('CREATE TABLE "organizations"');
-    expect(migration).toContain('ALTER TABLE "patients" ADD COLUMN "organizationId" UUID;');
-    expect(migration).toContain('ALTER TABLE "financial_transactions" ADD COLUMN "organizationId" UUID;');
+    expect(migration).toContain(
+      'ALTER TABLE "patients" ADD COLUMN "organizationId" UUID;',
+    );
+    expect(migration).toContain(
+      'ALTER TABLE "financial_transactions" ADD COLUMN "organizationId" UUID;',
+    );
     expect(migration).not.toMatch(/DROP\s+(TABLE|COLUMN|TYPE)/i);
     expect(migration).not.toMatch(/ALTER\s+COLUMN.+SET\s+NOT\s+NULL/i);
     expect(migration).not.toMatch(/UPDATE\s+"/i);

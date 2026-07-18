@@ -70,6 +70,7 @@ describe('DocumentsController', () => {
   it('accepts a valid multipart upload using the file field and caseFileId metadata', async () => {
     documentsService.upload.mockResolvedValue({
       id: 'document-id',
+      organizationId: null,
       caseFileId,
       uploadedById: authenticatedUser.id,
       fileName: 'consent.pdf',
