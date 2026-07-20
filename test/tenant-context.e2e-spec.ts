@@ -2,11 +2,17 @@ import { INestApplication } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { Test } from '@nestjs/testing';
 import { PrismaPg } from '@prisma/adapter-pg';
-import { MembershipRole, PrismaClient, UserRole } from '@prisma/client';
+import {
+  MembershipRole,
+  OrganizationStatus,
+  PrismaClient,
+  UserRole,
+} from '@prisma/client';
 import { randomUUID } from 'node:crypto';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from '../src/app.module';
+import { PrismaService } from '../src/prisma/prisma.service';
 
 const describeCertification =
   process.env.RUN_TENANT_CERTIFICATION_TESTS === 'true'
@@ -35,6 +41,9 @@ describeCertification('Tenant context runtime guard integration', () => {
         'Tenant runtime certification requires DATABASE_URL ending in _test',
       );
     }
+
+    process.env.DATABASE_URL = databaseUrl;
+    process.env.JWT_SECRET = 'Qx7Za9Lp4Vm2Kr8Nj5Hs6Dt3Bw1Cy0Fu7Eg9Ra2';
     prisma = new PrismaClient({ adapter: new PrismaPg(databaseUrl) });
     await prisma.$connect();
     await prisma.user.createMany({
@@ -63,15 +72,27 @@ describeCertification('Tenant context runtime guard integration', () => {
       ],
     });
 
-    process.env.DATABASE_URL = databaseUrl;
-    process.env.JWT_SECRET = 'Qx7Za9Lp4Vm2Kr8Nj5Hs6Dt3Bw1Cy0Fu7Eg9Ra2';
-
     const moduleRef = await Test.createTestingModule({
       imports: [AppModule],
     }).compile();
     app = moduleRef.createNestApplication();
     await app.init();
     jwtService = moduleRef.get(JwtService);
+    const appPrisma = app.get(PrismaService);
+    const [fixtureMembership, appMembership] = await Promise.all([
+      prisma.organizationMembership.findFirst({
+        where: { userId: userOneId, organizationId: organizationOneId },
+      }),
+      appPrisma.organizationMembership.findFirst({
+        where: { userId: userOneId, organizationId: organizationOneId },
+      }),
+    ]);
+    expect(fixtureMembership).toMatchObject({
+      userId: userOneId,
+      organizationId: organizationOneId,
+      status: 'ACTIVE',
+    });
+    expect(appMembership).toEqual(fixtureMembership);
   });
 
   afterAll(async () => {
@@ -118,8 +139,13 @@ describeCertification('Tenant context runtime guard integration', () => {
       .get('/auth/context')
       .set('Authorization', bearerToken(userMultipleId, UserRole.PSYCHOLOGIST))
       .expect(200);
-    expect(unresolved.body.status).toBe('UNRESOLVED');
-    expect(unresolved.body.selectableMemberships).toEqual(
+    const unresolvedBody: unknown = unresolved.body;
+    expect(isUnresolvedTenantContextResponse(unresolvedBody)).toBe(true);
+    if (!isUnresolvedTenantContextResponse(unresolvedBody)) {
+      throw new Error('Expected an unresolved tenant context response');
+    }
+    expect(unresolvedBody.status).toBe('UNRESOLVED');
+    expect(unresolvedBody.selectableMemberships).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ organizationId: organizationMultipleOneId }),
         expect.objectContaining({ organizationId: organizationMultipleTwoId }),
@@ -180,6 +206,7 @@ function organization(id: string, slug: string) {
     slug,
     legalName: 'Runtime Tenant Organization',
     displayName: 'Runtime Tenant',
+    status: OrganizationStatus.ACTIVE,
   };
 }
 
@@ -195,4 +222,29 @@ function membership(
     status: 'ACTIVE' as const,
     joinedAt: new Date(),
   };
+}
+
+type UnresolvedTenantContextResponse = {
+  status: 'UNRESOLVED';
+  selectableMemberships: ReadonlyArray<{ organizationId: string }>;
+};
+
+function isUnresolvedTenantContextResponse(
+  value: unknown,
+): value is UnresolvedTenantContextResponse {
+  if (!isRecord(value) || value.status !== 'UNRESOLVED') {
+    return false;
+  }
+
+  return (
+    Array.isArray(value.selectableMemberships) &&
+    value.selectableMemberships.every(
+      (membership) =>
+        isRecord(membership) && typeof membership.organizationId === 'string',
+    )
+  );
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
 }

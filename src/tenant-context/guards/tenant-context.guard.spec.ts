@@ -93,9 +93,9 @@ describe('TenantContextGuard', () => {
   it('gives explicit bypass metadata precedence over required tenant metadata', async () => {
     metadata = { skipTenantContext: true, tenantContextRequired: true };
 
-    await expect(guard.canActivate(contextFor(requestWithUser()))).resolves.toBe(
-      true,
-    );
+    await expect(
+      guard.canActivate(contextFor(requestWithUser())),
+    ).resolves.toBe(true);
     expect(resolver.resolve).not.toHaveBeenCalled();
   });
 });
