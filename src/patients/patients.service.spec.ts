@@ -1,37 +1,34 @@
 import { NotFoundException } from '@nestjs/common';
-import { UserRole } from '@prisma/client';
-import { AuthenticatedUser } from '../auth/types/authenticated-user.type';
 import { DocumentsService } from '../documents/documents.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { PatientsService } from './patients.service';
+import { PatientAccessScope } from './types/patient-access-scope.type';
 
 type PrismaMock = {
   patient: {
     create: jest.Mock;
-    delete: jest.Mock;
+    deleteMany: jest.Mock;
     findFirst: jest.Mock;
     findMany: jest.Mock;
-    findUnique: jest.Mock;
-    update: jest.Mock;
+    updateMany: jest.Mock;
   };
   document: { findMany: jest.Mock };
-  user: { findUnique: jest.Mock };
 };
 
-const admin: AuthenticatedUser = {
-  id: 'admin-id',
-  name: 'Admin',
-  email: 'admin@example.test',
-  role: UserRole.ADMIN,
+const scopeA: PatientAccessScope = {
+  organizationId: 'organization-a-id',
+  psychologistId: 'psychologist-a-id',
 };
-const psychologistA: AuthenticatedUser = {
-  id: 'psychologist-a-id',
-  name: 'Psychologist A',
-  email: 'a@example.test',
-  role: UserRole.PSYCHOLOGIST,
+const scopeSameOrganizationOtherPsychologist: PatientAccessScope = {
+  organizationId: scopeA.organizationId,
+  psychologistId: 'psychologist-b-id',
+};
+const scopeSamePsychologistOtherOrganization: PatientAccessScope = {
+  organizationId: 'organization-b-id',
+  psychologistId: scopeA.psychologistId,
 };
 
-describe('PatientsService ownership', () => {
+describe('PatientsService tenant-aware ownership', () => {
   let service: PatientsService;
   let prisma: PrismaMock;
   let documentsService: Pick<DocumentsService, 'cleanupDocumentFiles'>;
@@ -40,14 +37,12 @@ describe('PatientsService ownership', () => {
     prisma = {
       patient: {
         create: jest.fn(),
-        delete: jest.fn(),
+        deleteMany: jest.fn(),
         findFirst: jest.fn(),
         findMany: jest.fn(),
-        findUnique: jest.fn(),
-        update: jest.fn(),
+        updateMany: jest.fn(),
       },
       document: { findMany: jest.fn() },
-      user: { findUnique: jest.fn() },
     };
     documentsService = { cleanupDocumentFiles: jest.fn() };
     service = new PatientsService(
@@ -56,118 +51,149 @@ describe('PatientsService ownership', () => {
     );
   });
 
-  it('lists only patients owned by psychologist A', async () => {
+  it('lists only patients matching both tenant and legacy ownership', async () => {
     prisma.patient.findMany.mockResolvedValue([]);
 
-    await service.findAll(psychologistA);
+    await service.findAll(scopeA);
 
     expect(prisma.patient.findMany).toHaveBeenCalledWith({
-      where: { psychologistId: psychologistA.id },
+      where: {
+        organizationId: scopeA.organizationId,
+        psychologistId: scopeA.psychologistId,
+      },
       orderBy: { createdAt: 'desc' },
     });
   });
 
-  it('returns 404 for psychologist A reading, updating, or deleting patient B without mutating', async () => {
+  it.each([
+    ['a missing patient', scopeA],
+    ['a patient from another psychologist in the same organization', scopeA],
+    ['a patient from another organization for the same psychologist', scopeA],
+    ['a legacy patient with a null organizationId', scopeA],
+  ])('returns the same 404 for %s', async (_, scope) => {
     prisma.patient.findFirst.mockResolvedValue(null);
 
-    await expect(
-      service.findOne('patient-b-id', psychologistA),
-    ).rejects.toBeInstanceOf(NotFoundException);
-    await expect(
-      service.update('patient-b-id', { firstName: 'Changed' }, psychologistA),
-    ).rejects.toBeInstanceOf(NotFoundException);
-    await expect(
-      service.remove('patient-b-id', psychologistA),
-    ).rejects.toBeInstanceOf(NotFoundException);
-
+    await expect(service.findOne('patient-id', scope)).rejects.toEqual(
+      new NotFoundException('Patient with id "patient-id" not found'),
+    );
     expect(prisma.patient.findFirst).toHaveBeenCalledWith({
-      where: { id: 'patient-b-id', psychologistId: psychologistA.id },
+      where: {
+        id: 'patient-id',
+        organizationId: scope.organizationId,
+        psychologistId: scope.psychologistId,
+      },
     });
-    expect(prisma.patient.update).not.toHaveBeenCalled();
-    expect(prisma.patient.delete).not.toHaveBeenCalled();
   });
 
-  it('forces psychologist A as owner on create and ignores a supplied owner reassignment', async () => {
-    prisma.user.findUnique.mockResolvedValue({ id: psychologistA.id });
-    prisma.patient.create.mockResolvedValue({ id: 'patient-a-id' });
-    prisma.patient.findFirst.mockResolvedValue({ id: 'patient-a-id' });
-    prisma.patient.update.mockResolvedValue({ id: 'patient-a-id' });
-
-    await service.create(
-      {
-        psychologistId: 'psychologist-b-id',
-        firstName: 'A',
-        lastName: 'Patient',
-      },
-      psychologistA,
-    );
-    await service.update(
-      'patient-a-id',
-      { psychologistId: 'psychologist-b-id' },
-      psychologistA,
-    );
-
-    expect(prisma.patient.create).toHaveBeenCalledTimes(1);
-    const patientCreateCalls = prisma.patient.create.mock.calls as unknown as [
-      [{ data: { psychologistId: string } }],
-    ];
-    expect(patientCreateCalls[0][0].data.psychologistId).toBe(psychologistA.id);
-    expect(prisma.patient.update).toHaveBeenCalledTimes(1);
-    const patientUpdateCalls = prisma.patient.update.mock.calls as unknown as [
-      [{ data: { psychologistId: string } }],
-    ];
-    expect(patientUpdateCalls[0][0].data.psychologistId).toBe(psychologistA.id);
-  });
-
-  it('keeps admin global access and permits the requested owner', async () => {
+  it('keeps same-organization and same-psychologist scope variants distinct', async () => {
     prisma.patient.findMany.mockResolvedValue([]);
-    prisma.patient.findUnique.mockResolvedValue({ id: 'patient-b-id' });
-    prisma.user.findUnique.mockResolvedValue({ id: 'psychologist-b-id' });
-    prisma.patient.create.mockResolvedValue({ id: 'patient-b-id' });
 
-    await service.findAll(admin);
-    await service.findOne('patient-b-id', admin);
-    await service.create(
-      {
-        psychologistId: 'psychologist-b-id',
-        firstName: 'B',
-        lastName: 'Patient',
-      },
-      admin,
-    );
+    await service.findAll(scopeSameOrganizationOtherPsychologist);
+    await service.findAll(scopeSamePsychologistOtherOrganization);
 
-    expect(prisma.patient.findMany).toHaveBeenCalledWith({
-      where: undefined,
+    expect(prisma.patient.findMany).toHaveBeenNthCalledWith(1, {
+      where: scopeSameOrganizationOtherPsychologist,
       orderBy: { createdAt: 'desc' },
     });
-    expect(prisma.patient.findUnique).toHaveBeenCalledWith({
-      where: { id: 'patient-b-id' },
+    expect(prisma.patient.findMany).toHaveBeenNthCalledWith(2, {
+      where: scopeSamePsychologistOtherOrganization,
+      orderBy: { createdAt: 'desc' },
     });
-    expect(prisma.patient.create).toHaveBeenCalledTimes(1);
-    const adminPatientCreateCalls = prisma.patient.create.mock
-      .calls as unknown as [[{ data: { psychologistId: string } }]];
-    expect(adminPatientCreateCalls[0][0].data.psychologistId).toBe(
-      'psychologist-b-id',
-    );
   });
 
-  it('cleans document files only after the patient cascade succeeds', async () => {
-    prisma.patient.findUnique.mockResolvedValue({ id: 'patient-a-id' });
+  it('forces scope ownership on create even when an unsafe caller supplies IDs', async () => {
+    prisma.patient.create.mockResolvedValue({ id: 'patient-a-id' });
+    const unsafeDto = {
+      firstName: 'A',
+      lastName: 'Patient',
+      organizationId: 'organization-b-id',
+      psychologistId: 'psychologist-b-id',
+    };
+
+    await service.create(unsafeDto, scopeA);
+
+    expect(prisma.patient.create).toHaveBeenCalledWith({
+      data: {
+        firstName: 'A',
+        lastName: 'Patient',
+        organizationId: scopeA.organizationId,
+        psychologistId: scopeA.psychologistId,
+      },
+    });
+  });
+
+  it('updates only a fully scoped patient and never forwards unsafe ownership fields', async () => {
+    prisma.patient.updateMany.mockResolvedValue({ count: 1 });
+    prisma.patient.findFirst.mockResolvedValue({ id: 'patient-a-id' });
+    const unsafeDto = {
+      firstName: 'Updated',
+      organizationId: 'organization-b-id',
+      psychologistId: 'psychologist-b-id',
+    };
+
+    await service.update('patient-a-id', unsafeDto, scopeA);
+
+    expect(prisma.patient.updateMany).toHaveBeenCalledWith({
+      where: { id: 'patient-a-id', ...scopeA },
+      data: { firstName: 'Updated' },
+    });
+    expect(prisma.patient.findFirst).toHaveBeenCalledWith({
+      where: { id: 'patient-a-id', ...scopeA },
+    });
+  });
+
+  it('returns 404 and does not reread when scoped update affects no patient', async () => {
+    prisma.patient.updateMany.mockResolvedValue({ count: 0 });
+
+    await expect(
+      service.update('patient-id', { firstName: 'Updated' }, scopeA),
+    ).rejects.toEqual(
+      new NotFoundException('Patient with id "patient-id" not found'),
+    );
+    expect(prisma.patient.updateMany).toHaveBeenCalledWith({
+      where: { id: 'patient-id', ...scopeA },
+      data: { firstName: 'Updated' },
+    });
+    expect(prisma.patient.findFirst).not.toHaveBeenCalled();
+  });
+
+  it('checks the scoped patient before loading document metadata and cleans files only after delete', async () => {
+    prisma.patient.findFirst.mockResolvedValue({ id: 'patient-a-id' });
     prisma.document.findMany.mockResolvedValue([
       { filePath: 'uploads/patients/patient-a-id/one.pdf' },
-      { filePath: 'uploads/patients/patient-a-id/two.pdf' },
     ]);
-    prisma.patient.delete.mockResolvedValue({ id: 'patient-a-id' });
+    prisma.patient.deleteMany.mockResolvedValue({ count: 1 });
 
-    await service.remove('patient-a-id', admin);
+    await service.remove('patient-a-id', scopeA);
 
+    expect(prisma.patient.findFirst).toHaveBeenCalledWith({
+      where: { id: 'patient-a-id', ...scopeA },
+    });
     expect(prisma.document.findMany).toHaveBeenCalledWith({
-      where: { caseFile: { patientId: 'patient-a-id' } },
+      where: {
+        caseFile: { patient: { id: 'patient-a-id', ...scopeA } },
+      },
       select: { filePath: true },
+    });
+    expect(prisma.patient.deleteMany).toHaveBeenCalledWith({
+      where: { id: 'patient-a-id', ...scopeA },
     });
     expect(documentsService.cleanupDocumentFiles).toHaveBeenCalledWith([
       'uploads/patients/patient-a-id/one.pdf',
-      'uploads/patients/patient-a-id/two.pdf',
     ]);
+  });
+
+  it('returns the same 404 without cleanup when scoped delete affects no patient', async () => {
+    prisma.patient.findFirst.mockResolvedValue({ id: 'patient-id' });
+    prisma.document.findMany.mockResolvedValue([]);
+    prisma.patient.deleteMany.mockResolvedValue({ count: 0 });
+
+    await expect(service.remove('patient-id', scopeA)).rejects.toEqual(
+      new NotFoundException('Patient with id "patient-id" not found'),
+    );
+    expect(prisma.patient.deleteMany).toHaveBeenCalledWith({
+      where: { id: 'patient-id', ...scopeA },
+    });
+    expect(documentsService.cleanupDocumentFiles).not.toHaveBeenCalled();
   });
 });

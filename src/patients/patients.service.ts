@@ -1,10 +1,10 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { UserRole } from '@prisma/client';
-import { AuthenticatedUser } from '../auth/types/authenticated-user.type';
+import { Prisma } from '@prisma/client';
 import { DocumentsService } from '../documents/documents.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreatePatientDto } from './dto/create-patient.dto';
 import { UpdatePatientDto } from './dto/update-patient.dto';
+import { PatientAccessScope } from './types/patient-access-scope.type';
 
 @Injectable()
 export class PatientsService {
@@ -13,107 +13,103 @@ export class PatientsService {
     private readonly documentsService: DocumentsService,
   ) {}
 
-  async create(createPatientDto: CreatePatientDto, user: AuthenticatedUser) {
-    const psychologistId = this.isAdmin(user)
-      ? createPatientDto.psychologistId
-      : user.id;
-
-    await this.ensurePsychologistExists(psychologistId);
-
+  create(createPatientDto: CreatePatientDto, scope: PatientAccessScope) {
     return this.prisma.patient.create({
       data: {
-        ...createPatientDto,
-        psychologistId,
+        ...this.withoutOwnership(createPatientDto),
+        organizationId: scope.organizationId,
+        psychologistId: scope.psychologistId,
       },
     });
   }
 
-  findAll(user: AuthenticatedUser) {
+  findAll(scope: PatientAccessScope) {
     return this.prisma.patient.findMany({
-      where: this.isAdmin(user) ? undefined : { psychologistId: user.id },
-      orderBy: {
-        createdAt: 'desc',
-      },
+      where: this.scopeWhere(scope),
+      orderBy: { createdAt: 'desc' },
     });
   }
 
-  async findOne(id: string, user: AuthenticatedUser) {
-    const patient = this.isAdmin(user)
-      ? await this.prisma.patient.findUnique({ where: { id } })
-      : await this.prisma.patient.findFirst({
-          where: {
-            id,
-            psychologistId: user.id,
-          },
-        });
-
-    if (!patient) {
-      throw new NotFoundException(`Patient with id "${id}" not found`);
-    }
-
-    return patient;
+  async findOne(id: string, scope: PatientAccessScope) {
+    return this.findScopedPatientOrThrow(id, scope);
   }
 
   async update(
     id: string,
     updatePatientDto: UpdatePatientDto,
-    user: AuthenticatedUser,
+    scope: PatientAccessScope,
   ) {
-    await this.findOne(id, user);
-
-    let psychologistId = updatePatientDto.psychologistId;
-
-    if (!this.isAdmin(user)) {
-      psychologistId = user.id;
-    }
-
-    if (psychologistId) {
-      await this.ensurePsychologistExists(psychologistId);
-    }
-
-    return this.prisma.patient.update({
-      where: { id },
-      data: {
-        ...updatePatientDto,
-        ...(psychologistId ? { psychologistId } : {}),
-      },
+    const result = await this.prisma.patient.updateMany({
+      where: { id, ...this.scopeWhere(scope) },
+      data: this.withoutOwnership(updatePatientDto),
     });
+
+    if (result.count !== 1) {
+      throw this.patientNotFound(id);
+    }
+
+    // updateMany atomically applies the full ownership predicate before reread.
+    return this.findScopedPatientOrThrow(id, scope);
   }
 
-  async remove(id: string, user: AuthenticatedUser) {
-    await this.findOne(id, user);
+  async remove(id: string, scope: PatientAccessScope) {
+    const patient = await this.findScopedPatientOrThrow(id, scope);
     const documents = await this.prisma.document.findMany({
       where: {
         caseFile: {
-          patientId: id,
+          patient: { id, ...this.scopeWhere(scope) },
         },
       },
       select: { filePath: true },
     });
 
-    const deletedPatient = await this.prisma.patient.delete({
-      where: { id },
+    const result = await this.prisma.patient.deleteMany({
+      where: { id, ...this.scopeWhere(scope) },
     });
+
+    if (result.count !== 1) {
+      throw this.patientNotFound(id);
+    }
 
     await this.documentsService.cleanupDocumentFiles(
       documents.map((document) => document.filePath),
     );
 
-    return deletedPatient;
+    return patient;
   }
 
-  private isAdmin(user: AuthenticatedUser) {
-    return user.role === UserRole.ADMIN;
+  private scopeWhere(scope: PatientAccessScope): Prisma.PatientWhereInput {
+    return {
+      organizationId: scope.organizationId,
+      psychologistId: scope.psychologistId,
+    };
   }
 
-  private async ensurePsychologistExists(userId: string) {
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      select: { id: true },
+  private withoutOwnership<T extends object>(
+    dto: T,
+  ): Omit<T, 'organizationId' | 'psychologistId'> {
+    const patientData = { ...dto };
+    Reflect.deleteProperty(patientData, 'organizationId');
+    Reflect.deleteProperty(patientData, 'psychologistId');
+    return patientData;
+  }
+
+  private async findScopedPatientOrThrow(
+    id: string,
+    scope: PatientAccessScope,
+  ) {
+    const patient = await this.prisma.patient.findFirst({
+      where: { id, ...this.scopeWhere(scope) },
     });
 
-    if (!user) {
-      throw new NotFoundException(`User with id "${userId}" not found`);
+    if (!patient) {
+      throw this.patientNotFound(id);
     }
+
+    return patient;
+  }
+
+  private patientNotFound(id: string) {
+    return new NotFoundException(`Patient with id "${id}" not found`);
   }
 }

@@ -42,3 +42,23 @@ bootstrap cycle. `User.role` and `psychologistId` remain authoritative for
 legacy authorization and ownership. A later phase may enable required context
 route by route before adding tenant query enforcement; this ADR does not claim
 tenant isolation is complete.
+
+## ADR-POST-GO-LIVE.1.7A: Patients Double-Barrier Pilot
+
+### Decision
+
+Patients is the first tenant-aware clinical module. Every endpoint requires a
+resolved TenantContext and receives an immutable `PatientAccessScope` containing
+`organizationId` and the authenticated user's legacy `psychologistId`. This
+also applies to legacy `UserRole.ADMIN`; membership role remains distinct from
+that legacy role. The `organizationId + psychologistId` double barrier is a
+temporary strategy until the SaaS migration is complete.
+
+### Consequences
+
+Patient DTOs cannot supply ownership fields. Scoped `updateMany` and
+`deleteMany` operations avoid mutations by ID alone, while null organization
+records remain intentionally invisible. This is not global enforcement: other
+modules keep their legacy ownership behavior. No global Prisma extension,
+schema migration, or new index is introduced. A release must independently
+certify the backfill of the target database.

@@ -171,6 +171,12 @@ or make nullable organization references mandatory. The next phase should move
 individual routes from optional to required context before changing query
 ownership semantics.
 
+POST-GO-LIVE.1.7A makes Patients the first route-by-route tenant-aware pilot:
+its endpoints require resolved tenant context and enforce `organizationId AND
+psychologistId`. It deliberately leaves nullable legacy records outside the
+scope, retains legacy compatibility in all other modules, and requires an
+independent target-database backfill certification before deployment.
+
 ---
 
 # Known Technical Debt

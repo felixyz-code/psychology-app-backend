@@ -27,10 +27,14 @@ import { UserRole } from '@prisma/client';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import type { AuthenticatedUser } from '../auth/types/authenticated-user.type';
+import { CurrentTenant } from '../tenant-context/decorators/current-tenant.decorator';
+import { TenantRequired } from '../tenant-context/decorators/tenant-required.decorator';
+import type { TenantContext } from '../tenant-context/tenant-context.types';
 import { CreatePatientDto } from './dto/create-patient.dto';
 import { UpdatePatientDto } from './dto/update-patient.dto';
 import { PatientResponseDto } from './dto/patient-response.dto';
 import { PatientsService } from './patients.service';
+import type { PatientAccessScope } from './types/patient-access-scope.type';
 
 @ApiTags('patients')
 @ApiBearerAuth('bearer')
@@ -40,6 +44,7 @@ import { PatientsService } from './patients.service';
 @ApiForbiddenResponse({
   description: 'Authenticated user lacks a permitted role',
 })
+@TenantRequired()
 @Controller('patients')
 @Roles(UserRole.ADMIN, UserRole.PSYCHOLOGIST)
 @UsePipes(
@@ -59,14 +64,15 @@ export class PatientsController {
     type: PatientResponseDto,
   })
   @ApiBadRequestResponse({ description: 'Invalid patient payload' })
-  @ApiNotFoundResponse({
-    description: 'Referenced psychologist is not available for this operation',
-  })
   create(
     @Body() createPatientDto: CreatePatientDto,
     @CurrentUser() user: AuthenticatedUser,
+    @CurrentTenant(true) tenant: TenantContext,
   ) {
-    return this.patientsService.create(createPatientDto, user);
+    return this.patientsService.create(
+      createPatientDto,
+      this.createScope(tenant, user),
+    );
   }
 
   @Get()
@@ -76,8 +82,11 @@ export class PatientsController {
     type: PatientResponseDto,
     isArray: true,
   })
-  findAll(@CurrentUser() user: AuthenticatedUser) {
-    return this.patientsService.findAll(user);
+  findAll(
+    @CurrentUser() user: AuthenticatedUser,
+    @CurrentTenant(true) tenant: TenantContext,
+  ) {
+    return this.patientsService.findAll(this.createScope(tenant, user));
   }
 
   @Get(':id')
@@ -97,8 +106,9 @@ export class PatientsController {
   findOne(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser() user: AuthenticatedUser,
+    @CurrentTenant(true) tenant: TenantContext,
   ) {
-    return this.patientsService.findOne(id, user);
+    return this.patientsService.findOne(id, this.createScope(tenant, user));
   }
 
   @Patch(':id')
@@ -120,8 +130,13 @@ export class PatientsController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updatePatientDto: UpdatePatientDto,
     @CurrentUser() user: AuthenticatedUser,
+    @CurrentTenant(true) tenant: TenantContext,
   ) {
-    return this.patientsService.update(id, updatePatientDto, user);
+    return this.patientsService.update(
+      id,
+      updatePatientDto,
+      this.createScope(tenant, user),
+    );
   }
 
   @Delete(':id')
@@ -141,7 +156,18 @@ export class PatientsController {
   remove(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser() user: AuthenticatedUser,
+    @CurrentTenant(true) tenant: TenantContext,
   ) {
-    return this.patientsService.remove(id, user);
+    return this.patientsService.remove(id, this.createScope(tenant, user));
+  }
+
+  private createScope(
+    tenant: TenantContext,
+    user: AuthenticatedUser,
+  ): PatientAccessScope {
+    return {
+      organizationId: tenant.organizationId,
+      psychologistId: user.id,
+    };
   }
 }

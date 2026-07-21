@@ -5,20 +5,10 @@ import {
   IsEmail,
   IsOptional,
   IsString,
-  IsUUID,
   MaxLength,
 } from 'class-validator';
 
 export class UpdatePatientDto {
-  @ApiPropertyOptional({
-    description: 'Psychologist user ID',
-    format: 'uuid',
-    example: '550e8400-e29b-41d4-a716-446655440000',
-  })
-  @IsOptional()
-  @IsUUID()
-  psychologistId?: string;
-
   @ApiPropertyOptional({
     description: 'Patient first name',
     maxLength: 100,

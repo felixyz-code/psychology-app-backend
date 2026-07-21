@@ -570,6 +570,22 @@ cache, because revocation, role changes and organization suspension must take
 effect on the next request. Any future cache needs explicit invalidation for
 those mutations.
 
+## Tenant-Aware Patients Pilot (POST-GO-LIVE.1.7A)
+
+Patients is the first clinical module to opt into `@TenantRequired()`. Its
+controller builds an immutable explicit scope from `@CurrentTenant(true)` and
+the authenticated user, then passes it to the service. Every CRUD operation
+intersects `organizationId` with legacy `psychologistId`; `User.role === ADMIN`
+does not create a global bypass in this pilot. `organizationId = NULL` is never
+included as a compatibility fallback.
+
+The pilot does not add a Prisma middleware, a schema migration, or a compound
+index. The existing `(organizationId, createdAt)` index remains unchanged; a
+future production-sized plan review should decide whether an additional index
+is warranted. All non-Patients clinical modules continue with legacy ownership
+until explicitly migrated. Deployment requires separate backfill certification
+for the target database.
+
 ---
 
 # References

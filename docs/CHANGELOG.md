@@ -2,6 +2,26 @@
 
 ---
 
+# POST-GO-LIVE.1.7A Tenant-Aware Patients Pilot
+
+## Changed
+
+* Patients is the first tenant-aware clinical module. Every Patients endpoint
+  requires a resolved TenantContext and scopes access by both `organizationId`
+  and authenticated `psychologistId`; legacy global ADMIN access is not used.
+* Patient create and update contracts no longer accept ownership fields. A
+  nullable `organizationId` is deliberately excluded from the pilot scope.
+
+## Security Notes
+
+* The pilot uses explicit scope parameters; it adds neither a global Prisma
+  middleware nor global tenant enforcement. Other clinical modules remain on
+  legacy ownership compatibility.
+* A future deployment requires separate certification that the target database
+  has completed the versioned backfill. No index or migration was added here.
+
+---
+
 # POST-GO-LIVE.1.6 Tenant Context & Runtime Compatibility Foundation
 
 ## Added
