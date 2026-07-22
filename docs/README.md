@@ -89,6 +89,12 @@ Includes:
 * Common commands
 * Deployment notes
 
+## PRISMA_MIGRATION_ARTIFACT.md
+
+Documents the dedicated immutable Prisma migration image used by the
+POST-GO-LIVE schema procedure, including local PostgreSQL 16 validation and
+digest-based publication.
+
 ---
 
 ## ROADMAP.md
