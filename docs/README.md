@@ -95,6 +95,20 @@ Documents the dedicated immutable Prisma migration image used by the
 POST-GO-LIVE schema procedure, including local PostgreSQL 16 validation and
 digest-based publication.
 
+## SaaS authorization contracts
+
+`AUTHORIZATION_CONTRACT.md` is the primary source of truth for the phased SaaS
+authorization model. Its companion documents are:
+
+* `AUTHORIZATION_CAPABILITY_MATRIX.md`
+* `TENANT_ENDPOINT_SCOPE_MATRIX.md`
+* `TENANT_SECURITY_TEST_CONTRACT.md`
+* `adr/ADR-TENANT-CONTEXT.md`
+* `adr/ADR-TENANT-DATA-ISOLATION.md`
+
+They specify the approved target design and distinguish it from current runtime
+enforcement. They do not themselves change database, API, or runtime behavior.
+
 ---
 
 ## ROADMAP.md

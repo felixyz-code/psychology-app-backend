@@ -1,5 +1,21 @@
 # Decision Log
 
+## ADR-POST-GO-LIVE.2.1A: Versioned SaaS Authorization Contract
+
+### Decision
+
+`AUTHORIZATION_CONTRACT.md` is the primary source of truth for the next SaaS
+implementation stages. The tenant-context and data-isolation ADRs, capability
+matrix, endpoint scope matrix, and security-test contract are versioned in
+`docs/` and must move together with future authorization changes.
+
+### Boundary
+
+This phase documents the approved target architecture only. It adds no Prisma
+schema or migration, runtime guard, service, controller, JWT, API, frontend,
+backfill, or tenant-filtering change. The existing tenant-context foundation
+and Patients pilot remain the sole implemented tenant-aware behavior.
+
 ## ADR-POST-GO-LIVE.1.6: Tenant Context Propagation Strategy
 
 ### Context
