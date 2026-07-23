@@ -1,5 +1,30 @@
 # Decision Log
 
+## ADR-POST-GO-LIVE.2.1B: Closed Capability Resolution and Immutable Request Context
+
+### Decision
+
+Organization capabilities are resolved centrally from
+`AUTHORIZATION_CAPABILITY_MATRIX.md` using the validated membership role, not
+the legacy `User.role`. The resolver returns `ALLOW`, `CONDITIONAL`, or `DENY`.
+Only `ALLOW` is usable by the reusable policy guard; every conditional or
+unknown capability fails closed until its documented policy is implemented.
+
+TenantContext remains deliberately capability-free. It is frozen once in the
+request AsyncLocalStorage store and cannot be silently overwritten. This avoids
+turning a per-request policy result into a second long-lived authorization
+source. Sanitized telemetry records technical identifiers and reason codes only.
+
+### Boundary
+
+The new capability guard is reusable infrastructure, not a global guard and
+not an authorization conversion of Patients or legacy modules. Patients keeps
+the existing tenant plus psychologist double barrier. Assignment/redaction and
+owner-specific conditional policies, as well as broader clinical enforcement,
+remain 2.1D work.
+
+---
+
 ## ADR-POST-GO-LIVE.2.1A: Versioned SaaS Authorization Contract
 
 ### Decision

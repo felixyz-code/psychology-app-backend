@@ -62,6 +62,12 @@ describe('OpenAPI document', () => {
     expect(document.paths['/patients'].get?.responses).toHaveProperty('401');
     expect(document.paths['/patients'].get?.responses).toHaveProperty('403');
     expect(
+      getHeaderParameter(document, '/patients', 'get', 'X-Organization-Id'),
+    ).toMatchObject({
+      required: false,
+      schema: { type: 'string' },
+    });
+    expect(
       getQueryParameterNames(document, '/financial-transactions', 'get'),
     ).toEqual([
       'appointmentId',
@@ -195,6 +201,20 @@ function getQueryParameterNames(
         '$ref' in parameter || parameter.in !== 'query' ? [] : [parameter.name],
       )
       .sort() ?? []
+  );
+}
+
+function getHeaderParameter(
+  document: OpenAPIObject,
+  path: string,
+  method: 'get' | 'post',
+  name: string,
+) {
+  return getOperation(document, path, method).parameters?.find(
+    (parameter) =>
+      !('$ref' in parameter) &&
+      parameter.in === 'header' &&
+      parameter.name === name,
   );
 }
 

@@ -1,8 +1,9 @@
-import { ConflictException, ForbiddenException, Logger } from '@nestjs/common';
+import { ConflictException, ForbiddenException } from '@nestjs/common';
 import { MembershipRole, UserRole } from '@prisma/client';
 import { Reflector } from '@nestjs/core';
 import {
   RequestContextService,
+  TenantContextAlreadySetError,
   TenantResolutionMode,
 } from '../../common/request-context/request-context.service';
 import { TenantResolutionFailure } from '../tenant-context.types';
@@ -20,12 +21,22 @@ const tenantContext = Object.freeze({
 describe('TenantContextGuard', () => {
   let resolver: { resolve: jest.Mock };
   let requestContext: RequestContextService;
+  let observability: {
+    resolutionSucceeded: jest.Mock;
+    ambiguousContext: jest.Mock;
+    missingRequiredContext: jest.Mock;
+  };
   let metadata: Record<string, boolean | undefined>;
   let guard: TenantContextGuard;
 
   beforeEach(() => {
     resolver = { resolve: jest.fn() };
     requestContext = new RequestContextService();
+    observability = {
+      resolutionSucceeded: jest.fn(),
+      ambiguousContext: jest.fn(),
+      missingRequiredContext: jest.fn(),
+    };
     metadata = {};
     const reflector = {
       getAllAndOverride: jest.fn((key: string) => metadata[key]),
@@ -34,6 +45,7 @@ describe('TenantContextGuard', () => {
       reflector as unknown as Reflector,
       resolver as never,
       requestContext,
+      observability as never,
     );
   });
 
@@ -47,22 +59,21 @@ describe('TenantContextGuard', () => {
 
     expect(request.tenantContext).toBe(tenantContext);
     expect(resolver.resolve).toHaveBeenCalledWith(request.user, request);
+    expect(observability.resolutionSucceeded).toHaveBeenCalledWith(
+      tenantContext,
+    );
   });
 
   it('allows legacy compatibility without a context, but fails closed on required routes', async () => {
     resolver.resolve.mockResolvedValue({
       failure: TenantResolutionFailure.NO_ACTIVE_MEMBERSHIP,
     });
-    const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
     await expect(
       requestContext.run('optional', () =>
         guard.canActivate(contextFor(requestWithUser())),
       ),
     ).resolves.toBe(true);
-    expect(warn).toHaveBeenCalledWith(
-      expect.stringContaining('tenant_context_unresolved'),
-    );
-    expect(warn).not.toHaveBeenCalledWith(expect.stringContaining('headers'));
+    expect(observability.ambiguousContext).not.toHaveBeenCalled();
 
     metadata.tenantContextRequired = true;
     await expect(
@@ -70,6 +81,10 @@ describe('TenantContextGuard', () => {
         guard.canActivate(contextFor(requestWithUser())),
       ),
     ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(observability.missingRequiredContext).toHaveBeenCalledWith(
+      tenantContext.userId,
+      TenantResolutionFailure.NO_ACTIVE_MEMBERSHIP,
+    );
   });
 
   it('returns a redacted conflict for an ambiguous required request and bypasses public routes', async () => {
@@ -82,6 +97,9 @@ describe('TenantContextGuard', () => {
         guard.canActivate(contextFor(requestWithUser())),
       ),
     ).rejects.toBeInstanceOf(ConflictException);
+    expect(observability.ambiguousContext).toHaveBeenCalledWith(
+      tenantContext.userId,
+    );
 
     metadata = { isPublic: true };
     await expect(
@@ -97,6 +115,18 @@ describe('TenantContextGuard', () => {
       guard.canActivate(contextFor(requestWithUser())),
     ).resolves.toBe(true);
     expect(resolver.resolve).not.toHaveBeenCalled();
+  });
+
+  it('does not silently overwrite a context already attached to the request', async () => {
+    resolver.resolve.mockResolvedValue({ tenantContext });
+    const request = requestWithUser();
+    request.tenantContext = tenantContext;
+
+    await expect(
+      requestContext.run('already-resolved', () =>
+        guard.canActivate(contextFor(request)),
+      ),
+    ).rejects.toBeInstanceOf(TenantContextAlreadySetError);
   });
 });
 

@@ -1,14 +1,23 @@
 import { MembershipRole, UserRole } from '@prisma/client';
 import {
+  RequiredTenantContextUnavailableError,
   RequestContextService,
+  TenantContextAlreadySetError,
+  RequestContextNotInitializedError,
   TenantResolutionMode,
 } from './request-context.service';
 
 describe('RequestContextService tenant isolation', () => {
   it('keeps interleaved async tenant contexts isolated and cleans them up after each request', async () => {
     const context = new RequestContextService();
-    const tenantA = tenant('11111111-1111-4111-8111-111111111111');
-    const tenantB = tenant('22222222-2222-4222-8222-222222222222');
+    const tenantA = tenant(
+      '11111111-1111-4111-8111-111111111111',
+      '33333333-3333-4333-8333-333333333333',
+    );
+    const tenantB = tenant(
+      '22222222-2222-4222-8222-222222222222',
+      '44444444-4444-4444-8444-444444444444',
+    );
     let releaseA!: () => void;
     const waitA = new Promise<void>((resolve) => (releaseA = resolve));
 
@@ -29,11 +38,36 @@ describe('RequestContextService tenant isolation', () => {
     expect(context.tenantContext).toBeUndefined();
     expect(context.requestId).toBeUndefined();
   });
+
+  it('freezes a context, rejects overwrites, and exposes a typed required-context error', () => {
+    const context = new RequestContextService();
+    const tenantA = tenant('11111111-1111-4111-8111-111111111111');
+    const tenantB = tenant('22222222-2222-4222-8222-222222222222');
+
+    expect(() => context.setTenantContext(tenantA)).toThrow(
+      RequestContextNotInitializedError,
+    );
+    expect(() => context.getRequiredTenantContext()).toThrow(
+      RequiredTenantContextUnavailableError,
+    );
+
+    context.run('request-a', () => {
+      context.setTenantContext(tenantA);
+      expect(Object.isFrozen(tenantA)).toBe(true);
+      expect(() => context.setTenantContext(tenantB)).toThrow(
+        TenantContextAlreadySetError,
+      );
+      expect(context.getRequiredTenantContext()).toBe(tenantA);
+    });
+  });
 });
 
-function tenant(organizationId: string) {
+function tenant(
+  organizationId: string,
+  userId = '33333333-3333-4333-8333-333333333333',
+) {
   return Object.freeze({
-    userId: '33333333-3333-4333-8333-333333333333',
+    userId,
     organizationId,
     membershipId: `membership-${organizationId}`,
     organizationRole: MembershipRole.OWNER,

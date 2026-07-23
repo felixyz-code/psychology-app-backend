@@ -25,20 +25,29 @@ type Membership = {
   userId: string;
   organizationId: string;
   role: MembershipRole;
+  status: MembershipStatus;
   organization: { id: string; status: OrganizationStatus };
 };
 
 describe('TenantResolverService', () => {
   let memberships: Membership[];
   let findMany: jest.Mock;
+  let observability: { invalidHeader: jest.Mock; selectionDenied: jest.Mock };
   let service: TenantResolverService;
 
   beforeEach(() => {
     memberships = [];
     findMany = jest.fn(() => Promise.resolve(memberships));
-    service = new TenantResolverService({
-      organizationMembership: { findMany },
-    } as unknown as PrismaService);
+    observability = {
+      invalidHeader: jest.fn(),
+      selectionDenied: jest.fn(),
+    };
+    service = new TenantResolverService(
+      {
+        organizationMembership: { findMany },
+      } as unknown as PrismaService,
+      observability as never,
+    );
   });
 
   it('rejects invalid, empty, and duplicated selection headers before trusting them', async () => {
@@ -57,6 +66,7 @@ describe('TenantResolverService', () => {
       ]),
     ).rejects.toBeInstanceOf(BadRequestException);
     expect(findMany).not.toHaveBeenCalled();
+    expect(observability.invalidHeader).toHaveBeenCalledTimes(3);
   });
 
   it('uses the only active membership and preserves separate legacy and organization roles', async () => {
@@ -72,7 +82,7 @@ describe('TenantResolverService', () => {
     });
     expect(findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { userId: user.id, status: MembershipStatus.ACTIVE },
+        where: { userId: user.id },
       }),
     );
   });
@@ -119,6 +129,11 @@ describe('TenantResolverService', () => {
     await expect(
       resolve({ 'x-organization-id': organizationA }),
     ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(observability.selectionDenied).toHaveBeenLastCalledWith(
+      user.id,
+      'INACTIVE_ORGANIZATION',
+      expect.objectContaining({ organizationId: organizationA }),
+    );
 
     memberships = [
       {
@@ -129,6 +144,34 @@ describe('TenantResolverService', () => {
     await expect(
       resolve({ 'x-organization-id': organizationA }),
     ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('rejects comma-separated, array, and whitespace-normalized values', async () => {
+    await expect(
+      resolve({ 'x-organization-id': `${organizationA},${organizationB}` }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    await expect(
+      resolve({ 'x-organization-id': [organizationA, organizationB] }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    await expect(
+      resolve({ 'x-organization-id': ` ${organizationA}` }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('rejects suspended, revoked, and invited rows as non-memberships', async () => {
+    for (const status of [
+      MembershipStatus.SUSPENDED,
+      MembershipStatus.REVOKED,
+      MembershipStatus.INVITED,
+    ]) {
+      memberships = [{ ...membership(organizationA), status }];
+      await expect(
+        resolve({ 'x-organization-id': organizationA }),
+      ).rejects.toMatchObject({
+        status: 403,
+        message: 'Organization access denied',
+      });
+    }
   });
 
   function resolve(
@@ -149,6 +192,7 @@ function membership(
     userId: user.id,
     organizationId,
     role,
+    status: MembershipStatus.ACTIVE,
     organization: { id: organizationId, status },
   };
 }
