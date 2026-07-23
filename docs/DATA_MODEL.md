@@ -569,6 +569,28 @@ The active-PRIMARY partial unique index and cross-tenant composite foreign
 keys remain deferred until organization scopes are enforced and non-nullable
 where appropriate. No tenant filtering is active in this phase.
 
+### POST-GO-LIVE.2.1C0 proposed invitation schema boundary
+
+This is a documented 2.1C1 proposal only; it changes neither the Prisma schema
+nor any migration in 2.1C0.
+
+| Proposed change | Classification | Rationale |
+| --- | --- | --- |
+| Invitation status enum | NOT_NEEDED | Timestamp-derived terminal state avoids an enum migration and preserves accepted/rejected/revoked distinction. |
+| `rejectedAt` and `expiredAt` | REQUIRED_FOR_2_1C | Recipient rejection and materialized time expiry must not be stored indistinguishably from revocation. |
+| `normalizedEmail` | REQUIRED_FOR_2_1C | Required recipient binding and pending-duplicate key; existing `email` remains a personal-data migration concern. |
+| `invitedUserId` | RECOMMENDED_BEFORE_2_1C | Optional strengthening for already registered recipients; acceptance still requires normalized email. |
+| `acceptedByUserId` | REQUIRED_FOR_2_1C | Durable proof of the authenticated accepting identity. |
+| `createdByMembershipId` / `revokedByMembershipId` | DEFERRED | Sanitized structured observability suffices for the API phase; persistent audit design needs separate approval. |
+| Pending-invitation partial unique index | REQUIRED_FOR_2_1C | Database-level protection for `(organizationId, normalizedEmail)` while every terminal timestamp is null; the transaction materializes expired rows first. |
+| Terminal timestamp check constraint | REQUIRED_FOR_2_1C | Prevents mutually incompatible accepted/rejected/revoked states. |
+| PatientAssignment PRIMARY index | NOT_NEEDED | It is unrelated to invitation or membership lifecycle and remains deferred. |
+
+PostgreSQL partial indexes cannot be represented completely in Prisma schema;
+the proposed 2.1C1 migration must contain reviewed SQL, local validation and a
+rollback plan. This 2.1C0 proposal authorizes neither production execution nor
+backfill; compatibility work must be rehearsed locally and approved separately.
+
 ---
 
 # Future Evolution

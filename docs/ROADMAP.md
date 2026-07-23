@@ -177,6 +177,13 @@ psychologistId`. It deliberately leaves nullable legacy records outside the
 scope, retains legacy compatibility in all other modules, and requires an
 independent target-database backfill certification before deployment.
 
+POST-GO-LIVE.2.1C0 documents the invitation and membership lifecycle required
+before organization-domain APIs. It introduces no runtime or schema behavior.
+The proposed sequence is 2.1C1 (reviewed local schema/migration only), then
+2.1C2 (organization, membership, and invitation APIs), then controlled review
+and merge. Neither phase may start before the listed product decisions are
+approved.
+
 ---
 
 # Known Technical Debt

@@ -28,3 +28,17 @@ Each converted module must satisfy this contract in unit, integration, and E2E t
 Integration tests cover scoped `findFirst`, `updateMany`, `deleteMany`, aggregate/groupBy, nested relation reads, and transaction relationship validation. Concurrent contexts prove `AsyncLocalStorage` does not leak tenant data. Database tests prove future constraints/backfill rehearsal without production databases or clinical records.
 
 Shadow telemetry may contain only module, operation, safe reason code, mode, and bounded technical identifiers/counters. It must not contain PHI, notes, document content, email, file path, authorization header, JWT, or raw request body.
+
+## POST-GO-LIVE.2.1C0 future organization-domain gate
+
+Before any organization, membership, or invitation endpoint may be marked
+Enforced, its 2.1C2 tests must prove: scoped organization and membership reads;
+cross-tenant `404`; default-deny for every proposed capability; no OWNER grant;
+last-OWNER protection for remove, suspend, downgrade, and leave; recipient
+email/user binding; digest-only persistence and no token/email log output;
+duplicate pending invitation rejection; double acceptance; accept/revoke race;
+and serializable retries only for PostgreSQL serialization failures.
+
+The 2.1C1 migration tests must additionally prove the active-invitation partial
+unique index and the terminal-timestamp consistency constraint. Fixtures must
+use synthetic identifiers and `example.test` email addresses only.
