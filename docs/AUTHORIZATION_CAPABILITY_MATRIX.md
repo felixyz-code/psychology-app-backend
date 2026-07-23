@@ -59,3 +59,12 @@ same normalized email is allowed after rejection. No invite may grant OWNER and
 ownership transfer is outside the MVP. These entries do not change the existing
 typed catalog or its 2.1B resolver until 2.1C2 follows the required schema
 phase.
+
+## POST-GO-LIVE.2.1C2 runtime mapping
+
+2.1C2 implements the invitation entries above as `invitation.read`,
+`invitation.create`, and `invitation.revoke`, and the membership entries as
+`membership.manage_role`, `membership.suspend`, `membership.reactivate`, and
+`membership.remove`. Conditional ADMIN operations are enforced by the
+organization service after central resolution: the target must be non-OWNER,
+the actor cannot target themself, and a new role cannot outrank ADMIN.

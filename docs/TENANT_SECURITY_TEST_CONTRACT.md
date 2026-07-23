@@ -42,3 +42,12 @@ and serializable retries only for PostgreSQL serialization failures.
 The 2.1C1 migration tests must additionally prove the active-invitation partial
 unique index and the terminal-timestamp consistency constraint. Fixtures must
 use synthetic identifiers and `example.test` email addresses only.
+
+## POST-GO-LIVE.2.1C2 coverage
+
+Organization path scope uses a required resolved context and membership reads
+use sanitized projections. Invitation lifecycle mutations use serializable
+transactions, conditional updates and the 2.1C1 partial pending key. The
+implementation tests malformed tokens, cross-tenant paths, ADMIN-to-OWNER
+denial and last-owner protection; integration certification remains required
+against the local `_test` PostgreSQL database.

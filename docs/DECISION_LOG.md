@@ -1,5 +1,26 @@
 # Decision Log
 
+## ADR-POST-GO-LIVE.2.1C2: Organization Domain APIs
+
+### Status
+
+Implemented locally; pending controlled review and merge.
+
+### Decision
+
+Organization APIs reuse the optional tenant foundation and require context only
+for organization-selected routes. Invitation recipient actions skip tenant
+selection and bind the digest-identified invitation to the authenticated user's
+normalized email and optional persisted user binding. Membership and invitation
+terminal mutations run in serializable transactions with conditional updates.
+The last active OWNER cannot be suspended, removed, or leave; role changes
+never grant OWNER because ownership transfer remains outside this phase.
+
+### Boundary
+
+No schema, migration, backfill, production sender, global enforcement, or
+clinical module conversion is introduced.
+
 ## ADR-POST-GO-LIVE.2.1C1: Invitation Lifecycle Persistence
 
 ### Status

@@ -1316,3 +1316,31 @@ ARCHITECTURE.md
 DATA_MODEL.md
 
 DOCKER.md
+
+---
+
+## POST-GO-LIVE.2.1C2 Organization APIs
+
+Authenticated organization routes are tenant-required except `GET /organizations`,
+which lists only the caller's active memberships, and recipient invitation
+accept/reject routes, which bind to the authenticated recipient instead of a
+tenant selection. `X-Organization-Id` remains a validated selector only.
+
+| Method | Route | Capability / policy |
+| --- | --- | --- |
+| GET | `/organizations` | caller active memberships |
+| GET | `/organizations/current` | `organization.read` |
+| GET | `/organizations/:organizationId` | `organization.read` |
+| GET | `/organizations/:organizationId/memberships` | `membership.read`; sanitized metadata |
+| PATCH | `/organizations/:organizationId/memberships/:membershipId/role` | owner/admin conditional; never OWNER grant |
+| PATCH | `/organizations/:organizationId/memberships/:membershipId/status` | owner/admin conditional |
+| DELETE | `/organizations/:organizationId/memberships/:membershipId` | owner/admin conditional |
+| POST | `/organizations/:organizationId/memberships/leave` | self only; last active OWNER denied |
+| GET/POST | `/organizations/:organizationId/invitations` | `invitation.read` / `invitation.create` |
+| POST | `/organizations/:organizationId/invitations/:invitationId/revoke` | `invitation.revoke` (OWNER) |
+| POST | `/organization-invitations/:token/accept` | authenticated bound recipient |
+| POST | `/organization-invitations/:token/reject` | authenticated bound recipient |
+
+Invitation tokens are SHA-256 digested before persistence and are returned only
+once from creation outside production. API responses and logs never expose a
+digest; invitation list responses omit recipient email and token data.
