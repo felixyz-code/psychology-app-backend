@@ -27,6 +27,9 @@ const ROLE_CAPABILITY_POLICY: Readonly<
       OrganizationCapability.ORGANIZATION_READ,
       OrganizationCapability.MEMBERSHIP_READ,
       OrganizationCapability.MEMBERSHIP_INVITE,
+      OrganizationCapability.MEMBERSHIP_LEAVE,
+      OrganizationCapability.INVITATION_READ,
+      OrganizationCapability.INVITATION_CREATE,
       OrganizationCapability.PATIENT_READ,
       OrganizationCapability.PATIENT_CREATE,
       OrganizationCapability.PATIENT_UPDATE,
@@ -43,12 +46,15 @@ const ROLE_CAPABILITY_POLICY: Readonly<
     conditional: [
       OrganizationCapability.MEMBERSHIP_MANAGE_ROLE,
       OrganizationCapability.MEMBERSHIP_SUSPEND,
+      OrganizationCapability.MEMBERSHIP_REACTIVATE,
+      OrganizationCapability.MEMBERSHIP_REMOVE,
       OrganizationCapability.PATIENT_DELETE,
     ],
   },
   [MembershipRole.PSYCHOLOGIST]: {
     allow: [
       OrganizationCapability.ORGANIZATION_READ,
+      OrganizationCapability.MEMBERSHIP_LEAVE,
       OrganizationCapability.PATIENT_CREATE,
     ],
     conditional: [
@@ -66,6 +72,7 @@ const ROLE_CAPABILITY_POLICY: Readonly<
   [MembershipRole.RECEPTIONIST]: {
     allow: [
       OrganizationCapability.ORGANIZATION_READ,
+      OrganizationCapability.MEMBERSHIP_LEAVE,
       OrganizationCapability.APPOINTMENT_READ,
     ],
     conditional: [
@@ -76,6 +83,7 @@ const ROLE_CAPABILITY_POLICY: Readonly<
   [MembershipRole.BILLING]: {
     allow: [
       OrganizationCapability.ORGANIZATION_READ,
+      OrganizationCapability.MEMBERSHIP_LEAVE,
       OrganizationCapability.FINANCE_READ,
       OrganizationCapability.FINANCE_MANAGE,
     ],
@@ -84,6 +92,7 @@ const ROLE_CAPABILITY_POLICY: Readonly<
   [MembershipRole.AUDITOR]: {
     allow: [
       OrganizationCapability.ORGANIZATION_READ,
+      OrganizationCapability.MEMBERSHIP_LEAVE,
       OrganizationCapability.MEMBERSHIP_READ,
       OrganizationCapability.AUDIT_READ,
     ],
@@ -97,7 +106,10 @@ const ROLE_CAPABILITY_POLICY: Readonly<
     ],
   },
   [MembershipRole.READ_ONLY]: {
-    allow: [OrganizationCapability.ORGANIZATION_READ],
+    allow: [
+      OrganizationCapability.ORGANIZATION_READ,
+      OrganizationCapability.MEMBERSHIP_LEAVE,
+    ],
     conditional: [
       OrganizationCapability.PATIENT_READ,
       OrganizationCapability.CLINICAL_READ,
