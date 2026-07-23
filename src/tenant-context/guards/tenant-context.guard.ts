@@ -4,17 +4,20 @@ import {
   ExecutionContext,
   ForbiddenException,
   Injectable,
-  Logger,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { IS_PUBLIC_KEY } from '../../auth/decorators/public.decorator';
 import { AuthenticatedUser } from '../../auth/types/authenticated-user.type';
-import { RequestContextService } from '../../common/request-context/request-context.service';
+import {
+  RequestContextService,
+  TenantContextAlreadySetError,
+} from '../../common/request-context/request-context.service';
 import {
   SKIP_TENANT_CONTEXT_KEY,
   TENANT_REQUIRED_KEY,
 } from '../tenant-context.constants';
 import { TenantResolverService } from '../tenant-resolver.service';
+import { TenantObservabilityService } from '../tenant-observability.service';
 import {
   TenantResolutionFailure,
   TenantContext,
@@ -29,12 +32,11 @@ type TenantRequest = {
 
 @Injectable()
 export class TenantContextGuard implements CanActivate {
-  private readonly logger = new Logger(TenantContextGuard.name);
-
   constructor(
     private readonly reflector: Reflector,
     private readonly resolver: TenantResolverService,
     private readonly requestContext: RequestContextService,
+    private readonly observability: TenantObservabilityService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -63,27 +65,34 @@ export class TenantContextGuard implements CanActivate {
     const resolution = await this.resolver.resolve(request.user, request);
 
     if (resolution.tenantContext) {
+      if (request.tenantContext) {
+        throw new TenantContextAlreadySetError();
+      }
       // The request field is a reference to the immutable ALS value for decorators.
       request.tenantContext = resolution.tenantContext;
       this.requestContext.setTenantContext(resolution.tenantContext);
+      this.observability.resolutionSucceeded(resolution.tenantContext);
       return true;
     }
 
     if (!required) {
-      this.logger.warn(
-        JSON.stringify({
-          event: 'tenant_context_unresolved',
-          userId: request.user.id,
-          resolutionFailure: resolution.failure,
-        }),
-      );
+      if (
+        resolution.failure === TenantResolutionFailure.AMBIGUOUS_MEMBERSHIPS
+      ) {
+        this.observability.ambiguousContext(request.user.id);
+      }
       return true;
     }
 
     if (resolution.failure === TenantResolutionFailure.AMBIGUOUS_MEMBERSHIPS) {
+      this.observability.ambiguousContext(request.user.id);
       throw new ConflictException('Organization selection is required');
     }
 
+    this.observability.missingRequiredContext(
+      request.user.id,
+      resolution.failure,
+    );
     throw new ForbiddenException('Tenant context is required');
   }
 }

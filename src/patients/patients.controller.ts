@@ -4,6 +4,7 @@ import {
   ApiBody,
   ApiCreatedResponse,
   ApiForbiddenResponse,
+  ApiHeader,
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
@@ -40,6 +41,12 @@ import type { PatientAccessScope } from './types/patient-access-scope.type';
 @ApiBearerAuth('bearer')
 @ApiUnauthorizedResponse({
   description: 'Missing, invalid, or expired Bearer JWT',
+})
+@ApiHeader({
+  name: 'X-Organization-Id',
+  required: false,
+  description:
+    'Optional UUID selection hint. A tenant-required route resolves the only eligible membership when it is omitted.',
 })
 @ApiForbiddenResponse({
   description: 'Authenticated user lacks a permitted role',

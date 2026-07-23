@@ -10,7 +10,9 @@ import {
 import { randomUUID } from 'node:crypto';
 import { AuthenticatedUser } from '../auth/types/authenticated-user.type';
 import { TenantResolutionMode } from '../common/request-context/request-context.service';
+import { RequestContextService } from '../common/request-context/request-context.service';
 import { TenantResolutionFailure } from './tenant-context.types';
+import { TenantObservabilityService } from './tenant-observability.service';
 import { TenantResolverService } from './tenant-resolver.service';
 
 const describeCertification =
@@ -46,7 +48,10 @@ describeCertification('Tenant context PostgreSQL certification', () => {
 
     prisma = new PrismaClient({ adapter: new PrismaPg(databaseUrl) });
     await prisma.$connect();
-    resolver = new TenantResolverService(prisma as never);
+    resolver = new TenantResolverService(
+      prisma as never,
+      new TenantObservabilityService(new RequestContextService()),
+    );
 
     await prisma.user.createMany({
       data: [

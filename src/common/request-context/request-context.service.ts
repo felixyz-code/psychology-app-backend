@@ -16,6 +16,27 @@ export type TenantContext = Readonly<{
   resolutionMode: TenantResolutionMode;
 }>;
 
+export class RequestContextNotInitializedError extends Error {
+  constructor() {
+    super('Request context is not initialized');
+    this.name = RequestContextNotInitializedError.name;
+  }
+}
+
+export class TenantContextAlreadySetError extends Error {
+  constructor() {
+    super('Tenant context has already been resolved for this request');
+    this.name = TenantContextAlreadySetError.name;
+  }
+}
+
+export class RequiredTenantContextUnavailableError extends Error {
+  constructor() {
+    super('Tenant context is required');
+    this.name = RequiredTenantContextUnavailableError.name;
+  }
+}
+
 type RequestContext = {
   requestId: string;
   tenantContext?: TenantContext;
@@ -36,13 +57,30 @@ export class RequestContextService {
   setTenantContext(tenantContext: TenantContext) {
     const context = this.storage.getStore();
     if (!context) {
-      throw new Error('Request context is not initialized');
+      throw new RequestContextNotInitializedError();
     }
+
+    if (context.tenantContext) {
+      throw new TenantContextAlreadySetError();
+    }
+
+    // TenantContext contains only primitive fields. Freezing the validated
+    // instance prevents a later guard or interceptor from changing scope.
+    Object.freeze(tenantContext);
 
     context.tenantContext = tenantContext;
   }
 
   get tenantContext() {
     return this.storage.getStore()?.tenantContext;
+  }
+
+  getRequiredTenantContext(): TenantContext {
+    const tenantContext = this.tenantContext;
+    if (!tenantContext) {
+      throw new RequiredTenantContextUnavailableError();
+    }
+
+    return tenantContext;
   }
 }

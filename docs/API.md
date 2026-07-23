@@ -1279,8 +1279,15 @@ exists.
 If no header is sent, a user with one eligible membership is resolved
 automatically. A user with several eligible memberships must make an explicit
 selection. Existing clinical endpoints remain tenant-optional in this phase and
-retain their legacy ownership behavior; new organization-aware endpoints may
-require a resolved context.
+retain their legacy ownership behavior, except for the Patients pilot. Patients
+requires a resolved context and continues to apply its separate legacy
+psychologist ownership condition; all other clinical modules remain legacy
+until 2.1D.
+
+`X-Organization-Id` is optional on the Patients pilot only because a caller
+with exactly one eligible membership is resolved automatically. It is a
+selection hint, never authorization evidence, and its UUID value is never
+accepted through a DTO, body, query, or path parameter.
 
 ### `GET /auth/context`
 

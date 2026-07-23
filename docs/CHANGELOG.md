@@ -2,6 +2,38 @@
 
 ---
 
+# POST-GO-LIVE.2.1B Tenant Context, Capability Resolution & Observability
+
+## Added
+
+* Closed, typed organization-capability catalog and centralized policy resolver
+  derived from the approved capability matrix. Conditional capabilities remain
+  denied until their specific assignment, redaction, or owner policy exists.
+* Sanitized tenant-resolution telemetry for successful resolution, malformed
+  selection, redacted denial, ambiguity, missing required context, and
+  capability denial.
+* Request-context protections that freeze TenantContext, reject a second
+  resolution in the same request, and expose typed absent-context errors.
+* Unit coverage for strict header parsing, inactive membership states,
+  capability default-deny behavior, conditional AUDITOR/READ_ONLY behavior,
+  reusable guard ordering, and interleaved AsyncLocalStorage contexts.
+
+## Changed
+
+* Tenant resolution now reads the authenticated user's membership status and
+  organization status together, allowing safe reason-code telemetry without
+  changing the redacted external `403` response.
+* Swagger documents `X-Organization-Id` on the tenant-required Patients pilot.
+
+## Compatibility
+
+* No Prisma schema, migration, seed, backfill, JWT tenant claim, global tenant
+  enforcement, or legacy clinical-module conversion was introduced. Patients
+  retains its `organizationId + psychologistId` double barrier; capability
+  enforcement for clinical modules remains deferred to 2.1D.
+
+---
+
 # POST-GO-LIVE.2.1A Domain, Tenant Context & Authorization Contract
 
 ## Added
