@@ -2,6 +2,21 @@
 
 ---
 
+# POST-GO-LIVE.2.1A Domain, Tenant Context & Authorization Contract
+
+## Added
+
+* Versioned tenant-context and data-isolation ADRs.
+* Primary authorization contract, capability matrix, endpoint scope matrix,
+  and tenant security test contract.
+
+## Compatibility
+
+* No Prisma schema, migration, runtime guard, service, controller, JWT, API,
+  frontend, data, backfill, or deployment behavior changed.
+
+---
+
 # POST-GO-LIVE.1.7A Tenant-Aware Patients Pilot
 
 ## Changed
