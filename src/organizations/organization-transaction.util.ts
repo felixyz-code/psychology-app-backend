@@ -14,9 +14,12 @@ export async function serializableTransaction<T>(
         isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
       });
     } catch (error) {
-      if (isSerializationFailure(error) && attempt < MAX_SERIALIZATION_ATTEMPTS)
+      if (
+        isSerializableWriteConflict(error) &&
+        attempt < MAX_SERIALIZATION_ATTEMPTS
+      )
         continue;
-      if (isSerializationFailure(error))
+      if (isSerializableWriteConflict(error))
         throw new ConflictException('Concurrent operation conflict');
       throw error;
     }
@@ -30,9 +33,35 @@ export function isUniqueViolation(error: unknown) {
     error.code === 'P2002'
   );
 }
-function isSerializationFailure(error: unknown) {
-  return (
-    error instanceof Prisma.PrismaClientKnownRequestError &&
-    error.code === 'P2034'
-  );
+export function isSerializableWriteConflict(error: unknown) {
+  const visited = new Set<object>();
+  let current: unknown = error;
+
+  for (let depth = 0; depth < 8; depth += 1) {
+    if (!isRecord(current) || visited.has(current)) return false;
+    visited.add(current);
+
+    if (
+      current instanceof Prisma.PrismaClientKnownRequestError &&
+      current.code === 'P2034'
+    ) {
+      return true;
+    }
+    if (
+      current.code === 'P2034' ||
+      current.code === '40001' ||
+      current.originalCode === '40001' ||
+      current.kind === 'TransactionWriteConflict' ||
+      (current.name === 'DriverAdapterError' &&
+        current.message === 'TransactionWriteConflict')
+    ) {
+      return true;
+    }
+    current = current.cause;
+  }
+  return false;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
 }
