@@ -15,6 +15,16 @@
 | GET | `/patients/:id` | Patients | Yes | `patient.read` | Current double barrier | 404 | Implemented pilot | 2.1D align policy |
 | PATCH | `/patients/:id` | Patients | Yes | `patient.update` | Current double barrier | 404 | Implemented pilot | 2.1D align policy |
 | DELETE | `/patients/:id` | Patients | Yes | `patient.delete` | Current double barrier | 404 | Implemented pilot | 2.1D align policy |
+| GET | `/organizations` | Organizations | Optional bootstrap | `organization.read` when resolved | Caller eligible memberships only | N/A | 2.1C0 contract approved; no route | 2.1C2 after 2.1C1 |
+| GET | `/organizations/:organizationId` | Organizations | Yes | `organization.read` | Path must match resolved tenant | 404 | 2.1C0 contract approved; no route | 2.1C2 after 2.1C1 |
+| GET | `/organizations/:organizationId/memberships` | Memberships | Yes | `membership.read` | Selected tenant only; AUDITOR gets sanitized metadata and no complete emails | 404 | 2.1C0 contract approved; no route | 2.1C2 after 2.1C1 |
+| POST | `/organizations/:organizationId/invitations` | Invitations | Yes | `invitation.create` | Selected tenant; OWNER/ADMIN; no OWNER grant | 404 | 2.1C0 contract approved; no route | 2.1C2 after 2.1C1 |
+| GET | `/organizations/:organizationId/invitations` | Invitations | Yes | `invitation.read` | Selected tenant; no digest/token projection | 404 | 2.1C0 contract approved; no route | 2.1C2 after 2.1C1 |
+| POST | `/organizations/:organizationId/invitations/:invitationId/revoke` | Invitations | Yes | `invitation.revoke` | Selected tenant and PENDING state | 404 | 2.1C0 contract approved; no route | 2.1C2 after 2.1C1 |
+| POST | `/organization-invitations/:token/accept` | Invitations | No tenant selection | Authenticated recipient binding | Redacted 404 | 2.1C0 contract approved; no route | 2.1C2 after 2.1C1 |
+| POST | `/organization-invitations/:token/reject` | Invitations | No tenant selection | Authenticated recipient binding | Redacted 404 | 2.1C0 contract approved; no route | 2.1C2 after 2.1C1 |
+| PATCH | `/organizations/:organizationId/memberships/:membershipId` | Memberships | Yes | Role/suspend/reactivate capability | Target must be same tenant and preserve owner invariant | 404 | 2.1C0 contract approved; no route | 2.1C2 after 2.1C1 |
+| DELETE | `/organizations/:organizationId/memberships/:membershipId` | Memberships | Yes | `membership.remove` or `membership.leave` | Explicit administrative remove vs self-leave | 404 | 2.1C0 contract approved; no route | 2.1C2 after 2.1C1 |
 | POST | `/case-files` | Case files | Target yes | `clinical.write` | Patient tenant + assignment | 404 | Legacy global/psychologist | 2.1D |
 | GET | `/case-files` | Case files | Target yes | `clinical.read` | Tenant + assignment | Empty list | Legacy global/psychologist | 2.1D |
 | GET | `/case-files/patient/:patientId` | Case files | Target yes | `clinical.read` | Patient tenant + assignment | 404 | Legacy global/psychologist | 2.1D |

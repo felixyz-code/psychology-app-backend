@@ -1,5 +1,30 @@
 # Decision Log
 
+## ADR-POST-GO-LIVE.2.1C0: Invitation and Membership Mutation Contract
+
+### Status
+
+Approved contract; documentation-only phase pending controlled merge.
+
+### Decision
+
+Invitation lifecycle needs persistent distinction between recipient rejection,
+administrative revocation, and expiry, recipient binding, and database-enforced
+active duplicate prevention. ADMIN may create invitations and administer
+non-OWNER memberships. AUDITOR sees only sanitized membership/organization
+metadata. Rejection permits a new invitation but never reuse; ownership
+transfer and real email delivery are excluded. The next steps are a dedicated
+2.1C1 Prisma schema/migration review followed by 2.1C2 APIs; the two must not
+be combined.
+
+### Boundary
+
+No runtime capability, route, Prisma model, migration, seed, backfill, or
+production behavior changes in 2.1C0. Capabilities absent from the approved
+matrix remain default-deny.
+
+---
+
 ## ADR-POST-GO-LIVE.2.1B: Closed Capability Resolution and Immutable Request Context
 
 ### Decision

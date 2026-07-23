@@ -6,6 +6,11 @@
 
 This document defines the public REST API contract exposed by the backend.
 
+> POST-GO-LIVE.2.1C0 note: organization, membership, and invitation routes are
+> not implemented or publicly available. Their proposed routes are recorded in
+> `TENANT_ENDPOINT_SCOPE_MATRIX.md` pending human decisions and 2.1C1 schema
+> work; this document does not advertise them as current API.
+
 Business rules are documented in PROJECT.md.
 
 Architecture is documented in ARCHITECTURE.md.

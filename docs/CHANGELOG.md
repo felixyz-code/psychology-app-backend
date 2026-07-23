@@ -2,6 +2,28 @@
 
 ---
 
+# POST-GO-LIVE.2.1C0 Invitation & Membership Mutation Contract
+
+## Added
+
+* An approved, default-deny capability contract for invitation lifecycle and
+  membership mutations.
+* Contract definitions separating revocation, recipient rejection, expiry,
+  administrative removal, and self-leave.
+* A recommended schema/migration boundary, recipient-binding model,
+  anti-enumeration semantics, concurrency gates, and staged 2.1C1/2.1C2 plan.
+* Approved product decisions for ADMIN non-OWNER management, AUDITOR sanitized
+  reads, seven-day expiry, persistent rejection/expiry, re-invitation after
+  rejection, no MVP ownership transfer, and no production email delivery.
+
+## Compatibility
+
+* No Prisma schema, migration, runtime module, endpoint, DTO, service,
+  repository, backfill, frontend, production data, or deployment behavior was
+  changed. The current typed capability catalog remains unchanged.
+
+---
+
 # POST-GO-LIVE.2.1B Tenant Context, Capability Resolution & Observability
 
 ## Added

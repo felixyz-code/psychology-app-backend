@@ -54,3 +54,78 @@ An `INVITED`, `SUSPENDED`, or `REVOKED` membership cannot establish context. An 
 Sensitive operations eventually record actor user, organization, membership, capability, technical resource ID/type, result, request ID, and approved reason where required. Logs/audit events never contain notes, document content, names, emails, passwords, JWTs, headers, or file paths.
 
 `Disabled` retains legacy behavior. `Shadow` resolves and compares scope without denying, logging only sanitized discrepancy metadata. `Enforced` requires context, capability, scope, and relationship validation. A module moves to Enforced only after endpoint-matrix rows and security-test contract pass.
+
+## POST-GO-LIVE.2.1C0 approved invitation and membership lifecycle contract
+
+This approved contract is **not runtime behavior**. The current typed catalog
+remains closed and default-deny until 2.1C1 has introduced the required schema
+safely and 2.1C2 is expressly authorized.
+
+### Distinct operations
+
+* **Revoke invitation** is an authorized tenant-administration action.
+* **Reject invitation** is a decision by the authenticated recipient.
+* **Expire invitation** is a time-derived outcome once `expiresAt <= now()`.
+* **Remove membership** is an OWNER-only administrative mutation of another
+  membership; it ends tenant eligibility immediately without deleting the row.
+* **Leave organization** is a self-only action. It is not an administrative
+  remove endpoint and may not leave the organization with zero active OWNERS.
+
+An active organization must retain at least one `ACTIVE` OWNER. No actor may
+remove, suspend, downgrade, or self-leave as the last active OWNER. Ownership
+transfer, if approved for this MVP, is an explicit, serializable operation; it
+is never implicit in a role-change or remove request.
+
+Removal and leave are non-idempotent state transitions: a target that is
+already terminal returns `409`. They retain historical assignments rather than
+deleting clinical links; a future assignment policy must treat an inactive
+membership as ineligible. Existing requests are not force-terminated, but the
+next tenant-context resolution fails and no new tenant-scoped action is
+authorized.
+
+### Proposed invitation identity and lifecycle
+
+The recommended persistence model is hybrid: required `normalizedEmail`,
+optional `invitedUserId`, and `acceptedByUserId`. Acceptance requires the
+authenticated user's normalized, verified email to match; when `invitedUserId`
+is present it must match too. A changed email invalidates eligibility rather
+than silently rebinding an invitation. Plain tokens are generated from a
+cryptographic source, shown only once where an approved local/test delivery
+flow needs them, and persisted solely as a SHA-256 digest.
+
+The recommended lifecycle is timestamp-based: `acceptedAt`, `rejectedAt`,
+`revokedAt`, and `expiredAt` are mutually exclusive terminal timestamps. An
+expired invitation is derived while read-only, and materialized as `expiredAt`
+inside the next serializable lifecycle/create transaction that encounters it.
+This preserves the meaningful distinction between recipient rejection,
+administrative revocation, and time-based expiry without a background job. A
+PENDING invitation has no terminal timestamp. Before creating an equivalent
+invitation, the transaction materializes eligible expired rows, then relies on
+the partial unique index for rows with no terminal timestamp.
+
+### HTTP and anti-enumeration contract
+
+Malformed DTOs or tokens return `400`; tenant-visible but unauthorized actions
+return `403`; foreign tenant resources return `404`; unknown invitation tokens
+return a stable redacted `404`; duplicate pending invitations, terminal-token
+reuse, invalid state transitions, existing memberships, last-OWNER attempts,
+and serialization conflicts return `409`. Responses never disclose email,
+token, digest, or a foreign organization identifier.
+
+### Approved 2.1C0 decisions
+
+* ADMIN may create invitations and administer non-OWNER memberships; it may not
+  self-elevate, grant a higher privilege, or mutate an OWNER. Invitation
+  revocation remains OWNER-only.
+* AUDITOR may read memberships and sanitized organization metadata only. It
+  receives neither clinical access nor complete email values.
+* Rejection persists in `rejectedAt`; expiry persists in `expiredAt`; they are
+  distinct from revocation. A new invitation may follow a rejection, but the
+  rejected invitation is never reused.
+* The default invitation duration is seven days. The unique pending-invitation
+  index is required to prevent concurrent duplicates by organization and
+  normalized email.
+* Ownership transfer and real email delivery are outside the MVP. A future
+  delivery adapter has no production sender in 2.1C.
+* The last active OWNER may not leave, be removed, suspended, or degraded.
+  Ambiguous capabilities remain denied by default.
