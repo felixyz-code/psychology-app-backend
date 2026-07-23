@@ -109,7 +109,7 @@ export class InvitationsService {
     tenant: TenantContext,
   ) {
     this.assertTenantPath(organizationId, tenant);
-    return serializableTransaction(this.prisma, async (tx) => {
+    const result = await serializableTransaction(this.prisma, async (tx) => {
       const invitation = await tx.organizationInvitation.findFirst({
         where: { id: invitationId, organizationId: tenant.organizationId },
         select: {
@@ -122,7 +122,8 @@ export class InvitationsService {
         },
       });
       if (!invitation) throw new NotFoundException('Invitation not found');
-      await this.materializeInvitationIfExpired(tx, invitation, tenant);
+      if (await this.materializeInvitationIfExpired(tx, invitation, tenant))
+        return { expired: true as const };
       const updated = await tx.organizationInvitation.updateMany({
         where: pendingInvitationWhere(invitation.id),
         data: { revokedAt: new Date() },
@@ -136,8 +137,14 @@ export class InvitationsService {
         'INVITATION_REVOKED',
         invitation.id,
       );
-      return { id: invitation.id, revokedAt: new Date() };
+      return {
+        expired: false as const,
+        value: { id: invitation.id, revokedAt: new Date() },
+      };
     });
+    if (result.expired)
+      throw new ConflictException('Invitation is no longer pending');
+    return result.value;
   }
 
   async accept(token: string, user: AuthenticatedUser) {
@@ -154,7 +161,7 @@ export class InvitationsService {
     action: 'accept' | 'reject',
   ) {
     const tokenDigest = digestValidatedToken(token);
-    return serializableTransaction(this.prisma, async (tx) => {
+    const result = await serializableTransaction(this.prisma, async (tx) => {
       const invitation = await tx.organizationInvitation.findFirst({
         where: { tokenDigest },
         select: {
@@ -189,7 +196,8 @@ export class InvitationsService {
         membershipId: 'not-applicable',
         organizationId: invitation.organizationId,
       };
-      await this.materializeInvitationIfExpired(tx, invitation, tenant);
+      if (await this.materializeInvitationIfExpired(tx, invitation, tenant))
+        return { expired: true as const };
       if (action === 'reject') {
         const updated = await tx.organizationInvitation.updateMany({
           where: pendingInvitationWhere(invitation.id),
@@ -204,7 +212,10 @@ export class InvitationsService {
           'INVITATION_REJECTED',
           invitation.id,
         );
-        return { id: invitation.id, rejectedAt: new Date() };
+        return {
+          expired: false as const,
+          value: { id: invitation.id, rejectedAt: new Date() },
+        };
       }
       const existingMembership = await tx.organizationMembership.findFirst({
         where: {
@@ -246,13 +257,16 @@ export class InvitationsService {
           'INVITATION_ACCEPTED',
           invitation.id,
         );
-        return membership;
+        return { expired: false as const, value: membership };
       } catch (error) {
         if (isUniqueViolation(error))
           throw new ConflictException('Membership already exists');
         throw error;
       }
     });
+    if (result.expired)
+      throw new ConflictException('Invitation is no longer pending');
+    return result.value;
   }
 
   private async materializeExpired(
@@ -286,12 +300,12 @@ export class InvitationsService {
     tenant: { userId: string; membershipId: string; organizationId: string },
   ) {
     if (invitation.expiresAt > new Date() || hasTerminalState(invitation))
-      return;
+      return false;
     const updated = await tx.organizationInvitation.updateMany({
       where: pendingInvitationWhere(invitation.id),
       data: { expiredAt: new Date() },
     });
-    if (updated.count === 1)
+    if (updated.count === 1) {
       this.observability.organizationDomainEvent(
         'invitation_expired',
         tenant,
@@ -299,7 +313,9 @@ export class InvitationsService {
         'INVITATION_EXPIRED',
         invitation.id,
       );
-    throw new ConflictException('Invitation is no longer pending');
+      return true;
+    }
+    return false;
   }
 
   private assertTenantPath(organizationId: string, tenant: TenantContext) {

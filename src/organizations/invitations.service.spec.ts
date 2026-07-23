@@ -64,4 +64,68 @@ describe('InvitationsService', () => {
       service.findAll('00000000-0000-4000-8000-000000000099', tenant),
     ).rejects.toBeInstanceOf(NotFoundException);
   });
+
+  it('materializes an expired invitation before returning the accept conflict', async () => {
+    const recipientId = '00000000-0000-4000-8000-000000000004';
+    const invitation = {
+      id: '00000000-0000-4000-8000-000000000005',
+      organizationId: tenant.organizationId,
+      normalizedEmail: 'recipient@example.test',
+      invitedUserId: recipientId,
+      role: MembershipRole.PSYCHOLOGIST,
+      expiresAt: new Date(Date.now() - 60_000),
+      acceptedAt: null,
+      rejectedAt: null,
+      revokedAt: null,
+      expiredAt: null,
+    };
+    let updateArgument: unknown;
+    const updateMany = jest.fn((argument: unknown) => {
+      updateArgument = argument;
+      return Promise.resolve({ count: 1 });
+    });
+    const prisma = {
+      $transaction: jest.fn((work: (tx: unknown) => unknown) =>
+        work({
+          organizationInvitation: {
+            findFirst: jest.fn().mockResolvedValue(invitation),
+            updateMany,
+          },
+          user: {
+            findFirst: jest.fn().mockResolvedValue({
+              id: recipientId,
+              email: 'recipient@example.test',
+            }),
+          },
+        }),
+      ),
+    } as never;
+    const service = new InvitationsService(prisma, observability as never);
+
+    await expect(
+      service.accept('A'.repeat(43), { id: recipientId } as never),
+    ).rejects.toBeInstanceOf(ConflictException);
+
+    expect(updateMany).toHaveBeenCalledTimes(1);
+    expect(hasMaterializedExpiration(updateArgument)).toBe(true);
+    expect(observability.organizationDomainEvent).toHaveBeenCalledWith(
+      'invitation_expired',
+      expect.objectContaining({ organizationId: tenant.organizationId }),
+      'SUCCESS',
+      'INVITATION_EXPIRED',
+      invitation.id,
+    );
+  });
 });
+
+function hasMaterializedExpiration(
+  value: unknown,
+): value is { data: { expiredAt: Date } } {
+  if (!value || typeof value !== 'object') return false;
+  const data = (value as { data?: unknown }).data;
+  return (
+    Boolean(data) &&
+    typeof data === 'object' &&
+    (data as { expiredAt?: unknown }).expiredAt instanceof Date
+  );
+}
