@@ -569,27 +569,63 @@ The active-PRIMARY partial unique index and cross-tenant composite foreign
 keys remain deferred until organization scopes are enforced and non-nullable
 where appropriate. No tenant filtering is active in this phase.
 
-### POST-GO-LIVE.2.1C0 proposed invitation schema boundary
+### POST-GO-LIVE.2.1C1 invitation lifecycle persistence
 
-This is a documented 2.1C1 proposal only; it changes neither the Prisma schema
-nor any migration in 2.1C0.
+2.1C1 adds persistence only; it does not add invitation, membership, or
+organization APIs, delivery, backfill, tenant enforcement, or a production
+deployment. `OrganizationInvitation` retains the original `email` and adds
+required `normalizedEmail`, optional `invitedUserId`, optional
+`acceptedByUserId`, `rejectedAt`, and `expiredAt`. The optional user references
+use `SET NULL` for an invitee and `RESTRICT` for an accepted-by identity, so a
+historical acceptance cannot be silently erased by a user deletion.
+
+The canonical key is `lower(btrim(email))` under the PostgreSQL database
+collation: trim first, then lowercase. It is limited to 255 bytes. The future
+API must validate email format and apply this exact canonicalization before
+write; the database deliberately has no complex email regex. PostgreSQL's
+`lower()` is collation-aware but is not Unicode full case folding, so the API
+must not substitute a locale-dependent normalization. Normalized email is
+personal data and must not be emitted in logs or public projections.
+
+Invitation state remains derived, not persisted as an enum: `PENDING` has no
+terminal timestamp; `ACCEPTED`, `REJECTED`, `REVOKED`, and `EXPIRED` each have
+exactly their corresponding terminal timestamp. `expiredAt` materializes a
+previously derived expiry only inside a future serializable lifecycle/create
+transaction after `expiresAt` has elapsed. It is retained to release the
+pending uniqueness key without an invalid `now()` predicate and to preserve
+the reason for terminality.
+
+The migration adds a named check that permits at most one of `acceptedAt`,
+`rejectedAt`, `revokedAt`, and `expiredAt`, plus a check that an `expiredAt` is
+not earlier than `expiresAt`. The SQL-managed partial unique index over
+`(organizationId, normalizedEmail)` covers only rows with all terminal
+timestamps null. Thus a future create flow must first materialize equivalent
+expired rows and then insert; rejection, revocation, acceptance, and
+materialized expiry each release the key.
+
+The migration is safe for legacy rows: it derives `normalizedEmail` from the
+existing required `email`, then sets it `NOT NULL`. It aborts without exposing
+the value if a legacy email is blank, exceeds the canonical column limit, or
+would create duplicate terminal-free invitations. It does not invent an
+invitee or accepter; historical accepted rows can therefore retain a null
+`acceptedByUserId`, while future acceptance must supply it atomically.
 
 | Proposed change | Classification | Rationale |
 | --- | --- | --- |
 | Invitation status enum | NOT_NEEDED | Timestamp-derived terminal state avoids an enum migration and preserves accepted/rejected/revoked distinction. |
-| `rejectedAt` and `expiredAt` | REQUIRED_FOR_2_1C | Recipient rejection and materialized time expiry must not be stored indistinguishably from revocation. |
-| `normalizedEmail` | REQUIRED_FOR_2_1C | Required recipient binding and pending-duplicate key; existing `email` remains a personal-data migration concern. |
-| `invitedUserId` | RECOMMENDED_BEFORE_2_1C | Optional strengthening for already registered recipients; acceptance still requires normalized email. |
-| `acceptedByUserId` | REQUIRED_FOR_2_1C | Durable proof of the authenticated accepting identity. |
+| `rejectedAt` and `expiredAt` | REQUIRED | Recipient rejection and materialized time expiry remain distinct from revocation. |
+| `normalizedEmail` | REQUIRED | Recipient binding and pending-duplicate key. |
+| `invitedUserId` | REQUIRED | Optional recipient binding approved by the lifecycle contract. |
+| `acceptedByUserId` | REQUIRED | Future acceptance durable proof; nullable only for unmappable legacy history. |
+| `rejectedByUserId` | REJECTED | The approved contract requires `rejectedAt`, not a persistent rejection actor. |
 | `createdByMembershipId` / `revokedByMembershipId` | DEFERRED | Sanitized structured observability suffices for the API phase; persistent audit design needs separate approval. |
-| Pending-invitation partial unique index | REQUIRED_FOR_2_1C | Database-level protection for `(organizationId, normalizedEmail)` while every terminal timestamp is null; the transaction materializes expired rows first. |
-| Terminal timestamp check constraint | REQUIRED_FOR_2_1C | Prevents mutually incompatible accepted/rejected/revoked states. |
+| Pending-invitation partial unique index | REQUIRED | Database-level protection for `(organizationId, normalizedEmail)` while every terminal timestamp is null. |
+| Terminal timestamp check constraint | REQUIRED | Prevents mutually incompatible accepted/rejected/revoked/expired states. |
 | PatientAssignment PRIMARY index | NOT_NEEDED | It is unrelated to invitation or membership lifecycle and remains deferred. |
 
 PostgreSQL partial indexes cannot be represented completely in Prisma schema;
-the proposed 2.1C1 migration must contain reviewed SQL, local validation and a
-rollback plan. This 2.1C0 proposal authorizes neither production execution nor
-backfill; compatibility work must be rehearsed locally and approved separately.
+the reviewed 2.1C1 migration contains the SQL and requires local validation and
+a rollback rehearsal. It authorizes neither production execution nor backfill.
 
 ---
 

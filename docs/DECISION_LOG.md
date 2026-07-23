@@ -1,5 +1,35 @@
 # Decision Log
 
+## ADR-POST-GO-LIVE.2.1C1: Invitation Lifecycle Persistence
+
+### Status
+
+Implemented locally; pending controlled review and merge. No production
+execution or data backfill is authorized.
+
+### Decision
+
+Persist invitation recipient identity and lifecycle through `normalizedEmail`,
+optional `invitedUserId`, optional `acceptedByUserId`, `rejectedAt`, and
+`expiredAt`. State is derived from mutually exclusive terminal timestamps, not
+from a status enum. PostgreSQL enforces that invariant and a partial unique
+pending key over organization and normalized email. Because a partial index
+predicate may not use `now()`, expiry is materialized before a future
+equivalent invite is created.
+
+Legacy normalization is deterministic (`lower(btrim(email))`) and fails closed
+for blank, overlength, or duplicate terminal-free values. No invitee or
+accepting user is inferred. Creation/revocation/rejection actor references are
+deferred pending a dedicated audit-data decision.
+
+### Boundary
+
+No controller, service, repository, guard, DTO, endpoint, email sender,
+tenant-enforcement behavior, production migration, or production backfill is
+part of 2.1C1.
+
+---
+
 ## ADR-POST-GO-LIVE.2.1C0: Invitation and Membership Mutation Contract
 
 ### Status

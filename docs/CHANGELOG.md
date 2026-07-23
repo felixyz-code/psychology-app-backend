@@ -2,6 +2,27 @@
 
 ---
 
+# POST-GO-LIVE.2.1C1 Invitation Lifecycle Persistence
+
+## Added
+
+* Prisma persistence for normalized invitation recipients, optional invitee and
+  accepter identity bindings, recipient rejection, and materialized expiry.
+* A PostgreSQL terminal-state check and SQL-managed partial unique index that
+  prevents concurrent terminal-free invitations with the same organization and
+  normalized email.
+* Fail-closed legacy preflight for unsafe normalized invitation keys, plus
+  schema/migration certification coverage.
+
+## Compatibility
+
+* No APIs, controllers, services, repositories, guards, DTOs, email delivery,
+  backfill, tenant enforcement, production migration, or deployment behavior
+  was introduced. Expiry materialization belongs to the expressly deferred API
+  transaction flow.
+
+---
+
 # POST-GO-LIVE.2.1C0 Invitation & Membership Mutation Contract
 
 ## Added
