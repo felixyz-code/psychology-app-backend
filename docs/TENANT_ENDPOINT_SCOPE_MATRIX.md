@@ -60,3 +60,11 @@
 | DELETE | `/financial-transactions/:id` | Finance | Target yes | `finance.manage` | Transaction tenant | 404 | Legacy global/psychologist | 2.1D |
 
 No backend report-export or dashboard endpoint exists at this checkpoint. Frontend-composed reports remain in scope because every upstream API must become tenant-scoped before they are isolated.
+
+## POST-GO-LIVE.2.1C2 implementation status
+
+The Organization, Membership, and Invitation rows above are now implemented.
+`GET /organizations/current`, membership mutations, and self-leave use a
+required resolved tenant context. Recipient accept/reject explicitly skip
+tenant resolution so a pending invitation cannot establish tenant authority.
+All organization-path mismatches are redacted as `404`.

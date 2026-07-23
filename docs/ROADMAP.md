@@ -233,3 +233,11 @@ Related documentation:
 * DOCKER.md
 
 End of document.
+
+---
+
+## POST-GO-LIVE.2.1C2
+
+Organization, membership and invitation API implementation is complete locally
+and awaits controlled review and merge. POST-GO-LIVE.2.1D remains ineligible
+until this work is integrated and formally closed.

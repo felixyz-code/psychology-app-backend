@@ -19,6 +19,7 @@ import { PrismaModule } from './prisma/prisma.module';
 import { SessionNotesModule } from './session-notes/session-notes.module';
 import { TenantContextGuard } from './tenant-context/guards/tenant-context.guard';
 import { TenantContextModule } from './tenant-context/tenant-context.module';
+import { OrganizationsModule } from './organizations/organizations.module';
 
 @Module({
   imports: [
@@ -33,6 +34,7 @@ import { TenantContextModule } from './tenant-context/tenant-context.module';
     FinancialTransactionsModule,
     HealthModule,
     TenantContextModule,
+    OrganizationsModule,
   ],
   controllers: [AppController],
   providers: [

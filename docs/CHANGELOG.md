@@ -2,6 +2,23 @@
 
 ---
 
+# POST-GO-LIVE.2.1C2 Organization, Membership & Invitation APIs
+
+## Added
+
+* Tenant-scoped Organization, Membership and Invitation API routes with typed
+  default-deny capabilities and sanitized lifecycle observations.
+* Serializable membership and invitation mutations that use conditional writes,
+  protect the last active OWNER, materialize relevant expired invitations, and
+  preserve membership history.
+
+## Compatibility
+
+* No Prisma schema/migration, backfill, production action, frontend change,
+  global enforcement, or conversion of legacy clinical modules was added.
+
+---
+
 # POST-GO-LIVE.2.1C1 Invitation Lifecycle Persistence
 
 ## Added

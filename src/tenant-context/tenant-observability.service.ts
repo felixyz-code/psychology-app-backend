@@ -13,6 +13,19 @@ type TenantEvent =
   | 'tenant_selection_denied'
   | 'tenant_capability_denied';
 
+export type OrganizationDomainEvent =
+  | 'invitation_created'
+  | 'invitation_revoked'
+  | 'invitation_accepted'
+  | 'invitation_rejected'
+  | 'invitation_expired'
+  | 'membership_role_changed'
+  | 'membership_suspended'
+  | 'membership_reactivated'
+  | 'membership_removed'
+  | 'membership_leave_denied'
+  | 'owner_invariant_denied';
+
 @Injectable()
 export class TenantObservabilityService {
   private readonly logger = new Logger(TenantObservabilityService.name);
@@ -75,6 +88,27 @@ export class TenantObservabilityService {
       route,
       reasonCode: 'CAPABILITY_DENIED',
     });
+  }
+
+  organizationDomainEvent(
+    event: OrganizationDomainEvent,
+    tenant: Pick<TenantContext, 'userId' | 'membershipId' | 'organizationId'>,
+    outcome: 'SUCCESS' | 'DENY' | 'CONFLICT',
+    reasonCode: string,
+    targetId?: string,
+  ) {
+    this.logger.log(
+      JSON.stringify({
+        event,
+        outcome,
+        requestId: this.requestContext.requestId ?? 'unavailable',
+        userId: tenant.userId,
+        membershipId: tenant.membershipId,
+        organizationId: tenant.organizationId,
+        ...(targetId && { targetId }),
+        reasonCode,
+      }),
+    );
   }
 
   private write(event: TenantEvent, outcome: string, details: object) {
