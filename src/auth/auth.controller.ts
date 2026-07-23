@@ -1,5 +1,6 @@
 import {
   ApiBody,
+  ApiBadRequestResponse,
   ApiBearerAuth,
   ApiCreatedResponse,
   ApiForbiddenResponse,
@@ -45,7 +46,13 @@ export class AuthController {
       'Optional UUID selection hint; server validates active membership.',
   })
   @ApiOperation({ summary: 'Get the validated current organization context' })
-  @ApiForbiddenResponse({ description: 'Authentication is required' })
+  @ApiBadRequestResponse({
+    description: 'Invalid organization selection header',
+  })
+  @ApiUnauthorizedResponse({ description: 'Authentication is required' })
+  @ApiForbiddenResponse({
+    description: 'Organization selection is not eligible',
+  })
   currentContext(
     @CurrentUser() user: AuthenticatedUser,
     @CurrentTenant() tenantContext?: TenantContext,

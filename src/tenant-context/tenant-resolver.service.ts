@@ -11,6 +11,7 @@ import {
 } from '../common/request-context/request-context.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { ORGANIZATION_ID_HEADER } from './tenant-context.constants';
+import { TenantObservabilityService } from './tenant-observability.service';
 import {
   TenantResolution,
   TenantResolutionFailure,
@@ -26,20 +27,33 @@ const uuidPattern =
 
 @Injectable()
 export class TenantResolverService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly observability: TenantObservabilityService,
+  ) {}
 
   async resolve(
     user: AuthenticatedUser,
     request: HeaderRequest,
   ): Promise<TenantResolution> {
-    const requestedOrganizationId = getRequestedOrganizationId(request);
+    let requestedOrganizationId: string | undefined;
+    try {
+      requestedOrganizationId = getRequestedOrganizationId(request);
+    } catch (error) {
+      this.observability.invalidHeader(user.id);
+      throw error;
+    }
+
     const memberships = await this.prisma.organizationMembership.findMany({
-      where: { userId: user.id, status: MembershipStatus.ACTIVE },
+      // Read only this authenticated user's memberships. Status and organization
+      // are selected together so eligibility is validated from one DB snapshot.
+      where: { userId: user.id },
       select: {
         id: true,
         userId: true,
         organizationId: true,
         role: true,
+        status: true,
         organization: { select: { id: true, status: true } },
       },
     });
@@ -48,6 +62,7 @@ export class TenantResolverService {
       new Set(memberships.map((membership) => membership.organizationId))
         .size !== memberships.length
     ) {
+      this.observability.selectionDenied(user.id, 'INCOHERENT_MEMBERSHIP');
       throw new ForbiddenException('Organization access denied');
     }
 
@@ -56,11 +71,25 @@ export class TenantResolverService {
         (candidate) => candidate.organizationId === requestedOrganizationId,
       );
 
-      if (
-        !membership ||
-        membership.organization.status !== OrganizationStatus.ACTIVE
-      ) {
+      if (!membership) {
         // The same response prevents organization enumeration.
+        this.observability.selectionDenied(user.id, 'INELIGIBLE_ORGANIZATION');
+        throw new ForbiddenException('Organization access denied');
+      }
+
+      if (membership.status !== MembershipStatus.ACTIVE) {
+        this.observability.selectionDenied(user.id, 'INACTIVE_MEMBERSHIP', {
+          membershipId: membership.id,
+          organizationId: membership.organizationId,
+        });
+        throw new ForbiddenException('Organization access denied');
+      }
+
+      if (membership.organization.status !== OrganizationStatus.ACTIVE) {
+        this.observability.selectionDenied(user.id, 'INACTIVE_ORGANIZATION', {
+          membershipId: membership.id,
+          organizationId: membership.organizationId,
+        });
         throw new ForbiddenException('Organization access denied');
       }
 
@@ -75,6 +104,7 @@ export class TenantResolverService {
 
     const eligibleMemberships = memberships.filter(
       (membership) =>
+        membership.status === MembershipStatus.ACTIVE &&
         membership.organization.status === OrganizationStatus.ACTIVE,
     );
 
@@ -106,6 +136,7 @@ export class TenantResolverService {
       userId: string;
       organizationId: string;
       role: TenantContext['organizationRole'];
+      status: MembershipStatus;
       organization: { id: string; status: OrganizationStatus };
     },
     resolutionMode: TenantResolutionMode,
@@ -136,11 +167,15 @@ function getRequestedOrganizationId(
     return undefined;
   }
 
-  if (values.length !== 1 || values[0].includes(',')) {
+  if (
+    values.length !== 1 ||
+    typeof values[0] !== 'string' ||
+    values[0].includes(',')
+  ) {
     throw new BadRequestException('Invalid organization selection header');
   }
 
-  const value = values[0].trim();
+  const value = values[0];
   if (!value || !uuidPattern.test(value)) {
     throw new BadRequestException('Invalid organization selection header');
   }
@@ -148,11 +183,16 @@ function getRequestedOrganizationId(
   return value;
 }
 
-function getHeaderValues(request: HeaderRequest, name: string): string[] {
+export function getHeaderValues(
+  request: HeaderRequest,
+  name: string,
+): string[] {
   const rawValues: string[] = [];
   for (let index = 0; index < (request.rawHeaders?.length ?? 0); index += 2) {
-    if (request.rawHeaders?.[index].toLowerCase() === name) {
-      rawValues.push(request.rawHeaders[index + 1]);
+    const rawName = request.rawHeaders?.[index];
+    const rawValue = request.rawHeaders?.[index + 1];
+    if (rawName?.toLowerCase() === name && typeof rawValue === 'string') {
+      rawValues.push(rawValue);
     }
   }
 
