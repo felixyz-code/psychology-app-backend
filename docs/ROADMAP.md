@@ -179,10 +179,12 @@ independent target-database backfill certification before deployment.
 
 POST-GO-LIVE.2.1C0 documents the invitation and membership lifecycle required
 before organization-domain APIs. It introduces no runtime or schema behavior.
-The proposed sequence is 2.1C1 (reviewed local schema/migration only), then
-2.1C2 (organization, membership, and invitation APIs), then controlled review
-and merge. The 2.1C0 product decisions are approved; neither phase may start
-until 2.1C0 is integrated and closed.
+POST-GO-LIVE.2.1C1 now adds only the reviewed local Prisma schema and migration
+for that lifecycle, including a terminal-state constraint and a partial unique
+pending-invitation key. It has no APIs, backfill, production migration or
+deployment. The next eligible action is controlled review and merge of 2.1C1;
+2.1C2 (organization, membership, and invitation APIs) must not start before
+that integration is closed.
 
 ---
 

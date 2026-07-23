@@ -2,8 +2,9 @@
 
 ## Status
 
-Accepted for POST-GO-LIVE.2.1C1 design after the 2.1C0 product decision. It
-does not change runtime behavior.
+Accepted and implemented locally for POST-GO-LIVE.2.1C1 after the 2.1C0 product
+decision. It does not change runtime behavior, authorize production execution,
+or authorize data backfill.
 
 ## Context
 
@@ -14,7 +15,7 @@ enforce one equivalent pending invitation under concurrency. The existing
 capability catalog also has no invitation, removal, leave, reactivation, or
 ownership-transfer entries.
 
-## Proposed decision
+## Decision
 
 Use a timestamp-derived invitation lifecycle. A future invitation has required
 `normalizedEmail`, optional `invitedUserId`, `acceptedByUserId`, `acceptedAt`,
@@ -25,16 +26,16 @@ the expiry. Acceptance compares the authenticated user's normalized verified
 email and, if present, `invitedUserId`. The only index-active invitation is
 PENDING, represented by no terminal timestamp.
 
-2.1C1 should add a PostgreSQL partial unique index over
+2.1C1 adds a PostgreSQL partial unique index over
 `(organizationId, normalizedEmail)` where all terminal timestamps are null,
 plus a check constraint for mutually exclusive terminal timestamps. PostgreSQL
 does not permit a dynamic `expiresAt > now()` index predicate, so each create
 transaction must first materialize matching expired PENDING rows, then create.
 Prisma cannot express that partial unique index directly, so the reviewed
-migration would contain explicit SQL and its test/rollback evidence. No
+migration contains explicit SQL and its test/rollback evidence. No
 application-only precheck is a substitute for the database constraint.
 
-The reviewed 2.1C1 migration must use the semantic equivalent of:
+The reviewed 2.1C1 migration uses the semantic equivalent of:
 
 ```sql
 CREATE UNIQUE INDEX organization_invitations_pending_email_key

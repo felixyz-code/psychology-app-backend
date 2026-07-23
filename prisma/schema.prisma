@@ -104,10 +104,12 @@ model User {
   uploadedDocuments     Document[]
   appointments          Appointment[]
   financialTransactions FinancialTransaction[]
-  memberships           OrganizationMembership[]
-  psychologistProfile   PsychologistProfile?
-  createdAt             DateTime                 @default(now())
-  updatedAt             DateTime                 @updatedAt
+  memberships                     OrganizationMembership[]
+  invitedOrganizationInvitations  OrganizationInvitation[] @relation("OrganizationInvitationInvitedUser")
+  acceptedOrganizationInvitations OrganizationInvitation[] @relation("OrganizationInvitationAcceptedByUser")
+  psychologistProfile             PsychologistProfile?
+  createdAt                       DateTime                 @default(now())
+  updatedAt                       DateTime                 @updatedAt
 
   @@map("users")
 }
@@ -199,17 +201,24 @@ model OrganizationBranding {
 }
 
 model OrganizationInvitation {
-  id             String         @id @default(uuid()) @db.Uuid
-  organizationId String         @db.Uuid
-  email          String         @db.VarChar(255)
-  role           MembershipRole
-  tokenDigest    String         @unique @db.Char(64)
-  expiresAt      DateTime       @db.Timestamptz(3)
-  acceptedAt     DateTime?      @db.Timestamptz(3)
-  revokedAt      DateTime?      @db.Timestamptz(3)
-  organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  createdAt      DateTime       @default(now()) @db.Timestamptz(3)
-  updatedAt      DateTime       @updatedAt @db.Timestamptz(3)
+  id               String         @id @default(uuid()) @db.Uuid
+  organizationId   String         @db.Uuid
+  email            String         @db.VarChar(255)
+  normalizedEmail  String         @db.VarChar(255)
+  invitedUserId    String?        @db.Uuid
+  role             MembershipRole
+  tokenDigest      String         @unique @db.Char(64)
+  expiresAt        DateTime       @db.Timestamptz(3)
+  acceptedAt       DateTime?      @db.Timestamptz(3)
+  acceptedByUserId String?        @db.Uuid
+  rejectedAt       DateTime?      @db.Timestamptz(3)
+  revokedAt        DateTime?      @db.Timestamptz(3)
+  expiredAt        DateTime?      @db.Timestamptz(3)
+  organization     Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  invitedUser      User?          @relation("OrganizationInvitationInvitedUser", fields: [invitedUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  acceptedByUser   User?          @relation("OrganizationInvitationAcceptedByUser", fields: [acceptedByUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  createdAt        DateTime       @default(now()) @db.Timestamptz(3)
+  updatedAt        DateTime       @updatedAt @db.Timestamptz(3)
 
   @@index([organizationId, email])
   @@map("organization_invitations")
