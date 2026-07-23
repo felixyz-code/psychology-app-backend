@@ -6,12 +6,15 @@
 
 ## Added
 
-* A pending, default-deny capability proposal for invitation lifecycle and
+* An approved, default-deny capability contract for invitation lifecycle and
   membership mutations.
 * Contract definitions separating revocation, recipient rejection, expiry,
   administrative removal, and self-leave.
 * A recommended schema/migration boundary, recipient-binding model,
   anti-enumeration semantics, concurrency gates, and staged 2.1C1/2.1C2 plan.
+* Approved product decisions for ADMIN non-OWNER management, AUDITOR sanitized
+  reads, seven-day expiry, persistent rejection/expiry, re-invitation after
+  rejection, no MVP ownership transfer, and no production email delivery.
 
 ## Compatibility
 

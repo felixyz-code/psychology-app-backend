@@ -2,8 +2,8 @@
 
 ## Status
 
-Proposed by POST-GO-LIVE.2.1C0. It requires the product decisions listed below
-before becoming accepted or changing runtime behavior.
+Accepted for POST-GO-LIVE.2.1C1 design after the 2.1C0 product decision. It
+does not change runtime behavior.
 
 ## Context
 
@@ -88,20 +88,16 @@ Unknown tokens return a redacted `404`; known tokens bound to another user
 return `403` without identity details. The API must never log the token,
 digest, email, authorization header, or request body.
 
-## Human decisions required
+## Approved product decisions
 
-| Decision | Proposed conservative default | Gate |
-| --- | --- | --- |
-| ADMIN invitation creation/revocation | Deny. | BLOCKS_ROLE_MATRIX |
-| ADMIN suspension/removal of peer ADMIN | Deny. | BLOCKS_ROLE_MATRIX |
-| PSYCHOLOGIST invitation creation | Deny. | BLOCKS_ROLE_MATRIX |
-| BILLING/RECEPTIONIST membership listing | Deny. | BLOCKS_ROLE_MATRIX |
-| AUDITOR member identity visibility | Deny; no identity projection. | BLOCKS_ROLE_MATRIX |
-| Rejection persistence | Persist `rejectedAt`. | BLOCKS_SCHEMA |
-| Re-invitation after rejection | Deny until an explicit future workflow. | BLOCKS_API |
-| Invitation lifetime | Seven days. | BLOCKS_SCHEMA |
-| MVP ownership transfer | Exclude. | BLOCKS_API |
-| MVP email delivery | No real delivery. | NON_BLOCKING |
+ADMIN may create invitations and manage non-OWNER memberships but may not
+promote, degrade, suspend, or remove an OWNER; it may not self-elevate or grant
+a privilege above its own. Revocation is OWNER-only. AUDITOR receives sanitized
+membership and organization metadata, never clinical data or complete emails.
+Rejection persists and permits a fresh invitation, never reuse of the rejected
+record. Default expiry is seven days and expiry persists separately from
+rejection/revocation. Ownership transfer and real email delivery are outside
+the MVP. All unlisted capabilities remain denied.
 
 ## Consequences
 

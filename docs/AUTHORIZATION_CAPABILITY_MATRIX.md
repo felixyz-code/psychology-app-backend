@@ -27,32 +27,35 @@
 
 No role grants platform-wide access, tenant switching without membership, cross-tenant access, or authority through a DTO/body/query organization ID. Assignments never grant organization management or finance access. Until a redaction policy is approved, AUDITOR and READ_ONLY clinical entries remain disabled in implementation.
 
-## POST-GO-LIVE.2.1C0 proposal — invitation and membership mutations
+## POST-GO-LIVE.2.1C0 approved contract — invitation and membership mutations
 
-This table is a contract proposal, not a runtime grant. `REQUIRES_PRODUCT_DECISION`
-is intentionally fail-closed: the typed catalog and APIs must not add or use the
-capability until the listed product decision is approved. `SELF_ONLY` is an
-object-level restriction, never a role grant. `CONDITIONAL` requires the target
-to be non-OWNER and no more privileged than the actor; ADMIN-on-ADMIN mutation
-is separately pending product approval. Every mutation remains subject to the
-last-active-OWNER invariant.
+This table is an approved 2.1C0 contract, not a runtime grant. The typed catalog
+and APIs must not add or use these capabilities until 2.1C1 and 2.1C2 are
+explicitly approved. `SELF_ONLY` is an object-level restriction, never a role
+grant. `CONDITIONAL` requires the target to be non-OWNER and no more privileged
+than the actor. Every mutation remains subject to the last-active-OWNER
+invariant. Unlisted or ambiguous capabilities remain DENY.
 
 | Capability | OWNER | ADMIN | PSYCHOLOGIST | RECEPTIONIST | BILLING | AUDITOR | READ_ONLY |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `invitation.read` | ALLOW | ALLOW | DENY | DENY | DENY | REQUIRES_PRODUCT_DECISION | DENY |
-| `invitation.create` | ALLOW | REQUIRES_PRODUCT_DECISION | DENY | DENY | DENY | DENY | DENY |
-| `invitation.revoke` | ALLOW | REQUIRES_PRODUCT_DECISION | DENY | DENY | DENY | DENY | DENY |
-| `membership.read` | ALLOW | ALLOW | DENY | DENY | DENY | REQUIRES_PRODUCT_DECISION | DENY |
+| `invitation.read` | ALLOW | ALLOW | DENY | DENY | DENY | DENY | DENY |
+| `invitation.create` | ALLOW | ALLOW | DENY | DENY | DENY | DENY | DENY |
+| `invitation.revoke` | ALLOW | DENY | DENY | DENY | DENY | DENY | DENY |
+| `membership.read` | ALLOW | ALLOW | DENY | DENY | DENY | ALLOW | DENY |
 | `membership.change_role` | ALLOW | CONDITIONAL | DENY | DENY | DENY | DENY | DENY |
 | `membership.suspend` | ALLOW | CONDITIONAL | DENY | DENY | DENY | DENY | DENY |
 | `membership.reactivate` | ALLOW | CONDITIONAL | DENY | DENY | DENY | DENY | DENY |
-| `membership.remove` | OWNER_ONLY | DENY | DENY | DENY | DENY | DENY | DENY |
+| `membership.remove` | ALLOW | CONDITIONAL | DENY | DENY | DENY | DENY | DENY |
 | `membership.leave` | SELF_ONLY | SELF_ONLY | SELF_ONLY | SELF_ONLY | SELF_ONLY | SELF_ONLY | SELF_ONLY |
-| `membership.transfer_ownership` | REQUIRES_PRODUCT_DECISION | DENY | DENY | DENY | DENY | DENY | DENY |
+| `membership.transfer_ownership` | DENY | DENY | DENY | DENY | DENY | DENY | DENY |
 
-The proposed conservative defaults are: only an OWNER may remove a membership;
-ADMIN invitation/revocation and membership-identity visibility for AUDITOR need
-product approval; no non-owner may grant, modify, suspend, reactivate, remove,
-or transfer an OWNER. No invite may grant OWNER. These rows supersede neither
-the existing typed catalog nor its 2.1B resolver until 2.1C2 is explicitly
-approved after the required schema phase.
+ADMIN may create invitations and administer a non-OWNER membership, but may not
+promote, degrade, suspend, remove, or otherwise mutate an OWNER; ADMIN may not
+self-elevate or grant a privilege above its own. Invitation revocation remains
+OWNER-only because it was not granted to ADMIN. AUDITOR may read memberships
+only through a sanitized projection with no complete email or clinical data. A
+rejected invitation is terminal and not reusable, but a new invitation to the
+same normalized email is allowed after rejection. No invite may grant OWNER and
+ownership transfer is outside the MVP. These entries do not change the existing
+typed catalog or its 2.1B resolver until 2.1C2 follows the required schema
+phase.

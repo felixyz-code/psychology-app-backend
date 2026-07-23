@@ -55,12 +55,11 @@ Sensitive operations eventually record actor user, organization, membership, cap
 
 `Disabled` retains legacy behavior. `Shadow` resolves and compares scope without denying, logging only sanitized discrepancy metadata. `Enforced` requires context, capability, scope, and relationship validation. A module moves to Enforced only after endpoint-matrix rows and security-test contract pass.
 
-## POST-GO-LIVE.2.1C0 invitation and membership lifecycle proposal
+## POST-GO-LIVE.2.1C0 approved invitation and membership lifecycle contract
 
-This proposal resolves the missing contract but is **not approved runtime
-behavior**. The current typed catalog remains closed and default-deny until the
-human decisions listed below are approved and 2.1C1 has introduced the required
-schema safely.
+This approved contract is **not runtime behavior**. The current typed catalog
+remains closed and default-deny until 2.1C1 has introduced the required schema
+safely and 2.1C2 is expressly authorized.
 
 ### Distinct operations
 
@@ -104,7 +103,7 @@ PENDING invitation has no terminal timestamp. Before creating an equivalent
 invitation, the transaction materializes eligible expired rows, then relies on
 the partial unique index for rows with no terminal timestamp.
 
-### HTTP and anti-enumeration proposal
+### HTTP and anti-enumeration contract
 
 Malformed DTOs or tokens return `400`; tenant-visible but unauthorized actions
 return `403`; foreign tenant resources return `404`; unknown invitation tokens
@@ -113,31 +112,20 @@ reuse, invalid state transitions, existing memberships, last-OWNER attempts,
 and serialization conflicts return `409`. Responses never disclose email,
 token, digest, or a foreign organization identifier.
 
-### Required product decisions
+### Approved 2.1C0 decisions
 
-The following retain `REQUIRES_PRODUCT_DECISION` and block 2.1C2 API work:
-
-1. ADMIN invitation creation and revocation authority.
-2. Whether an AUDITOR may see member identity or invitation metadata.
-3. Whether an existing recipient may be re-invited after rejecting.
-4. The invitation lifetime (the conservative proposed default is 7 days).
-5. Whether ownership transfer belongs in the MVP.
-6. Whether any email delivery exists in the MVP (default: no real delivery).
-
-### Human-decision register
-
-| Decision | Conservative proposed default | Classification |
-| --- | --- | --- |
-| Can ADMIN invite? | No until explicitly approved. | BLOCKS_ROLE_MATRIX |
-| Can ADMIN suspend/remove another ADMIN? | No; ADMIN may not mutate peers or OWNER. | BLOCKS_ROLE_MATRIX |
-| Can PSYCHOLOGIST invite? | No. | BLOCKS_ROLE_MATRIX |
-| Can BILLING or RECEPTIONIST list memberships? | No. | BLOCKS_ROLE_MATRIX |
-| Can AUDITOR view member identity? | No; only no member-list endpoint until approved. | BLOCKS_ROLE_MATRIX |
-| Must rejection persist? | Yes, as `rejectedAt`. | BLOCKS_SCHEMA |
-| Can a recipient be re-invited after rejection? | Not automatically; require an explicit future decision. | BLOCKS_API |
-| Default invitation duration | Seven days. | BLOCKS_SCHEMA |
-| Is ownership transfer in the MVP? | No; omit the endpoint. | BLOCKS_API |
-| Does MVP notify by email? | No real email delivery; local/test artifact only if separately approved. | NON_BLOCKING |
-
-`membership.remove` is proposed OWNER-only; every active member may invoke
-only self-leave. These are documented proposals, not an authorization change.
+* ADMIN may create invitations and administer non-OWNER memberships; it may not
+  self-elevate, grant a higher privilege, or mutate an OWNER. Invitation
+  revocation remains OWNER-only.
+* AUDITOR may read memberships and sanitized organization metadata only. It
+  receives neither clinical access nor complete email values.
+* Rejection persists in `rejectedAt`; expiry persists in `expiredAt`; they are
+  distinct from revocation. A new invitation may follow a rejection, but the
+  rejected invitation is never reused.
+* The default invitation duration is seven days. The unique pending-invitation
+  index is required to prevent concurrent duplicates by organization and
+  normalized email.
+* Ownership transfer and real email delivery are outside the MVP. A future
+  delivery adapter has no production sender in 2.1C.
+* The last active OWNER may not leave, be removed, suspended, or degraded.
+  Ambiguous capabilities remain denied by default.
