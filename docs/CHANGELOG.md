@@ -4,6 +4,25 @@
 
 # POST-GO-LIVE.2.1D2 Clinical Core and Documents Tenant Conversion
 
+## Status
+
+Completed
+
+## Highlights
+
+* Converted Clinical Core to tenant-aware architecture.
+* Case Files.
+* Workspace.
+* Session Notes.
+* Documents.
+* Blob access.
+* Shared `ClinicalAccessPolicyService`.
+* D2 capability catalog completed.
+* PostgreSQL certification completed.
+* Full regression passed.
+* No Prisma schema changes.
+* No new migrations.
+
 ## Changed
 
 * Aligned Case Files, Workspace, Session Notes, and Documents/blob access with

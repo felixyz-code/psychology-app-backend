@@ -4,10 +4,10 @@
 
 ### Status
 
-Implemented in code and locally unit/type certified for Case Files, Workspace,
-Session Notes, and Documents. PostgreSQL HTTP certification is represented by
-an opt-in `_test` E2E suite and must be executed in a local PostgreSQL
-environment before final D2 closure.
+Completed. Case Files, Workspace, Session Notes, Documents, and blob access are
+implemented, PostgreSQL certified, regression certified, merged, and closed.
+No Prisma schema change, migration, production access, deployment, frontend
+change, or D3 work was introduced.
 
 ### Decision
 
@@ -23,6 +23,26 @@ appointments, session notes, and documents. Session note and document services
 derive `organizationId`, `authorId`, and `uploadedById` server-side. Document
 download and inline view authorize metadata before filesystem access and
 constrain paths to the authorized patient upload folder.
+
+Clinical Core is fully tenant-aware before Organization Management is
+introduced as a broader product surface.
+
+### Reason
+
+This preserves backward compatibility while progressively migrating the
+platform toward a full SaaS model. The conversion keeps the legacy
+psychologist ownership restriction as a temporary additional barrier until the
+remaining tenant-aware scheduling, financial, cross-validation, and
+certification phases are closed.
+
+### Consequences
+
+Clinical modules share one access policy service for assignment-aware tenant
+authorization. Tenant isolation is enforced at the service layer through
+`organizationId`, legacy nullable organization records stay invisible to
+converted endpoints, and legacy psychologist ownership remains temporarily
+preserved. The result remains compatible with the future Organization module
+and later tenant certification.
 
 ### Boundary
 
