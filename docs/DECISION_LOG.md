@@ -1,10 +1,46 @@
 # Decision Log
 
+## ADR-POST-GO-LIVE.2.1D0: Clinical and Financial Tenant Conversion Contract
+
+### Status
+
+Approved documentation contract; no runtime implementation, Prisma schema
+change, migration, production access, deployment, or D1 work.
+
+### Decision
+
+POST-GO-LIVE.2.1D will convert clinical and financial modules through one
+organizational role per membership, explicit capabilities, and clinical
+assignment. Roles are not accumulated. A freelancer can operate as `OWNER`
+with administrative, operational, clinical, and financial capabilities plus
+assignment to their own patients, but an `OWNER` or `ADMIN` does not
+automatically gain access to unassigned clinical content.
+
+Clinical content requires valid tenant context, active membership, active
+organization, explicit clinical capability, and valid clinical assignment.
+`organizationId` is the primary isolation boundary; legacy `psychologistId`
+remains only a temporary additional assignment restriction. `AUDITOR` and
+`READ_ONLY` have no clinical-content, session-note, or document-download access
+during 2.1D.
+
+The normative contract is
+`POST_GO_LIVE_2_1D0_TENANT_CONVERSION_CONTRACT.md`. It defines the module
+matrix, role matrix, target capabilities, legacy null policy, intra-tenant
+relationship validation, HTTP semantics, projections, sanitized observability,
+test gates, and D1 through D4 order.
+
+### Boundary
+
+No current route contract is changed in runtime. No capability enum, resolver,
+controller, service, DTO, Prisma model, migration, seed, frontend, production
+data, deployment, merge, or D1 implementation is part of D0.
+
 ## ADR-POST-GO-LIVE.2.1C2: Organization Domain APIs
 
 ### Status
 
-Implemented locally; pending controlled review and merge.
+Merged and closed before POST-GO-LIVE.2.1D0. This status update records the
+baseline transition only; it does not change the approved boundary.
 
 ### Decision
 
@@ -25,8 +61,8 @@ clinical module conversion is introduced.
 
 ### Status
 
-Implemented locally; pending controlled review and merge. No production
-execution or data backfill is authorized.
+Merged before POST-GO-LIVE.2.1D0. No production execution or data backfill is
+authorized.
 
 ### Decision
 

@@ -27,6 +27,32 @@
 
 No role grants platform-wide access, tenant switching without membership, cross-tenant access, or authority through a DTO/body/query organization ID. Assignments never grant organization management or finance access. Until a redaction policy is approved, AUDITOR and READ_ONLY clinical entries remain disabled in implementation.
 
+## POST-GO-LIVE.2.1D0 clinical and financial target
+
+`POST_GO_LIVE_2_1D0_TENANT_CONVERSION_CONTRACT.md` is the normative matrix for
+the 2.1D module conversion. It supersedes the older broad target interpretation
+for clinical and document access. A role can be eligible for a capability, but
+clinical content is returned only when the actor also has a valid assignment to
+the patient in the selected organization.
+
+The target 2.1D capability vocabulary is domain-specific and default-deny. It
+may be added in D1 through D3 without changing this D0 documentation task:
+
+| Domain | Capabilities |
+| --- | --- |
+| Patients | `patient.read`, `patient.create`, `patient.update`, `patient.delete`, `patient.assign` |
+| Case files | `case_file.read`, `case_file.create`, `case_file.update` |
+| Workspace | `workspace.read` |
+| Session notes | `session_note.read`, `session_note.create`, `session_note.update`, `session_note.delete` |
+| Documents | `document.metadata_read`, `document.upload`, `document.download`, `document.update`, `document.delete` |
+| Appointments | `appointment.read`, `appointment.manage` |
+| Finance | `finance.read`, `finance.manage`, `finance.summary_read` |
+
+`OWNER` and `ADMIN` do not receive clinical-content access by role alone.
+`AUDITOR` and `READ_ONLY` receive no clinical content, session notes, document
+downloads, or partial clinical redaction during 2.1D. Unknown capabilities and
+conditional capabilities without a module policy remain denied.
+
 ## POST-GO-LIVE.2.1C0 approved contract — invitation and membership mutations
 
 This table is an approved 2.1C0 contract, not a runtime grant. The typed catalog

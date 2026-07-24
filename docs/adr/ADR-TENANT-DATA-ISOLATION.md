@@ -22,6 +22,13 @@ Tenant isolation will use tenant-aware repositories and an authorization policy 
 
 Tenant scope is the outer boundary. Legacy `psychologistId` remains a temporary compatibility condition during conversion but never broadens tenant scope. `PatientAssignment` is a secondary clinical policy condition and never substitutes for active membership.
 
+POST-GO-LIVE.2.1D0 narrows the clinical conversion rule further: `OWNER` and
+`ADMIN` roles do not automatically read clinical content. A clinical read needs
+tenant context, active membership, active organization, explicit clinical
+capability, and valid assignment. `AUDITOR` and `READ_ONLY` have no clinical
+content or document-download access during 2.1D. The detailed module contract
+lives in `../POST_GO_LIVE_2_1D0_TENANT_CONVERSION_CONTRACT.md`.
+
 ## Prisma options
 
 Repositories are the primary defense because scope is explicit and testable. Client Extensions may provide narrow helpers but cannot be the sole control: they are bypassable by alternate client use, nested writes, raw SQL, or an unscoped model. Global Prisma middleware is not adopted because it cannot reliably distinguish tenant models, public operations, and relation semantics.

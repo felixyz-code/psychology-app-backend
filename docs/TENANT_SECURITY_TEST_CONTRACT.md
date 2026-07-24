@@ -29,6 +29,23 @@ Integration tests cover scoped `findFirst`, `updateMany`, `deleteMany`, aggregat
 
 Shadow telemetry may contain only module, operation, safe reason code, mode, and bounded technical identifiers/counters. It must not contain PHI, notes, document content, email, file path, authorization header, JWT, or raw request body.
 
+## POST-GO-LIVE.2.1D0 module-conversion gates
+
+`POST_GO_LIVE_2_1D0_TENANT_CONVERSION_CONTRACT.md` defines the complete D1
+through D4 gate list. Each converted clinical or financial module must cover at
+least: missing tenant context, invalid tenant context, actor without
+membership, suspended membership, inactive organization, missing capability,
+unknown capability, actor from another tenant, missing ID, cross-tenant ID,
+two-tenant lists, cross-tenant mutations, cross-tenant relations, missing
+assignment, assignment from another tenant, legacy `organizationId = NULL`,
+sanitized projections, and sanitized logs.
+
+Freelancer coverage must prove a single `OWNER` can operate through
+capabilities plus assignment without accumulated roles. Document coverage must
+prove metadata authorization happens before any physical file access.
+Financial-summary coverage must prove all aggregates include `organizationId`
+and exclude legacy null rows.
+
 ## POST-GO-LIVE.2.1C0 future organization-domain gate
 
 Before any organization, membership, or invitation endpoint may be marked
