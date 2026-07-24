@@ -58,10 +58,17 @@ Current roles:
 
 General ownership behavior:
 
-* `ADMIN` has full access to all resources.
-* `PSYCHOLOGIST` can only access resources owned by them.
-* If a resource exists but does not belong to the authenticated `PSYCHOLOGIST`, the API returns `404 Not Found`.
-* For `PSYCHOLOGIST`, ownership fields sent in request bodies are ignored and replaced with the authenticated user ID when applicable.
+* Tenant-converted clinical modules require resolved tenant context, active
+  membership, active organization, explicit capability, active clinical
+  assignment, and the temporary legacy psychologist restriction.
+* `ADMIN` and `OWNER` do not bypass clinical assignment on tenant-converted
+  clinical content.
+* Cross-tenant or legacy-null tenant-converted clinical resources return
+  redacted `404 Not Found`.
+* Visible in-tenant clinical resources without assignment or capability return
+  `403 Forbidden`.
+* Legacy modules not yet converted keep their documented legacy ownership
+  behavior until their approved phase.
 
 ---
 
@@ -286,6 +293,13 @@ Bearer Token required.
 
 # Case Files
 
+POST-GO-LIVE.2.1D2: Case Files and Workspace are tenant-required and
+tenant-aware. Access requires valid tenant context, active membership, active
+organization, explicit `case_file.*` or `workspace.read` capability, active
+same-tenant `PatientAssignment`, and the temporary legacy psychologist
+restriction. Legacy case files with `organizationId = null` are excluded from
+lists, direct reads, relationship reads, updates and workspace projections.
+
 ## `POST /case-files`
 
 Creates a unique case file for a patient.
@@ -306,9 +320,11 @@ Bearer Token required.
 
 ### Behavior
 
-* Validates that the patient exists.
-* Validates patient ownership for `PSYCHOLOGIST`.
-* Rejects creating a second case file for the same patient.
+* Requires `case_file.create`.
+* Validates that the patient exists in the selected tenant and is assigned to
+  the current membership.
+* The backend assigns `organizationId` from the resolved tenant context.
+* Rejects creating a second same-tenant case file for the same patient.
 
 ---
 
@@ -322,8 +338,8 @@ Bearer Token required.
 
 ### Ownership
 
-* `ADMIN` sees all case files.
-* `PSYCHOLOGIST` only sees case files from owned patients.
+* Requires `case_file.read`.
+* Returns only case files in the selected tenant for actively assigned patients.
 
 ---
 
@@ -341,8 +357,8 @@ Bearer Token required.
 
 ### Ownership
 
-* `ADMIN` can access any patient case file.
-* `PSYCHOLOGIST` can only access it if the patient belongs to them.
+* Requires `case_file.read`.
+* Requires active same-tenant assignment to the requested patient.
 
 ---
 
@@ -360,8 +376,8 @@ Bearer Token required.
 
 ### Ownership
 
-* `ADMIN` can access any case file.
-* `PSYCHOLOGIST` can only access case files from owned patients.
+* Requires `case_file.read`.
+* Requires active same-tenant assignment to the case file patient.
 
 ---
 
@@ -381,9 +397,11 @@ Bearer Token required.
 
 ### Ownership
 
-* `ADMIN` can access any case file workspace.
-* `PSYCHOLOGIST` can only access workspaces for case files from owned patients.
-* If the case file exists but is not accessible to the authenticated `PSYCHOLOGIST`, the API returns `404 Not Found`.
+* Requires `workspace.read`.
+* Requires active same-tenant assignment to the case file patient.
+* Included appointments, session notes and documents are constrained by
+  `organizationId`.
+* Cross-tenant or legacy-null workspaces return `404 Not Found`.
 
 ### Response
 
@@ -516,12 +534,19 @@ Bearer Token required.
 
 ### Ownership
 
-* `ADMIN` can update any case file.
-* `PSYCHOLOGIST` can only update case files from owned patients.
+* Requires `case_file.update`.
+* Requires active same-tenant assignment to the case file patient.
 
 ---
 
 # Session Notes
+
+POST-GO-LIVE.2.1D2: Session Notes are tenant-required and tenant-aware. Access
+requires valid tenant context, active membership, active organization, explicit
+`session_note.*` capability, active same-tenant `PatientAssignment`, and the
+temporary legacy psychologist restriction. Legacy notes with
+`organizationId = null` are excluded. The backend derives `organizationId` and
+`authorId`; request-provided server fields are ignored.
 
 ## `POST /session-notes`
 
@@ -545,9 +570,9 @@ Bearer Token required.
 
 ### Ownership
 
-* `ADMIN` can use `authorId` from the request body.
-* `PSYCHOLOGIST` must own the case file.
-* For `PSYCHOLOGIST`, `authorId` is replaced with `user.id`.
+* Requires `session_note.create`.
+* Requires active same-tenant assignment to the case file patient.
+* `authorId` is always replaced with the authenticated user ID.
 
 ---
 
@@ -561,8 +586,8 @@ Bearer Token required.
 
 ### Ownership
 
-* `ADMIN` sees all session notes.
-* `PSYCHOLOGIST` only sees notes from case files of owned patients.
+* Requires `session_note.read`.
+* Returns only notes for assigned case files in the selected tenant.
 
 ---
 
@@ -580,8 +605,8 @@ Bearer Token required.
 
 ### Ownership
 
-* `ADMIN` can access any case file notes.
-* `PSYCHOLOGIST` can only access notes if the case file belongs to one of their patients.
+* Requires `session_note.read`.
+* Requires active same-tenant assignment to the case file patient.
 
 ---
 
@@ -599,8 +624,8 @@ Bearer Token required.
 
 ### Ownership
 
-* `ADMIN` can access any note.
-* `PSYCHOLOGIST` can only access notes from case files of owned patients.
+* Requires `session_note.read`.
+* Requires active same-tenant assignment to the note's case file patient.
 
 ---
 
@@ -628,8 +653,8 @@ Bearer Token required.
 
 ### Ownership
 
-* `ADMIN` can update any note.
-* `PSYCHOLOGIST` can only update notes from case files of owned patients.
+* Requires `session_note.update`.
+* Requires active same-tenant assignment to the note's case file patient.
 
 ---
 
@@ -647,14 +672,20 @@ Bearer Token required.
 
 ### Ownership
 
-* `ADMIN` can delete any note.
-* `PSYCHOLOGIST` can only delete notes from case files of owned patients.
+* Requires `session_note.delete`.
+* Requires active same-tenant assignment to the note's case file patient.
 
 ---
 
 # Documents
 
 The `documents` module supports metadata management, physical file upload, secure download and inline preview.
+
+POST-GO-LIVE.2.1D2: Documents are tenant-required and tenant-aware. Access
+requires valid tenant context, active membership, active organization, explicit
+document capability, active same-tenant `PatientAssignment`, and the temporary
+legacy psychologist restriction. Legacy documents with `organizationId = null`
+are excluded. Blob routes authorize metadata before filesystem access.
 
 ## Allowed File Types
 
@@ -703,14 +734,13 @@ multipart/form-data
 * Preserves `fileName` with the original filename.
 * Stores `filePath` as a relative path.
 * Uses the structure `patients/{patientId}/{uuid}.{ext}`.
-* Sets `uploadedById` from the authenticated JWT user.
+* Sets `organizationId` and `uploadedById` from the validated request context.
 * Legacy clients may still send `uploadedById`, but the backend ignores it.
 
 ### Ownership
 
-* `ADMIN` can upload to any accessible case file.
-* `PSYCHOLOGIST` must own the case file.
-* For every role, `uploadedById` is replaced with `user.id`.
+* Requires `document.upload`.
+* Requires active same-tenant assignment to the case file patient.
 
 ---
 
@@ -736,9 +766,9 @@ Bearer Token required.
 
 ### Ownership
 
-* `ADMIN` can use `uploadedById` from the body.
-* `PSYCHOLOGIST` must own the case file.
-* For `PSYCHOLOGIST`, `uploadedById` is replaced with `user.id`.
+* Requires `document.upload`.
+* Requires active same-tenant assignment to the case file patient.
+* `uploadedById` is always replaced with the authenticated user ID.
 
 ### Note
 
@@ -756,8 +786,8 @@ Bearer Token required.
 
 ### Ownership
 
-* `ADMIN` sees all documents.
-* `PSYCHOLOGIST` only sees documents from case files of owned patients.
+* Requires `document.metadata_read`.
+* Returns only documents for assigned case files in the selected tenant.
 
 ---
 
@@ -775,8 +805,8 @@ Bearer Token required.
 
 ### Ownership
 
-* `ADMIN` can access any case file documents.
-* `PSYCHOLOGIST` can only access documents if the case file belongs to one of their patients.
+* Requires `document.metadata_read`.
+* Requires active same-tenant assignment to the case file patient.
 
 ---
 
@@ -794,8 +824,8 @@ Bearer Token required.
 
 ### Ownership
 
-* `ADMIN` can access any document.
-* `PSYCHOLOGIST` can only access documents from case files of owned patients.
+* Requires `document.metadata_read`.
+* Requires active same-tenant assignment to the document's case file patient.
 
 ---
 
@@ -814,9 +844,11 @@ Bearer Token required.
 ### Behavior
 
 * Finds document metadata by ID.
-* Validates ownership before accessing the filesystem.
+* Requires `document.download` and validates tenant assignment before accessing
+  the filesystem.
 * Validates that the physical file exists.
 * Resolves the file path from `UPLOADS_PATH` or `uploads`.
+* Confines the path to `patients/{patientId}/...` under the upload root.
 * Responds with `Content-Disposition: attachment`.
 * Uses the original `fileName` as download filename.
 * Uses `mimeType` as `Content-Type`.
@@ -839,9 +871,11 @@ Bearer Token required.
 ### Behavior
 
 * Finds document metadata by ID.
-* Validates ownership before accessing the filesystem.
+* Requires `document.download` and validates tenant assignment before accessing
+  the filesystem.
 * Validates that the physical file exists.
 * Resolves the file path from `UPLOADS_PATH` or `uploads`.
+* Confines the path to `patients/{patientId}/...` under the upload root.
 * Responds with `Content-Disposition: inline`.
 * Uses `mimeType` as `Content-Type`.
 * Blocks path traversal.
@@ -879,8 +913,8 @@ Bearer Token required.
 
 ### Ownership
 
-* `ADMIN` can update any document.
-* `PSYCHOLOGIST` can only update documents from case files of owned patients.
+* Requires `document.update`.
+* Requires active same-tenant assignment to the document's case file patient.
 
 ---
 
@@ -898,13 +932,13 @@ Bearer Token required.
 
 ### Behavior
 
-* Deletes only the database record.
-* Does not delete the physical file from disk.
+* Deletes the database record first.
+* Attempts sanitized best-effort physical cleanup after metadata deletion.
 
 ### Ownership
 
-* `ADMIN` can delete any document.
-* `PSYCHOLOGIST` can only delete documents from case files of owned patients.
+* Requires `document.delete`.
+* Requires active same-tenant assignment to the document's case file patient.
 
 ---
 
@@ -1298,7 +1332,8 @@ The following items should be reviewed in future backend sprints:
 * Add pagination contract for list endpoints.
 * Add search/filter query parameters.
 * Decide whether `POST /documents` should remain available.
-* Decide whether `DELETE /documents/:id` should also delete the physical file.
+* Decide whether document physical cleanup should remain best-effort or move to
+  an explicit storage lifecycle/audit workflow.
 * Decide whether `GET /` should remain a legacy greeting or be replaced by the health/status payload in a future release.
 
 ## Tenant Context Selection
@@ -1313,18 +1348,19 @@ exists.
 
 If no header is sent, a user with one eligible membership is resolved
 automatically. A user with several eligible memberships must make an explicit
-selection. Existing clinical endpoints remain tenant-optional in this phase and
-retain their legacy ownership behavior, except for the Patients pilot. Patients
-requires a resolved context and continues to apply its separate legacy
-psychologist ownership condition; all other clinical modules remain legacy
-until 2.1D.
+selection. Patients, Case Files, Workspace, Session Notes, and Documents now
+require a resolved context and continue to apply the temporary legacy
+psychologist ownership condition. Appointments and financial modules remain
+legacy until their approved 2.1D phase.
 
 ## POST-GO-LIVE.2.1D0 clinical and financial conversion contract
 
-`POST_GO_LIVE_2_1D0_TENANT_CONVERSION_CONTRACT.md` defines the future
-documentation-only contract for converting Patients, Case Files, Workspace,
-Session Notes, Documents, Appointments, Financial Transactions, and Financial
-Summary during 2.1D. It does not change the current routes documented above.
+`POST_GO_LIVE_2_1D0_TENANT_CONVERSION_CONTRACT.md` defines the conversion
+contract for Patients, Case Files, Workspace, Session Notes, Documents,
+Appointments, Financial Transactions, and Financial Summary during 2.1D.
+Patients were converted in D1. Case Files, Workspace, Session Notes, and
+Documents were converted in D2. Appointments, Financial Transactions, and
+Financial Summary remain pending.
 
 For D1 through D3, converted DTOs must not accept `organizationId`; the server
 derives tenant scope from the validated request context. Clinical content will

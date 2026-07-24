@@ -64,6 +64,22 @@ Conditional patient capability is accepted only for the module-approved
 assigned `PSYCHOLOGIST` policy. `AUDITOR` and `READ_ONLY` remain denied for
 patient clinical/personal projections in 2.1D1.
 
+### POST-GO-LIVE.2.1D2 clinical core and documents runtime status
+
+Case Files, Workspace, Session Notes, and Documents now implement the D0
+domain-specific capability names locally: `case_file.*`, `workspace.read`,
+`session_note.*`, and `document.metadata_read`, `document.upload`,
+`document.download`, `document.update`, `document.delete`. These capabilities
+are still not sufficient by themselves for clinical content: each converted
+service also requires resolved tenant context, active membership, active
+organization, active same-tenant assignment, and the temporary legacy
+psychologist restriction.
+
+`OWNER` and `ADMIN` capability eligibility does not bypass clinical assignment.
+`AUDITOR` and `READ_ONLY` continue to receive no clinical content, session
+notes, document metadata, document blob download, or redacted clinical
+projection during 2.1D2.
+
 ## POST-GO-LIVE.2.1C0 approved contract — invitation and membership mutations
 
 This table is an approved 2.1C0 contract, not a runtime grant. The typed catalog

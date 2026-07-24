@@ -2,6 +2,38 @@
 
 ---
 
+# POST-GO-LIVE.2.1D2 Clinical Core and Documents Tenant Conversion
+
+## Changed
+
+* Aligned Case Files, Workspace, Session Notes, and Documents/blob access with
+  the 2.1D0 tenant-aware policy: resolved tenant context, active membership,
+  active organization, explicit domain capability, active clinical assignment,
+  and temporary legacy psychologist restriction.
+* Converted direct, list, relationship, workspace, metadata, download, update,
+  and delete flows to scope by `organizationId` and exclude legacy
+  `organizationId = NULL` records.
+* Session note and document creation/update ignore server-owned tenant and
+  actor fields from request payloads and derive them from the validated
+  request context.
+* Document blob access now authorizes metadata before filesystem access and
+  constrains physical paths to the assigned patient folder; document deletes
+  remove metadata first and then run sanitized best-effort blob cleanup.
+
+## Security Notes
+
+* Cross-tenant and legacy-null direct resources return redacted `404`.
+* Visible in-tenant clinical resources without active assignment return `403`.
+* `OWNER` and `ADMIN` do not bypass clinical assignment.
+* `AUDITOR` and `READ_ONLY` receive no clinical core or document projection in
+  this phase.
+
+## Compatibility
+
+* No Prisma schema change, migration, seed, frontend change, production data
+  access, deployment, Appointments, Financial Transactions, Financial Summary,
+  or D3 conversion was introduced.
+
 # POST-GO-LIVE.2.1D1 Patients Tenant Policy Alignment
 
 ## Changed

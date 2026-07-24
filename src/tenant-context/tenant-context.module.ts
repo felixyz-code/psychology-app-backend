@@ -3,6 +3,7 @@ import { RequestContextService } from '../common/request-context/request-context
 import { CapabilitiesGuard } from './authorization/capabilities.guard';
 import { CapabilityResolverService } from './authorization/capability-resolver.service';
 import { OrganizationPolicyService } from './authorization/organization-policy.service';
+import { ClinicalAccessPolicyService } from './clinical-access-policy.service';
 import { TenantContextGuard } from './guards/tenant-context.guard';
 import { TenantObservabilityService } from './tenant-observability.service';
 import { TenantResolverService } from './tenant-resolver.service';
@@ -15,6 +16,7 @@ import { TenantResolverService } from './tenant-resolver.service';
     TenantObservabilityService,
     CapabilityResolverService,
     OrganizationPolicyService,
+    ClinicalAccessPolicyService,
     CapabilitiesGuard,
   ],
   exports: [
@@ -24,6 +26,7 @@ import { TenantResolverService } from './tenant-resolver.service';
     TenantObservabilityService,
     CapabilityResolverService,
     OrganizationPolicyService,
+    ClinicalAccessPolicyService,
     CapabilitiesGuard,
   ],
 })

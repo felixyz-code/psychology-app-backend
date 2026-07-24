@@ -1,67 +1,94 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { UserRole } from '@prisma/client';
-import { AuthenticatedUser } from '../auth/types/authenticated-user.type';
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { ClinicalAccessPolicyService } from '../tenant-context/clinical-access-policy.service';
+import type { ClinicalAccessScope } from '../tenant-context/clinical-access.types';
+import { OrganizationCapability } from '../tenant-context/authorization/organization-capability';
 import { CreateSessionNoteDto } from './dto/create-session-note.dto';
 import { UpdateSessionNoteDto } from './dto/update-session-note.dto';
 
 @Injectable()
 export class SessionNotesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly clinicalPolicy: ClinicalAccessPolicyService,
+  ) {}
 
   async create(
     createSessionNoteDto: CreateSessionNoteDto,
-    user: AuthenticatedUser,
+    scope: ClinicalAccessScope,
   ) {
-    await this.getAccessibleCaseFileOrThrow(
+    const caseFile = await this.getVisibleCaseFileOrThrow(
       createSessionNoteDto.caseFileId,
-      user,
+      scope,
     );
-
-    const authorId = this.isAdmin(user)
-      ? createSessionNoteDto.authorId
-      : user.id;
-
-    if (this.isAdmin(user)) {
-      await this.ensureAuthorExists(authorId);
-    }
+    this.clinicalPolicy.requireCapability(
+      scope,
+      OrganizationCapability.SESSION_NOTE_CREATE,
+      'session_notes.create',
+    );
+    await this.requireAssignment(caseFile.patientId, scope);
 
     return this.prisma.sessionNote.create({
       data: {
-        ...createSessionNoteDto,
-        authorId,
+        ...this.withoutServerFields(createSessionNoteDto),
+        organizationId: scope.organizationId,
+        authorId: scope.userId,
       },
     });
   }
 
-  findAll(user: AuthenticatedUser) {
+  findAll(scope: ClinicalAccessScope) {
+    this.clinicalPolicy.requireCapability(
+      scope,
+      OrganizationCapability.SESSION_NOTE_READ,
+      'session_notes.find_all',
+    );
+
     return this.prisma.sessionNote.findMany({
-      where: this.isAdmin(user)
-        ? undefined
-        : {
-            caseFile: {
-              patient: {
-                psychologistId: user.id,
-              },
-            },
-          },
+      where: {
+        organizationId: scope.organizationId,
+        caseFile: {
+          organizationId: scope.organizationId,
+          patient: this.clinicalPolicy.assignedPatientWhere(scope),
+        },
+      },
       orderBy: {
         sessionDate: 'desc',
       },
     });
   }
 
-  async findOne(id: string, user: AuthenticatedUser) {
-    const sessionNote = await this.getAccessibleSessionNoteOrThrow(id, user);
+  async findOne(id: string, scope: ClinicalAccessScope) {
+    const sessionNote = await this.getVisibleSessionNoteOrThrow(id, scope);
+    this.clinicalPolicy.requireCapability(
+      scope,
+      OrganizationCapability.SESSION_NOTE_READ,
+      'session_notes.find_one',
+    );
+    await this.requireAssignment(sessionNote.caseFile.patientId, scope);
 
-    return sessionNote;
+    return stripSessionNoteRelations(sessionNote);
   }
 
-  async findByCaseFileId(caseFileId: string, user: AuthenticatedUser) {
-    await this.getAccessibleCaseFileOrThrow(caseFileId, user);
+  async findByCaseFileId(caseFileId: string, scope: ClinicalAccessScope) {
+    const caseFile = await this.getVisibleCaseFileOrThrow(caseFileId, scope);
+    this.clinicalPolicy.requireCapability(
+      scope,
+      OrganizationCapability.SESSION_NOTE_READ,
+      'session_notes.find_by_case_file',
+    );
+    await this.requireAssignment(caseFile.patientId, scope);
 
     return this.prisma.sessionNote.findMany({
-      where: { caseFileId },
+      where: {
+        caseFileId,
+        organizationId: scope.organizationId,
+      },
       orderBy: {
         sessionDate: 'desc',
       },
@@ -71,84 +98,165 @@ export class SessionNotesService {
   async update(
     id: string,
     updateSessionNoteDto: UpdateSessionNoteDto,
-    user: AuthenticatedUser,
+    scope: ClinicalAccessScope,
   ) {
-    await this.getAccessibleSessionNoteOrThrow(id, user);
+    const sessionNote = await this.getVisibleSessionNoteOrThrow(id, scope);
+    this.clinicalPolicy.requireCapability(
+      scope,
+      OrganizationCapability.SESSION_NOTE_UPDATE,
+      'session_notes.update',
+    );
+    await this.requireAssignment(sessionNote.caseFile.patientId, scope);
 
-    return this.prisma.sessionNote.update({
-      where: { id },
-      data: updateSessionNoteDto,
+    const result = await this.prisma.sessionNote.updateMany({
+      where: {
+        id,
+        organizationId: scope.organizationId,
+        caseFile: {
+          organizationId: scope.organizationId,
+          patient: this.clinicalPolicy.assignedPatientWhere(scope),
+        },
+      },
+      data: this.withoutServerFields(updateSessionNoteDto),
     });
+
+    if (result.count !== 1) {
+      throw this.sessionNoteNotFound();
+    }
+
+    return this.getAssignedSessionNoteOrThrow(id, scope);
   }
 
-  async remove(id: string, user: AuthenticatedUser) {
-    await this.getAccessibleSessionNoteOrThrow(id, user);
+  async remove(id: string, scope: ClinicalAccessScope) {
+    const sessionNote = await this.getVisibleSessionNoteOrThrow(id, scope);
+    this.clinicalPolicy.requireCapability(
+      scope,
+      OrganizationCapability.SESSION_NOTE_DELETE,
+      'session_notes.remove',
+    );
+    await this.requireAssignment(sessionNote.caseFile.patientId, scope);
 
-    return this.prisma.sessionNote.delete({
-      where: { id },
+    const result = await this.prisma.sessionNote.deleteMany({
+      where: {
+        id,
+        organizationId: scope.organizationId,
+        caseFile: {
+          organizationId: scope.organizationId,
+          patient: this.clinicalPolicy.assignedPatientWhere(scope),
+        },
+      },
     });
+
+    if (result.count !== 1) {
+      throw this.sessionNoteNotFound();
+    }
+
+    return stripSessionNoteRelations(sessionNote);
   }
 
-  private isAdmin(user: AuthenticatedUser) {
-    return user.role === UserRole.ADMIN;
-  }
-
-  private async getAccessibleCaseFileOrThrow(
+  private async getVisibleCaseFileOrThrow(
     caseFileId: string,
-    user: AuthenticatedUser,
+    scope: ClinicalAccessScope,
   ) {
-    const caseFile = this.isAdmin(user)
-      ? await this.prisma.caseFile.findUnique({ where: { id: caseFileId } })
-      : await this.prisma.caseFile.findFirst({
-          where: {
-            id: caseFileId,
-            patient: {
-              psychologistId: user.id,
-            },
-          },
-        });
+    const caseFile = await this.prisma.caseFile.findFirst({
+      where: {
+        id: caseFileId,
+        organizationId: scope.organizationId,
+        patient: this.clinicalPolicy.tenantPatientWhere(scope),
+      },
+      select: { id: true, patientId: true },
+    });
 
     if (!caseFile) {
-      throw new NotFoundException(
-        `Case file with id "${caseFileId}" not found`,
-      );
+      throw new NotFoundException('Case file not found');
     }
 
     return caseFile;
   }
 
-  private async getAccessibleSessionNoteOrThrow(
+  private async getVisibleSessionNoteOrThrow(
     id: string,
-    user: AuthenticatedUser,
+    scope: ClinicalAccessScope,
   ) {
-    const sessionNote = this.isAdmin(user)
-      ? await this.prisma.sessionNote.findUnique({ where: { id } })
-      : await this.prisma.sessionNote.findFirst({
-          where: {
-            id,
-            caseFile: {
-              patient: {
-                psychologistId: user.id,
-              },
-            },
-          },
-        });
+    const sessionNote = await this.prisma.sessionNote.findFirst({
+      where: {
+        id,
+        organizationId: scope.organizationId,
+        caseFile: {
+          organizationId: scope.organizationId,
+          patient: this.clinicalPolicy.tenantPatientWhere(scope),
+        },
+      },
+      include: { caseFile: { select: { patientId: true } } },
+    });
 
     if (!sessionNote) {
-      throw new NotFoundException(`Session note with id "${id}" not found`);
+      throw this.sessionNoteNotFound();
     }
 
     return sessionNote;
   }
 
-  private async ensureAuthorExists(authorId: string) {
-    const author = await this.prisma.user.findUnique({
-      where: { id: authorId },
+  private async getAssignedSessionNoteOrThrow(
+    id: string,
+    scope: ClinicalAccessScope,
+  ) {
+    const sessionNote = await this.prisma.sessionNote.findFirst({
+      where: {
+        id,
+        organizationId: scope.organizationId,
+        caseFile: {
+          organizationId: scope.organizationId,
+          patient: this.clinicalPolicy.assignedPatientWhere(scope),
+        },
+      },
+    });
+
+    if (!sessionNote) {
+      throw this.sessionNoteNotFound();
+    }
+
+    return sessionNote;
+  }
+
+  private async requireAssignment(
+    patientId: string,
+    scope: ClinicalAccessScope,
+  ) {
+    const assignment = await this.prisma.patientAssignment.findFirst({
+      where: {
+        ...this.clinicalPolicy.assignmentWhere(scope),
+        patientId,
+        patient: this.clinicalPolicy.tenantPatientWhere(scope),
+      },
       select: { id: true },
     });
 
-    if (!author) {
-      throw new NotFoundException(`User with id "${authorId}" not found`);
+    if (!assignment) {
+      throw new ForbiddenException('Clinical assignment is required');
     }
   }
+
+  private withoutServerFields<T extends object>(
+    dto: T,
+  ): Omit<T, 'organizationId' | 'authorId'> {
+    const noteData = { ...dto };
+    Reflect.deleteProperty(noteData, 'organizationId');
+    Reflect.deleteProperty(noteData, 'authorId');
+    return noteData;
+  }
+
+  private sessionNoteNotFound() {
+    return new NotFoundException('Session note not found');
+  }
+}
+
+type AuthorizedSessionNote = Prisma.SessionNoteGetPayload<{
+  include: { caseFile: { select: { patientId: true } } };
+}>;
+
+function stripSessionNoteRelations(sessionNote: AuthorizedSessionNote) {
+  const metadata = { ...sessionNote };
+  Reflect.deleteProperty(metadata, 'caseFile');
+  return metadata;
 }

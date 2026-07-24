@@ -1,137 +1,251 @@
-import { NotFoundException } from '@nestjs/common';
-import { UserRole } from '@prisma/client';
-import { AuthenticatedUser } from '../auth/types/authenticated-user.type';
+import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import {
+  MembershipRole,
+  MembershipStatus,
+  OrganizationStatus,
+  PatientAssignmentStatus,
+  UserRole,
+} from '@prisma/client';
+import { TenantResolutionMode } from '../common/request-context/request-context.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { ClinicalAccessPolicyService } from '../tenant-context/clinical-access-policy.service';
+import type { ClinicalAccessScope } from '../tenant-context/clinical-access.types';
+import { OrganizationCapability } from '../tenant-context/authorization/organization-capability';
 import { SessionNotesService } from './session-notes.service';
 
 type PrismaMock = {
-  caseFile: { findFirst: jest.Mock; findUnique: jest.Mock };
+  caseFile: { findFirst: jest.Mock };
+  patientAssignment: { findFirst: jest.Mock };
   sessionNote: {
     create: jest.Mock;
-    delete: jest.Mock;
+    deleteMany: jest.Mock;
     findFirst: jest.Mock;
     findMany: jest.Mock;
-    findUnique: jest.Mock;
-    update: jest.Mock;
+    updateMany: jest.Mock;
   };
-  user: { findUnique: jest.Mock };
 };
 
-const admin: AuthenticatedUser = {
-  id: 'admin-id',
-  name: 'Admin',
-  email: 'admin@example.test',
-  role: UserRole.ADMIN,
-};
-const psychologistA: AuthenticatedUser = {
-  id: 'psychologist-a-id',
-  name: 'Psychologist A',
-  email: 'a@example.test',
-  role: UserRole.PSYCHOLOGIST,
+const scope: ClinicalAccessScope = {
+  organizationId: 'organization-a-id',
+  membershipId: 'membership-a-id',
+  organizationRole: MembershipRole.PSYCHOLOGIST,
+  userId: 'psychologist-a-id',
+  legacyUserRole: UserRole.PSYCHOLOGIST,
+  resolutionMode: TenantResolutionMode.EXPLICIT,
 };
 
-describe('SessionNotesService ownership', () => {
+describe('SessionNotesService D2 tenant-aware policy', () => {
   let service: SessionNotesService;
   let prisma: PrismaMock;
+  let clinicalPolicy: jest.Mocked<
+    Pick<
+      ClinicalAccessPolicyService,
+      | 'requireCapability'
+      | 'tenantPatientWhere'
+      | 'assignedPatientWhere'
+      | 'assignmentWhere'
+    >
+  >;
 
   beforeEach(() => {
     prisma = {
-      caseFile: { findFirst: jest.fn(), findUnique: jest.fn() },
+      caseFile: { findFirst: jest.fn() },
+      patientAssignment: { findFirst: jest.fn() },
       sessionNote: {
         create: jest.fn(),
-        delete: jest.fn(),
+        deleteMany: jest.fn(),
         findFirst: jest.fn(),
         findMany: jest.fn(),
-        findUnique: jest.fn(),
-        update: jest.fn(),
+        updateMany: jest.fn(),
       },
-      user: { findUnique: jest.fn() },
     };
-    service = new SessionNotesService(prisma as unknown as PrismaService);
+    clinicalPolicy = {
+      requireCapability: jest.fn(),
+      tenantPatientWhere: jest.fn(tenantPatientWhere),
+      assignedPatientWhere: jest.fn(assignedPatientWhere),
+      assignmentWhere: jest.fn(assignmentWhere),
+    };
+    service = new SessionNotesService(
+      prisma as unknown as PrismaService,
+      clinicalPolicy as unknown as ClinicalAccessPolicyService,
+    );
   });
 
-  it('filters lists through case file and patient ownership', async () => {
+  it('lists only notes attached to assigned case files in the active tenant', async () => {
     prisma.sessionNote.findMany.mockResolvedValue([]);
 
-    await service.findAll(psychologistA);
+    await service.findAll(scope);
 
+    expect(clinicalPolicy.requireCapability).toHaveBeenCalledWith(
+      scope,
+      OrganizationCapability.SESSION_NOTE_READ,
+      'session_notes.find_all',
+    );
     expect(prisma.sessionNote.findMany).toHaveBeenCalledWith({
-      where: { caseFile: { patient: { psychologistId: psychologistA.id } } },
+      where: {
+        organizationId: scope.organizationId,
+        caseFile: {
+          organizationId: scope.organizationId,
+          patient: assignedPatientWhere(scope),
+        },
+      },
       orderBy: { sessionDate: 'desc' },
     });
   });
 
-  it('prevents creating a note under psychologist B case file', async () => {
-    prisma.caseFile.findFirst.mockResolvedValue(null);
+  it('creates with server-side organizationId and authorId after assignment', async () => {
+    const sessionDate = new Date('2026-01-01T00:00:00.000Z');
+    prisma.caseFile.findFirst.mockResolvedValue({
+      id: 'case-file-id',
+      patientId: 'patient-a-id',
+    });
+    prisma.patientAssignment.findFirst.mockResolvedValue({
+      id: 'assignment-id',
+    });
+    prisma.sessionNote.create.mockResolvedValue({ id: 'note-id' });
 
-    await expect(
-      service.create(
-        {
-          caseFileId: 'case-file-b-id',
-          authorId: 'psychologist-b-id',
-          content: 'test',
-          sessionDate: new Date(),
-        },
-        psychologistA,
-      ),
-    ).rejects.toBeInstanceOf(NotFoundException);
+    await service.create(
+      {
+        caseFileId: 'case-file-id',
+        authorId: 'attacker-id',
+        organizationId: 'organization-b-id',
+        content: 'Clinical content',
+        sessionDate,
+      } as never,
+      scope,
+    );
 
     expect(prisma.caseFile.findFirst).toHaveBeenCalledWith({
       where: {
-        id: 'case-file-b-id',
-        patient: { psychologistId: psychologistA.id },
+        id: 'case-file-id',
+        organizationId: scope.organizationId,
+        patient: tenantPatientWhere(scope),
+      },
+      select: { id: true, patientId: true },
+    });
+    expect(prisma.sessionNote.create).toHaveBeenCalledWith({
+      data: {
+        caseFileId: 'case-file-id',
+        content: 'Clinical content',
+        sessionDate,
+        organizationId: scope.organizationId,
+        authorId: scope.userId,
       },
     });
-    expect(prisma.sessionNote.create).not.toHaveBeenCalled();
   });
 
-  it('returns 404 and does not update or delete note B', async () => {
+  it('returns redacted 404 for cross-tenant direct note access before capability checks', async () => {
     prisma.sessionNote.findFirst.mockResolvedValue(null);
 
-    await expect(
-      service.findOne('note-b-id', psychologistA),
-    ).rejects.toBeInstanceOf(NotFoundException);
-    await expect(
-      service.update('note-b-id', { title: 'Changed' }, psychologistA),
-    ).rejects.toBeInstanceOf(NotFoundException);
-    await expect(
-      service.remove('note-b-id', psychologistA),
-    ).rejects.toBeInstanceOf(NotFoundException);
+    await expect(service.findOne('note-b-id', scope)).rejects.toEqual(
+      new NotFoundException('Session note not found'),
+    );
+    expect(clinicalPolicy.requireCapability).not.toHaveBeenCalled();
+  });
 
-    expect(prisma.sessionNote.findFirst).toHaveBeenCalledWith({
+  it('returns 403 when a visible note lacks active assignment', async () => {
+    prisma.sessionNote.findFirst.mockResolvedValue(noteWithRelation());
+    prisma.patientAssignment.findFirst.mockResolvedValue(null);
+
+    await expect(service.findOne('note-id', scope)).rejects.toEqual(
+      new ForbiddenException('Clinical assignment is required'),
+    );
+  });
+
+  it('updates only scoped and assigned notes and strips server fields', async () => {
+    prisma.sessionNote.findFirst
+      .mockResolvedValueOnce(noteWithRelation())
+      .mockResolvedValueOnce({ id: 'note-id', title: 'Updated' });
+    prisma.patientAssignment.findFirst.mockResolvedValue({
+      id: 'assignment-id',
+    });
+    prisma.sessionNote.updateMany.mockResolvedValue({ count: 1 });
+
+    await service.update(
+      'note-id',
+      {
+        title: 'Updated',
+        authorId: 'attacker-id',
+        organizationId: 'organization-b-id',
+      } as never,
+      scope,
+    );
+
+    expect(prisma.sessionNote.updateMany).toHaveBeenCalledWith({
       where: {
-        id: 'note-b-id',
-        caseFile: { patient: { psychologistId: psychologistA.id } },
+        id: 'note-id',
+        organizationId: scope.organizationId,
+        caseFile: {
+          organizationId: scope.organizationId,
+          patient: assignedPatientWhere(scope),
+        },
       },
+      data: { title: 'Updated' },
     });
-    expect(prisma.sessionNote.update).not.toHaveBeenCalled();
-    expect(prisma.sessionNote.delete).not.toHaveBeenCalled();
   });
 
-  it('validates case file ownership before listing notes by relation', async () => {
-    prisma.caseFile.findFirst.mockResolvedValue(null);
-
-    await expect(
-      service.findByCaseFileId('case-file-b-id', psychologistA),
-    ).rejects.toBeInstanceOf(NotFoundException);
-    expect(prisma.sessionNote.findMany).not.toHaveBeenCalled();
-  });
-
-  it('keeps admin global access', async () => {
-    prisma.sessionNote.findMany.mockResolvedValue([]);
-    prisma.sessionNote.findUnique.mockResolvedValue({ id: 'note-b-id' });
-
-    await service.findAll(admin);
-    await expect(service.findOne('note-b-id', admin)).resolves.toEqual({
-      id: 'note-b-id',
+  it('deletes by organizationId and assignment and returns metadata only', async () => {
+    prisma.sessionNote.findFirst.mockResolvedValue(noteWithRelation());
+    prisma.patientAssignment.findFirst.mockResolvedValue({
+      id: 'assignment-id',
     });
+    prisma.sessionNote.deleteMany.mockResolvedValue({ count: 1 });
 
-    expect(prisma.sessionNote.findMany).toHaveBeenCalledWith({
-      where: undefined,
-      orderBy: { sessionDate: 'desc' },
+    await expect(service.remove('note-id', scope)).resolves.toEqual({
+      id: 'note-id',
+      caseFileId: 'case-file-id',
+      organizationId: scope.organizationId,
+      authorId: scope.userId,
+      content: 'Clinical content',
     });
-    expect(prisma.sessionNote.findUnique).toHaveBeenCalledWith({
-      where: { id: 'note-b-id' },
+    expect(prisma.sessionNote.deleteMany).toHaveBeenCalledWith({
+      where: {
+        id: 'note-id',
+        organizationId: scope.organizationId,
+        caseFile: {
+          organizationId: scope.organizationId,
+          patient: assignedPatientWhere(scope),
+        },
+      },
     });
   });
 });
+
+function noteWithRelation() {
+  return {
+    id: 'note-id',
+    caseFileId: 'case-file-id',
+    organizationId: scope.organizationId,
+    authorId: scope.userId,
+    content: 'Clinical content',
+    caseFile: { patientId: 'patient-a-id' },
+  };
+}
+
+function tenantPatientWhere(activeScope: ClinicalAccessScope) {
+  return {
+    organizationId: activeScope.organizationId,
+    psychologistId: activeScope.userId,
+  };
+}
+
+function assignmentWhere(activeScope: ClinicalAccessScope) {
+  return {
+    organizationId: activeScope.organizationId,
+    membershipId: activeScope.membershipId,
+    status: PatientAssignmentStatus.ACTIVE,
+    membership: {
+      organizationId: activeScope.organizationId,
+      userId: activeScope.userId,
+      status: MembershipStatus.ACTIVE,
+      organization: { status: OrganizationStatus.ACTIVE },
+    },
+  };
+}
+
+function assignedPatientWhere(activeScope: ClinicalAccessScope) {
+  return {
+    ...tenantPatientWhere(activeScope),
+    assignments: { some: assignmentWhere(activeScope) },
+  };
+}

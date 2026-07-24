@@ -1,190 +1,259 @@
-import { NotFoundException } from '@nestjs/common';
-import { AppointmentStatus, UserRole } from '@prisma/client';
-import { AuthenticatedUser } from '../auth/types/authenticated-user.type';
+import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import {
+  AppointmentStatus,
+  MembershipRole,
+  MembershipStatus,
+  OrganizationStatus,
+  PatientAssignmentStatus,
+  UserRole,
+} from '@prisma/client';
+import { TenantResolutionMode } from '../common/request-context/request-context.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { ClinicalAccessPolicyService } from '../tenant-context/clinical-access-policy.service';
+import type { ClinicalAccessScope } from '../tenant-context/clinical-access.types';
+import { OrganizationCapability } from '../tenant-context/authorization/organization-capability';
 import { CaseFilesService } from './case-files.service';
 import { CaseFileWorkspaceTimelineEventType } from './dto/case-file-workspace-response.dto';
 
 type PrismaMock = {
   caseFile: {
-    findFirst: jest.Mock;
-    findUnique: jest.Mock;
-    findMany: jest.Mock;
     create: jest.Mock;
-    update: jest.Mock;
-  };
-  patient: {
     findFirst: jest.Mock;
-    findUnique: jest.Mock;
+    findMany: jest.Mock;
+    updateMany: jest.Mock;
   };
+  patient: { findFirst: jest.Mock };
+  patientAssignment: { findFirst: jest.Mock };
 };
 
-const psychologist: AuthenticatedUser = {
-  id: 'psychologist-id',
-  name: 'Psychologist',
-  email: 'psychologist@example.com',
-  role: UserRole.PSYCHOLOGIST,
+const scope: ClinicalAccessScope = {
+  organizationId: 'organization-a-id',
+  membershipId: 'membership-a-id',
+  organizationRole: MembershipRole.PSYCHOLOGIST,
+  userId: 'psychologist-a-id',
+  legacyUserRole: UserRole.PSYCHOLOGIST,
+  resolutionMode: TenantResolutionMode.EXPLICIT,
 };
 
-const admin: AuthenticatedUser = {
-  id: 'admin-id',
-  name: 'Admin',
-  email: 'admin@example.com',
-  role: UserRole.ADMIN,
-};
-
-function daysFromNow(days: number) {
-  const date = new Date();
-  date.setDate(date.getDate() + days);
-  return date;
-}
-
-describe('CaseFilesService', () => {
+describe('CaseFilesService D2 tenant-aware policy', () => {
   let service: CaseFilesService;
   let prisma: PrismaMock;
+  let clinicalPolicy: jest.Mocked<
+    Pick<
+      ClinicalAccessPolicyService,
+      | 'requireCapability'
+      | 'tenantPatientWhere'
+      | 'assignedPatientWhere'
+      | 'assignmentWhere'
+    >
+  >;
 
   beforeEach(() => {
     prisma = {
       caseFile: {
-        findFirst: jest.fn(),
-        findUnique: jest.fn(),
-        findMany: jest.fn(),
         create: jest.fn(),
-        update: jest.fn(),
-      },
-      patient: {
         findFirst: jest.fn(),
-        findUnique: jest.fn(),
+        findMany: jest.fn(),
+        updateMany: jest.fn(),
       },
+      patient: { findFirst: jest.fn() },
+      patientAssignment: { findFirst: jest.fn() },
     };
-
-    service = new CaseFilesService(prisma as unknown as PrismaService);
+    clinicalPolicy = {
+      requireCapability: jest.fn(),
+      tenantPatientWhere: jest.fn(tenantPatientWhere),
+      assignedPatientWhere: jest.fn(assignedPatientWhere),
+      assignmentWhere: jest.fn(assignmentWhere),
+    };
+    service = new CaseFilesService(
+      prisma as unknown as PrismaService,
+      clinicalPolicy as unknown as ClinicalAccessPolicyService,
+    );
   });
 
-  it('returns an accessible clinical workspace with summary and timeline', async () => {
-    const caseFileCreatedAt = daysFromNow(-30);
-    const completedAppointmentAt = daysFromNow(-10);
-    const cancelledAppointmentAt = daysFromNow(-2);
-    const futureAppointmentAt = daysFromNow(5);
-    const sessionDate = daysFromNow(-3);
-    const documentUploadedAt = daysFromNow(-1);
-    const updatedAt = daysFromNow(-1);
+  it('lists only assigned case files inside the active tenant', async () => {
+    prisma.caseFile.findMany.mockResolvedValue([]);
 
+    await service.findAll(scope);
+
+    expect(clinicalPolicy.requireCapability).toHaveBeenCalledWith(
+      scope,
+      OrganizationCapability.CASE_FILE_READ,
+      'case_files.find_all',
+    );
+    expect(prisma.caseFile.findMany).toHaveBeenCalledWith({
+      where: {
+        organizationId: scope.organizationId,
+        patient: assignedPatientWhere(scope),
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  });
+
+  it('creates only for an assigned in-tenant patient and stamps organizationId', async () => {
+    prisma.patient.findFirst.mockResolvedValue({ id: 'patient-a-id' });
+    prisma.caseFile.findFirst.mockResolvedValue(null);
+    prisma.caseFile.create.mockResolvedValue({ id: 'case-file-id' });
+
+    await service.create({ patientId: 'patient-a-id' }, scope);
+
+    expect(prisma.patient.findFirst).toHaveBeenCalledWith({
+      where: { id: 'patient-a-id', ...assignedPatientWhere(scope) },
+      select: { id: true },
+    });
+    expect(prisma.caseFile.create).toHaveBeenCalledWith({
+      data: {
+        patientId: 'patient-a-id',
+        organizationId: scope.organizationId,
+      },
+    });
+  });
+
+  it('returns redacted 404 before capability checks for cross-tenant case files', async () => {
+    prisma.caseFile.findFirst.mockResolvedValue(null);
+
+    await expect(service.findOne('case-file-b-id', scope)).rejects.toEqual(
+      new NotFoundException('Case file not found'),
+    );
+    expect(clinicalPolicy.requireCapability).not.toHaveBeenCalled();
+  });
+
+  it('returns 403 when a visible case file has no active assignment', async () => {
     prisma.caseFile.findFirst.mockResolvedValue({
       id: 'case-file-id',
-      patientId: 'patient-id',
-      diagnosis: 'Diagnosis',
-      treatmentPlan: 'Treatment plan',
-      createdAt: caseFileCreatedAt,
-      updatedAt,
-      patient: {
-        id: 'patient-id',
-        firstName: 'Ana',
-        lastName: 'Martinez',
-        email: 'ana@example.com',
-        phoneNumber: '+526621234567',
-        birthDate: null,
-        createdAt: caseFileCreatedAt,
-        updatedAt,
-        appointments: [
+      patientId: 'patient-a-id',
+    });
+    prisma.patientAssignment.findFirst.mockResolvedValue(null);
+
+    await expect(service.findOne('case-file-id', scope)).rejects.toEqual(
+      new ForbiddenException('Clinical assignment is required'),
+    );
+  });
+
+  it('updates through organizationId and active assignment predicates', async () => {
+    prisma.caseFile.findFirst
+      .mockResolvedValueOnce({ id: 'case-file-id', patientId: 'patient-a-id' })
+      .mockResolvedValueOnce({ id: 'case-file-id', diagnosis: 'Updated' });
+    prisma.patientAssignment.findFirst.mockResolvedValue({
+      id: 'assignment-id',
+    });
+    prisma.caseFile.updateMany.mockResolvedValue({ count: 1 });
+
+    await service.update('case-file-id', { diagnosis: 'Updated' }, scope);
+
+    expect(prisma.caseFile.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: 'case-file-id',
+        organizationId: scope.organizationId,
+        patient: assignedPatientWhere(scope),
+      },
+      data: { diagnosis: 'Updated' },
+    });
+  });
+
+  it('scopes workspace relations and builds the tenant-local timeline', async () => {
+    const createdAt = new Date('2026-01-01T00:00:00.000Z');
+    const appointmentAt = new Date('2026-01-02T00:00:00.000Z');
+    const noteAt = new Date('2026-01-03T00:00:00.000Z');
+    const documentAt = new Date('2026-01-04T00:00:00.000Z');
+    prisma.caseFile.findFirst
+      .mockResolvedValueOnce({ id: 'case-file-id', patientId: 'patient-a-id' })
+      .mockResolvedValueOnce({
+        id: 'case-file-id',
+        patientId: 'patient-a-id',
+        diagnosis: null,
+        treatmentPlan: null,
+        createdAt,
+        updatedAt: createdAt,
+        patient: {
+          id: 'patient-a-id',
+          firstName: 'Ana',
+          lastName: 'Martinez',
+          email: null,
+          phoneNumber: null,
+          birthDate: null,
+          createdAt,
+          updatedAt: createdAt,
+          appointments: [
+            {
+              id: 'appointment-id',
+              patientId: 'patient-a-id',
+              psychologistId: scope.userId,
+              scheduledAt: appointmentAt,
+              durationMinutes: 50,
+              status: AppointmentStatus.COMPLETED,
+              notes: 'Completed',
+              createdAt,
+              updatedAt: createdAt,
+            },
+          ],
+        },
+        sessionNotes: [
           {
-            id: 'future-appointment-id',
-            patientId: 'patient-id',
-            psychologistId: psychologist.id,
-            scheduledAt: futureAppointmentAt,
-            durationMinutes: 50,
-            status: AppointmentStatus.SCHEDULED,
-            notes: 'Next appointment',
-            createdAt: caseFileCreatedAt,
-            updatedAt,
-          },
-          {
-            id: 'cancelled-appointment-id',
-            patientId: 'patient-id',
-            psychologistId: psychologist.id,
-            scheduledAt: cancelledAppointmentAt,
-            durationMinutes: 50,
-            status: AppointmentStatus.CANCELLED,
-            notes: 'Cancelled appointment',
-            createdAt: caseFileCreatedAt,
-            updatedAt,
-          },
-          {
-            id: 'completed-appointment-id',
-            patientId: 'patient-id',
-            psychologistId: psychologist.id,
-            scheduledAt: completedAppointmentAt,
-            durationMinutes: 50,
-            status: AppointmentStatus.COMPLETED,
-            notes: 'Completed appointment',
-            createdAt: caseFileCreatedAt,
-            updatedAt,
+            id: 'note-id',
+            caseFileId: 'case-file-id',
+            authorId: scope.userId,
+            sessionDate: noteAt,
+            title: 'Session',
+            content: 'Content',
+            createdAt,
+            updatedAt: createdAt,
           },
         ],
-      },
-      sessionNotes: [
-        {
-          id: 'session-note-id',
-          caseFileId: 'case-file-id',
-          authorId: psychologist.id,
-          sessionDate,
-          title: 'Clinical session',
-          content: 'Session content',
-          createdAt: daysFromNow(-20),
-          updatedAt,
-        },
-      ],
-      documents: [
-        {
-          id: 'document-id',
-          caseFileId: 'case-file-id',
-          uploadedById: psychologist.id,
-          fileName: 'consent.pdf',
-          filePath: 'uploads/patients/patient-id/consent.pdf',
-          mimeType: 'application/pdf',
-          uploadedAt: documentUploadedAt,
-          updatedAt,
-        },
-      ],
+        documents: [
+          {
+            id: 'document-id',
+            caseFileId: 'case-file-id',
+            uploadedById: scope.userId,
+            fileName: 'consent.pdf',
+            filePath: 'uploads/patients/patient-a-id/consent.pdf',
+            mimeType: 'application/pdf',
+            uploadedAt: documentAt,
+            updatedAt: createdAt,
+          },
+        ],
+      });
+    prisma.patientAssignment.findFirst.mockResolvedValue({
+      id: 'assignment-id',
     });
 
-    const result = await service.findWorkspace('case-file-id', psychologist);
+    const result = await service.findWorkspace('case-file-id', scope);
 
-    expect(prisma.caseFile.findFirst).toHaveBeenCalledWith(
+    expect(prisma.caseFile.findFirst).toHaveBeenLastCalledWith(
       expect.objectContaining({
         where: {
           id: 'case-file-id',
-          patient: {
-            psychologistId: psychologist.id,
-          },
+          organizationId: scope.organizationId,
+          patient: assignedPatientWhere(scope),
         },
       }),
     );
-    expect(result.caseFile).toEqual({
-      id: 'case-file-id',
-      patientId: 'patient-id',
-      diagnosis: 'Diagnosis',
-      treatmentPlan: 'Treatment plan',
-      createdAt: caseFileCreatedAt,
-      updatedAt,
+    const caseFileFindFirstCalls = prisma.caseFile.findFirst.mock
+      .calls as Array<[unknown]>;
+    const workspaceQuery = caseFileFindFirstCalls.at(-1)?.[0] as
+      | {
+          select: {
+            patient: { select: { appointments: { where: object } } };
+            sessionNotes: { where: object };
+            documents: { where: object };
+          };
+        }
+      | undefined;
+    expect(workspaceQuery?.select.patient.select.appointments.where).toEqual({
+      organizationId: scope.organizationId,
     });
-    expect(result.patient).toEqual({
-      id: 'patient-id',
-      firstName: 'Ana',
-      lastName: 'Martinez',
-      email: 'ana@example.com',
-      phoneNumber: '+526621234567',
-      birthDate: null,
-      createdAt: caseFileCreatedAt,
-      updatedAt,
+    expect(workspaceQuery?.select.sessionNotes.where).toEqual({
+      organizationId: scope.organizationId,
     });
-    expect(result.summary).toEqual({
-      appointmentsCount: 3,
+    expect(workspaceQuery?.select.documents.where).toEqual({
+      organizationId: scope.organizationId,
+    });
+    expect(result.summary).toMatchObject({
+      appointmentsCount: 1,
       sessionNotesCount: 1,
       documentsCount: 1,
-      lastActivityAt: documentUploadedAt,
-      nextAppointmentAt: futureAppointmentAt,
-      lastAppointmentAt: completedAppointmentAt,
+      lastActivityAt: documentAt,
+      lastAppointmentAt: appointmentAt,
     });
     expect(result.timeline.map((event) => event.type)).toEqual([
       CaseFileWorkspaceTimelineEventType.DOCUMENT_UPLOADED,
@@ -193,97 +262,32 @@ describe('CaseFilesService', () => {
       CaseFileWorkspaceTimelineEventType.CASE_FILE_CREATED,
     ]);
   });
-
-  it('returns 404 for an inaccessible psychologist workspace', async () => {
-    prisma.caseFile.findFirst.mockResolvedValue(null);
-
-    await expect(
-      service.findWorkspace('foreign-case-file-id', psychologist),
-    ).rejects.toThrow(NotFoundException);
-  });
-
-  it('uses admin-wide access for workspace lookup', async () => {
-    prisma.caseFile.findUnique.mockResolvedValue({
-      id: 'case-file-id',
-      patientId: 'patient-id',
-      diagnosis: null,
-      treatmentPlan: null,
-      createdAt: daysFromNow(-1),
-      updatedAt: daysFromNow(-1),
-      patient: {
-        id: 'patient-id',
-        firstName: 'Ana',
-        lastName: 'Martinez',
-        email: null,
-        phoneNumber: null,
-        birthDate: null,
-        createdAt: daysFromNow(-1),
-        updatedAt: daysFromNow(-1),
-        appointments: [],
-      },
-      sessionNotes: [],
-      documents: [],
-    });
-
-    await service.findWorkspace('case-file-id', admin);
-
-    expect(prisma.caseFile.findUnique).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { id: 'case-file-id' },
-      }),
-    );
-    expect(prisma.caseFile.findFirst).not.toHaveBeenCalled();
-  });
-
-  it('prevents psychologist A from creating a case file for patient B', async () => {
-    prisma.patient.findFirst.mockResolvedValue(null);
-
-    await expect(
-      service.create({ patientId: 'patient-b-id' }, psychologist),
-    ).rejects.toThrow(NotFoundException);
-
-    expect(prisma.patient.findFirst).toHaveBeenCalledWith({
-      where: { id: 'patient-b-id', psychologistId: psychologist.id },
-    });
-    expect(prisma.caseFile.create).not.toHaveBeenCalled();
-  });
-
-  it('filters lists through the owning patient relation', async () => {
-    prisma.caseFile.findMany.mockResolvedValue([]);
-
-    await service.findAll(psychologist);
-
-    expect(prisma.caseFile.findMany).toHaveBeenCalledWith({
-      where: { patient: { psychologistId: psychologist.id } },
-      orderBy: { createdAt: 'desc' },
-    });
-  });
-
-  it('returns 404 and does not update a case file B', async () => {
-    prisma.caseFile.findFirst.mockResolvedValue(null);
-
-    await expect(
-      service.findOne('case-file-b-id', psychologist),
-    ).rejects.toThrow(NotFoundException);
-    await expect(
-      service.update('case-file-b-id', { diagnosis: 'changed' }, psychologist),
-    ).rejects.toThrow(NotFoundException);
-
-    expect(prisma.caseFile.findFirst).toHaveBeenCalledWith({
-      where: {
-        id: 'case-file-b-id',
-        patient: { psychologistId: psychologist.id },
-      },
-    });
-    expect(prisma.caseFile.update).not.toHaveBeenCalled();
-  });
-
-  it('validates patient ownership before resolving the case file by patient ID', async () => {
-    prisma.patient.findFirst.mockResolvedValue(null);
-
-    await expect(
-      service.findByPatientId('patient-b-id', psychologist),
-    ).rejects.toThrow(NotFoundException);
-    expect(prisma.caseFile.findUnique).not.toHaveBeenCalled();
-  });
 });
+
+function tenantPatientWhere(activeScope: ClinicalAccessScope) {
+  return {
+    organizationId: activeScope.organizationId,
+    psychologistId: activeScope.userId,
+  };
+}
+
+function assignmentWhere(activeScope: ClinicalAccessScope) {
+  return {
+    organizationId: activeScope.organizationId,
+    membershipId: activeScope.membershipId,
+    status: PatientAssignmentStatus.ACTIVE,
+    membership: {
+      organizationId: activeScope.organizationId,
+      userId: activeScope.userId,
+      status: MembershipStatus.ACTIVE,
+      organization: { status: OrganizationStatus.ACTIVE },
+    },
+  };
+}
+
+function assignedPatientWhere(activeScope: ClinicalAccessScope) {
+  return {
+    ...tenantPatientWhere(activeScope),
+    assignments: { some: assignmentWhere(activeScope) },
+  };
+}
