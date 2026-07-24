@@ -174,7 +174,11 @@ export class PatientsController {
   ): PatientAccessScope {
     return {
       organizationId: tenant.organizationId,
-      psychologistId: user.id,
+      membershipId: tenant.membershipId,
+      organizationRole: tenant.organizationRole,
+      userId: user.id,
+      legacyUserRole: tenant.legacyUserRole,
+      resolutionMode: tenant.resolutionMode,
     };
   }
 }

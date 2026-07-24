@@ -24,7 +24,11 @@ const tenant: TenantContext = {
 };
 const expectedScope = {
   organizationId: tenant.organizationId,
-  psychologistId: user.id,
+  membershipId: tenant.membershipId,
+  organizationRole: tenant.organizationRole,
+  userId: user.id,
+  legacyUserRole: tenant.legacyUserRole,
+  resolutionMode: tenant.resolutionMode,
 };
 
 describe('PatientsController tenant-aware scope', () => {
