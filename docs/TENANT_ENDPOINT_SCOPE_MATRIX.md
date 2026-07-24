@@ -25,27 +25,27 @@
 | POST | `/organization-invitations/:token/reject` | Invitations | No tenant selection | Authenticated recipient binding | Redacted 404 | 2.1C0 contract approved; no route | 2.1C2 after 2.1C1 |
 | PATCH | `/organizations/:organizationId/memberships/:membershipId` | Memberships | Yes | Role/suspend/reactivate capability | Target must be same tenant and preserve owner invariant | 404 | 2.1C0 contract approved; no route | 2.1C2 after 2.1C1 |
 | DELETE | `/organizations/:organizationId/memberships/:membershipId` | Memberships | Yes | `membership.remove` or `membership.leave` | Explicit administrative remove vs self-leave | 404 | 2.1C0 contract approved; no route | 2.1C2 after 2.1C1 |
-| POST | `/case-files` | Case files | Target yes | `clinical.write` | Patient tenant + assignment | 404 | Legacy global/psychologist | 2.1D |
-| GET | `/case-files` | Case files | Target yes | `clinical.read` | Tenant + assignment | Empty list | Legacy global/psychologist | 2.1D |
-| GET | `/case-files/patient/:patientId` | Case files | Target yes | `clinical.read` | Patient tenant + assignment | 404 | Legacy global/psychologist | 2.1D |
-| GET | `/case-files/:id` | Case files | Target yes | `clinical.read` | Case file tenant + assignment | 404 | Legacy global/psychologist | 2.1D |
-| PATCH | `/case-files/:id` | Case files | Target yes | `clinical.write` | Case file tenant + assignment | 404 | Legacy global/psychologist | 2.1D |
-| GET | `/case-files/:id/workspace` | Workspace | Target yes | `clinical.read`, `appointment.read`, `document.read` | All included relations scoped | 404 | Legacy global/psychologist | 2.1D |
-| POST | `/session-notes` | Session notes | Target yes | `clinical.write` | Case file tenant + assignment | 404 | Legacy global/psychologist | 2.1D |
-| GET | `/session-notes` | Session notes | Target yes | `clinical.read` | Tenant + assignment | Empty list | Legacy global/psychologist | 2.1D |
-| GET | `/session-notes/case-file/:caseFileId` | Session notes | Target yes | `clinical.read` | Case file tenant + assignment | 404 | Legacy global/psychologist | 2.1D |
-| GET | `/session-notes/:id` | Session notes | Target yes | `clinical.read` | Note tenant + assignment | 404 | Legacy global/psychologist | 2.1D |
-| PATCH | `/session-notes/:id` | Session notes | Target yes | `clinical.write` | Note tenant + assignment | 404 | Legacy global/psychologist | 2.1D |
-| DELETE | `/session-notes/:id` | Session notes | Target yes | `clinical.write` | Note tenant + assignment | 404 | Legacy global/psychologist | 2.1D |
-| POST | `/documents/upload` | Documents | Target yes | `document.upload` | Case file tenant + assignment | 404 | Legacy global/psychologist | 2.1D |
-| POST | `/documents` | Documents | Target yes | `document.upload` | Case file tenant + assignment | 404 | Legacy global/psychologist | 2.1D |
-| GET | `/documents` | Documents | Target yes | `document.read` | Tenant + assignment | Empty list | Legacy global/psychologist | 2.1D |
-| GET | `/documents/case-file/:caseFileId` | Documents | Target yes | `document.read` | Case file tenant + assignment | 404 | Legacy global/psychologist | 2.1D |
-| GET | `/documents/:id` | Documents | Target yes | `document.read` | Document tenant + assignment | 404 | Legacy global/psychologist | 2.1D |
-| GET | `/documents/:id/view` | Documents | Target yes | `document.read` | Metadata before filesystem | 404 | Legacy global/psychologist | 2.1D |
-| GET | `/documents/:id/download` | Documents | Target yes | `document.read` | Metadata before filesystem | 404 | Legacy global/psychologist | 2.1D |
-| PATCH | `/documents/:id` | Documents | Target yes | `document.upload` | Document tenant + assignment | 404 | Legacy global/psychologist | 2.1D |
-| DELETE | `/documents/:id` | Documents | Target yes | `document.upload` | Document tenant + assignment | 404 | Legacy global/psychologist | 2.1D |
+| POST | `/case-files` | Case files | Yes | `case_file.create` | Patient tenant + active assignment + temporary legacy psychologist restriction | 404 | D2 aligned | Complete in 2.1D2 |
+| GET | `/case-files` | Case files | Yes | `case_file.read` | Tenant + active assignment + temporary legacy psychologist restriction | Empty list | D2 aligned | Complete in 2.1D2 |
+| GET | `/case-files/patient/:patientId` | Case files | Yes | `case_file.read` | Patient tenant + active assignment + temporary legacy psychologist restriction | 404 | D2 aligned | Complete in 2.1D2 |
+| GET | `/case-files/:id` | Case files | Yes | `case_file.read` | Case file tenant + active assignment + temporary legacy psychologist restriction | 404 | D2 aligned | Complete in 2.1D2 |
+| PATCH | `/case-files/:id` | Case files | Yes | `case_file.update` | Case file tenant + active assignment + temporary legacy psychologist restriction | 404 | D2 aligned | Complete in 2.1D2 |
+| GET | `/case-files/:id/workspace` | Workspace | Yes | `workspace.read` | Case file tenant + active assignment; included relations carry `organizationId` predicates | 404 | D2 aligned | Complete in 2.1D2 |
+| POST | `/session-notes` | Session notes | Yes | `session_note.create` | Case file tenant + active assignment + temporary legacy psychologist restriction | 404 | D2 aligned | Complete in 2.1D2 |
+| GET | `/session-notes` | Session notes | Yes | `session_note.read` | Tenant + active assignment + temporary legacy psychologist restriction | Empty list | D2 aligned | Complete in 2.1D2 |
+| GET | `/session-notes/case-file/:caseFileId` | Session notes | Yes | `session_note.read` | Case file tenant + active assignment + temporary legacy psychologist restriction | 404 | D2 aligned | Complete in 2.1D2 |
+| GET | `/session-notes/:id` | Session notes | Yes | `session_note.read` | Note tenant + active assignment + temporary legacy psychologist restriction | 404 | D2 aligned | Complete in 2.1D2 |
+| PATCH | `/session-notes/:id` | Session notes | Yes | `session_note.update` | Note tenant + active assignment + temporary legacy psychologist restriction | 404 | D2 aligned | Complete in 2.1D2 |
+| DELETE | `/session-notes/:id` | Session notes | Yes | `session_note.delete` | Note tenant + active assignment + temporary legacy psychologist restriction | 404 | D2 aligned | Complete in 2.1D2 |
+| POST | `/documents/upload` | Documents | Yes | `document.upload` | Case file tenant + active assignment + temporary legacy psychologist restriction | 404 | D2 aligned | Complete in 2.1D2 |
+| POST | `/documents` | Documents | Yes | `document.upload` | Case file tenant + active assignment + temporary legacy psychologist restriction | 404 | D2 aligned | Complete in 2.1D2 |
+| GET | `/documents` | Documents | Yes | `document.metadata_read` | Tenant + active assignment + temporary legacy psychologist restriction | Empty list | D2 aligned | Complete in 2.1D2 |
+| GET | `/documents/case-file/:caseFileId` | Documents | Yes | `document.metadata_read` | Case file tenant + active assignment + temporary legacy psychologist restriction | 404 | D2 aligned | Complete in 2.1D2 |
+| GET | `/documents/:id` | Documents | Yes | `document.metadata_read` | Document tenant + active assignment + temporary legacy psychologist restriction | 404 | D2 aligned | Complete in 2.1D2 |
+| GET | `/documents/:id/view` | Documents | Yes | `document.download` | Document metadata authorized before filesystem; path constrained to tenant patient folder | 404 | D2 aligned | Complete in 2.1D2 |
+| GET | `/documents/:id/download` | Documents | Yes | `document.download` | Document metadata authorized before filesystem; path constrained to tenant patient folder | 404 | D2 aligned | Complete in 2.1D2 |
+| PATCH | `/documents/:id` | Documents | Yes | `document.update` | Document tenant + active assignment + temporary legacy psychologist restriction | 404 | D2 aligned | Complete in 2.1D2 |
+| DELETE | `/documents/:id` | Documents | Yes | `document.delete` | Document tenant + active assignment + temporary legacy psychologist restriction; metadata delete before best-effort blob cleanup | 404 | D2 aligned | Complete in 2.1D2 |
 | POST | `/appointments` | Appointments | Target yes | `appointment.manage` | Patient/professional same tenant | 404/400 mismatch | Legacy global/psychologist | 2.1D |
 | GET | `/appointments` | Appointments | Target yes | `appointment.read` | Tenant; field minimization | Empty list | Legacy global/psychologist | 2.1D |
 | GET | `/appointments/patient/:patientId` | Appointments | Target yes | `appointment.read` | Patient tenant | 404 | Legacy global/psychologist | 2.1D |

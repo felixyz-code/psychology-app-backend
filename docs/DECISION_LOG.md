@@ -1,5 +1,37 @@
 # Decision Log
 
+## ADR-POST-GO-LIVE.2.1D2: Clinical Core and Documents Tenant Conversion
+
+### Status
+
+Implemented in code and locally unit/type certified for Case Files, Workspace,
+Session Notes, and Documents. PostgreSQL HTTP certification is represented by
+an opt-in `_test` E2E suite and must be executed in a local PostgreSQL
+environment before final D2 closure.
+
+### Decision
+
+Case Files, Workspace, Session Notes, and Documents now enforce the D0
+tenant-aware clinical policy locally. Each converted flow requires resolved
+tenant context, active membership, active organization, explicit
+domain-specific capability, active same-tenant `PatientAssignment`, and the
+temporary legacy `psychologistId` restriction. `organizationId` is the tenant
+isolation boundary and legacy `organizationId = NULL` rows remain invisible.
+
+Workspace projections carry `organizationId` predicates on included
+appointments, session notes, and documents. Session note and document services
+derive `organizationId`, `authorId`, and `uploadedById` server-side. Document
+download and inline view authorize metadata before filesystem access and
+constrain paths to the authorized patient upload folder.
+
+### Boundary
+
+No Prisma schema, migration, seed, production access, deployment, frontend
+change, Appointments conversion, Financial conversion, Financial Summary
+conversion, D3 work, global Prisma middleware, RLS, or backfill is included.
+`OWNER` and `ADMIN` do not bypass assignment. `AUDITOR` and `READ_ONLY` receive
+no clinical core or document projection during this phase.
+
 ## ADR-POST-GO-LIVE.2.1D1: Patients Tenant Policy Alignment
 
 ### Status
