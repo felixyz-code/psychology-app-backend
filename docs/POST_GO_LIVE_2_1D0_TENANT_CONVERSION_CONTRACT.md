@@ -68,6 +68,13 @@ This lets the freelancer administer the organization, invitations, future
 memberships, patients, assignments, case files, session notes, documents,
 appointments, and finances without storing more than one role.
 
+Organization bootstrap remains governed by the approved organization-domain
+flow; D0 does not add a new organization-create endpoint. The D1 through D4
+implementation must not make a single-user tenant impossible: once the
+organization is provisioned or created by the approved flow, the freelancer can
+hold the active `OWNER` membership and operate through capabilities plus
+assignment.
+
 Patient creation must remain explicit and auditable. The preferred D1 contract
 is server-validated self-assignment: the create DTO still does not accept
 `organizationId`; if the endpoint accepts or derives a clinical professional,
@@ -217,6 +224,11 @@ Financial access is controlled by financial capabilities. Clinical assignment
 alone never grants financial access. Every financial aggregate query must carry
 `organizationId`.
 
+Document file access is authorized through tenant-aware metadata before any
+physical blob or filesystem path is opened. A known, guessed, or manipulated
+storage key never grants access without authorized metadata in the selected
+tenant and required assignment.
+
 ## Legacy `organizationId = null`
 
 Tenant-aware endpoints must treat null organization rows as inaccessible:
@@ -352,7 +364,7 @@ Each converted module must cover:
 * invalid tenant context;
 * actor without membership;
 * suspended membership;
-* inactive organization;
+* inactive or suspended organization;
 * missing capability;
 * unknown capability;
 * actor from another tenant;
@@ -368,9 +380,9 @@ Each converted module must cover:
 * sanitized logs.
 
 Freelancer scenarios must cover a single `OWNER` creating a patient, being
-assigned to that patient, reading workspace, creating a note, administering an
-appointment, recording a transaction, and operating through capabilities plus
-assignment without accumulated roles.
+assigned to that patient, reading workspace, creating a note, uploading or
+managing a document, administering an appointment, recording a transaction, and
+operating through capabilities plus assignment without accumulated roles.
 
 Document scenarios must cover cross-tenant metadata, cross-tenant download,
 manipulated storage key, missing blob, metadata without blob, blob without valid
