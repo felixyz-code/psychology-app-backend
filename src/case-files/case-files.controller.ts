@@ -27,6 +27,10 @@ import { UserRole } from '@prisma/client';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import type { AuthenticatedUser } from '../auth/types/authenticated-user.type';
+import { CurrentTenant } from '../tenant-context/decorators/current-tenant.decorator';
+import { TenantRequired } from '../tenant-context/decorators/tenant-required.decorator';
+import type { ClinicalAccessScope } from '../tenant-context/clinical-access.types';
+import type { TenantContext } from '../tenant-context/tenant-context.types';
 import { CaseFilesService } from './case-files.service';
 import { CaseFileWorkspaceResponseDto } from './dto/case-file-workspace-response.dto';
 import { CreateCaseFileDto } from './dto/create-case-file.dto';
@@ -41,6 +45,7 @@ import { CaseFileResponseDto } from './dto/case-file-response.dto';
 @ApiForbiddenResponse({
   description: 'Authenticated user lacks a permitted role',
 })
+@TenantRequired()
 @Controller('case-files')
 @Roles(UserRole.ADMIN, UserRole.PSYCHOLOGIST)
 @UsePipes(
@@ -67,8 +72,12 @@ export class CaseFilesController {
   create(
     @Body() createCaseFileDto: CreateCaseFileDto,
     @CurrentUser() user: AuthenticatedUser,
+    @CurrentTenant(true) tenant: TenantContext,
   ) {
-    return this.caseFilesService.create(createCaseFileDto, user);
+    return this.caseFilesService.create(
+      createCaseFileDto,
+      this.createScope(tenant, user),
+    );
   }
 
   @Get()
@@ -78,8 +87,11 @@ export class CaseFilesController {
     type: CaseFileResponseDto,
     isArray: true,
   })
-  findAll(@CurrentUser() user: AuthenticatedUser) {
-    return this.caseFilesService.findAll(user);
+  findAll(
+    @CurrentUser() user: AuthenticatedUser,
+    @CurrentTenant(true) tenant: TenantContext,
+  ) {
+    return this.caseFilesService.findAll(this.createScope(tenant, user));
   }
 
   @Get('patient/:patientId')
@@ -99,8 +111,12 @@ export class CaseFilesController {
   findByPatientId(
     @Param('patientId', ParseUUIDPipe) patientId: string,
     @CurrentUser() user: AuthenticatedUser,
+    @CurrentTenant(true) tenant: TenantContext,
   ) {
-    return this.caseFilesService.findByPatientId(patientId, user);
+    return this.caseFilesService.findByPatientId(
+      patientId,
+      this.createScope(tenant, user),
+    );
   }
 
   @Get(':id/workspace')
@@ -120,8 +136,12 @@ export class CaseFilesController {
   findWorkspace(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser() user: AuthenticatedUser,
+    @CurrentTenant(true) tenant: TenantContext,
   ) {
-    return this.caseFilesService.findWorkspace(id, user);
+    return this.caseFilesService.findWorkspace(
+      id,
+      this.createScope(tenant, user),
+    );
   }
 
   @Get(':id')
@@ -141,8 +161,9 @@ export class CaseFilesController {
   findOne(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser() user: AuthenticatedUser,
+    @CurrentTenant(true) tenant: TenantContext,
   ) {
-    return this.caseFilesService.findOne(id, user);
+    return this.caseFilesService.findOne(id, this.createScope(tenant, user));
   }
 
   @Patch(':id')
@@ -164,7 +185,26 @@ export class CaseFilesController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updateCaseFileDto: UpdateCaseFileDto,
     @CurrentUser() user: AuthenticatedUser,
+    @CurrentTenant(true) tenant: TenantContext,
   ) {
-    return this.caseFilesService.update(id, updateCaseFileDto, user);
+    return this.caseFilesService.update(
+      id,
+      updateCaseFileDto,
+      this.createScope(tenant, user),
+    );
+  }
+
+  private createScope(
+    tenant: TenantContext,
+    user: AuthenticatedUser,
+  ): ClinicalAccessScope {
+    return {
+      organizationId: tenant.organizationId,
+      membershipId: tenant.membershipId,
+      organizationRole: tenant.organizationRole,
+      userId: user.id,
+      legacyUserRole: tenant.legacyUserRole,
+      resolutionMode: tenant.resolutionMode,
+    };
   }
 }

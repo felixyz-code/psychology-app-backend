@@ -1,11 +1,14 @@
 import {
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { AppointmentStatus, Prisma, UserRole } from '@prisma/client';
-import { AuthenticatedUser } from '../auth/types/authenticated-user.type';
+import { AppointmentStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { ClinicalAccessPolicyService } from '../tenant-context/clinical-access-policy.service';
+import type { ClinicalAccessScope } from '../tenant-context/clinical-access.types';
+import { OrganizationCapability } from '../tenant-context/authorization/organization-capability';
 import {
   CaseFileWorkspaceTimelineEventType,
   CaseFileWorkspaceTimelineSourceType,
@@ -13,7 +16,7 @@ import {
 import { CreateCaseFileDto } from './dto/create-case-file.dto';
 import { UpdateCaseFileDto } from './dto/update-case-file.dto';
 
-const caseFileWorkspaceSelect = {
+const baseWorkspaceSelect = {
   id: true,
   patientId: true,
   diagnosis: true,
@@ -80,8 +83,31 @@ const caseFileWorkspaceSelect = {
   },
 } satisfies Prisma.CaseFileSelect;
 
+function tenantWorkspaceSelect(organizationId: string) {
+  return {
+    ...baseWorkspaceSelect,
+    patient: {
+      select: {
+        ...baseWorkspaceSelect.patient.select,
+        appointments: {
+          ...baseWorkspaceSelect.patient.select.appointments,
+          where: { organizationId },
+        },
+      },
+    },
+    sessionNotes: {
+      ...baseWorkspaceSelect.sessionNotes,
+      where: { organizationId },
+    },
+    documents: {
+      ...baseWorkspaceSelect.documents,
+      where: { organizationId },
+    },
+  };
+}
+
 type CaseFileWorkspaceData = Prisma.CaseFileGetPayload<{
-  select: typeof caseFileWorkspaceSelect;
+  select: typeof baseWorkspaceSelect;
 }>;
 
 type CaseFileWorkspaceTimelineItem = {
@@ -96,51 +122,84 @@ type CaseFileWorkspaceTimelineItem = {
 
 @Injectable()
 export class CaseFilesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly clinicalPolicy: ClinicalAccessPolicyService,
+  ) {}
 
-  async create(createCaseFileDto: CreateCaseFileDto, user: AuthenticatedUser) {
-    await this.getAccessiblePatientOrThrow(createCaseFileDto.patientId, user);
+  async create(
+    createCaseFileDto: CreateCaseFileDto,
+    scope: ClinicalAccessScope,
+  ) {
+    this.clinicalPolicy.requireCapability(
+      scope,
+      OrganizationCapability.CASE_FILE_CREATE,
+      'case_files.create',
+    );
+    await this.getAssignedPatientOrThrow(createCaseFileDto.patientId, scope);
 
-    const existingCaseFile = await this.prisma.caseFile.findUnique({
-      where: { patientId: createCaseFileDto.patientId },
+    const existingCaseFile = await this.prisma.caseFile.findFirst({
+      where: {
+        patientId: createCaseFileDto.patientId,
+        organizationId: scope.organizationId,
+      },
+      select: { id: true },
     });
 
     if (existingCaseFile) {
-      throw new ConflictException(
-        `Patient with id "${createCaseFileDto.patientId}" already has a case file`,
-      );
+      throw new ConflictException('Patient already has a case file');
     }
 
     return this.prisma.caseFile.create({
-      data: createCaseFileDto,
+      data: {
+        ...createCaseFileDto,
+        organizationId: scope.organizationId,
+      },
     });
   }
 
-  findAll(user: AuthenticatedUser) {
+  findAll(scope: ClinicalAccessScope) {
+    this.clinicalPolicy.requireCapability(
+      scope,
+      OrganizationCapability.CASE_FILE_READ,
+      'case_files.find_all',
+    );
+
     return this.prisma.caseFile.findMany({
-      where: this.isAdmin(user)
-        ? undefined
-        : {
-            patient: {
-              psychologistId: user.id,
-            },
-          },
+      where: {
+        organizationId: scope.organizationId,
+        patient: this.clinicalPolicy.assignedPatientWhere(scope),
+      },
       orderBy: {
         createdAt: 'desc',
       },
     });
   }
 
-  async findOne(id: string, user: AuthenticatedUser) {
-    const caseFile = await this.getAccessibleCaseFileOrThrow(id, user);
+  async findOne(id: string, scope: ClinicalAccessScope) {
+    const caseFile = await this.getVisibleCaseFileOrThrow(id, scope);
+    this.clinicalPolicy.requireCapability(
+      scope,
+      OrganizationCapability.CASE_FILE_READ,
+      'case_files.find_one',
+    );
+    await this.requireAssignment(caseFile.patientId, scope);
 
     return caseFile;
   }
 
-  async findWorkspace(id: string, user: AuthenticatedUser) {
-    const workspaceData = await this.getAccessibleCaseFileWorkspaceOrThrow(
+  async findWorkspace(id: string, scope: ClinicalAccessScope) {
+    const visibleCaseFile = await this.getVisibleCaseFileOrThrow(id, scope);
+    this.clinicalPolicy.requireCapability(
+      scope,
+      OrganizationCapability.WORKSPACE_READ,
+      'case_files.workspace',
+    );
+    await this.requireAssignment(visibleCaseFile.patientId, scope);
+
+    const workspaceData = await this.getAssignedCaseFileWorkspaceOrThrow(
       id,
-      user,
+      scope,
     );
     const {
       patient: patientWithAppointments,
@@ -192,17 +251,23 @@ export class CaseFilesService {
     };
   }
 
-  async findByPatientId(patientId: string, user: AuthenticatedUser) {
-    await this.getAccessiblePatientOrThrow(patientId, user);
+  async findByPatientId(patientId: string, scope: ClinicalAccessScope) {
+    this.clinicalPolicy.requireCapability(
+      scope,
+      OrganizationCapability.CASE_FILE_READ,
+      'case_files.find_by_patient',
+    );
+    await this.getAssignedPatientOrThrow(patientId, scope);
 
-    const caseFile = await this.prisma.caseFile.findUnique({
-      where: { patientId },
+    const caseFile = await this.prisma.caseFile.findFirst({
+      where: {
+        patientId,
+        organizationId: scope.organizationId,
+      },
     });
 
     if (!caseFile) {
-      throw new NotFoundException(
-        `Case file for patient with id "${patientId}" not found`,
-      );
+      throw this.caseFileNotFound();
     }
 
     return caseFile;
@@ -211,86 +276,129 @@ export class CaseFilesService {
   async update(
     id: string,
     updateCaseFileDto: UpdateCaseFileDto,
-    user: AuthenticatedUser,
+    scope: ClinicalAccessScope,
   ) {
-    await this.getAccessibleCaseFileOrThrow(id, user);
+    const caseFile = await this.getVisibleCaseFileOrThrow(id, scope);
+    this.clinicalPolicy.requireCapability(
+      scope,
+      OrganizationCapability.CASE_FILE_UPDATE,
+      'case_files.update',
+    );
+    await this.requireAssignment(caseFile.patientId, scope);
 
-    return this.prisma.caseFile.update({
-      where: { id },
+    const result = await this.prisma.caseFile.updateMany({
+      where: {
+        id,
+        organizationId: scope.organizationId,
+        patient: this.clinicalPolicy.assignedPatientWhere(scope),
+      },
       data: updateCaseFileDto,
     });
+
+    if (result.count !== 1) {
+      throw this.caseFileNotFound();
+    }
+
+    return this.getAssignedCaseFileOrThrow(id, scope);
   }
 
-  private isAdmin(user: AuthenticatedUser) {
-    return user.role === UserRole.ADMIN;
-  }
-
-  private async getAccessiblePatientOrThrow(
+  private async getAssignedPatientOrThrow(
     patientId: string,
-    user: AuthenticatedUser,
+    scope: ClinicalAccessScope,
   ) {
-    const patient = this.isAdmin(user)
-      ? await this.prisma.patient.findUnique({ where: { id: patientId } })
-      : await this.prisma.patient.findFirst({
-          where: {
-            id: patientId,
-            psychologistId: user.id,
-          },
-        });
+    const patient = await this.prisma.patient.findFirst({
+      where: {
+        id: patientId,
+        ...this.clinicalPolicy.assignedPatientWhere(scope),
+      },
+      select: { id: true },
+    });
 
     if (!patient) {
-      throw new NotFoundException(`Patient with id "${patientId}" not found`);
+      throw new NotFoundException('Patient not found');
     }
 
     return patient;
   }
 
-  private async getAccessibleCaseFileOrThrow(
+  private async getVisibleCaseFileOrThrow(
     id: string,
-    user: AuthenticatedUser,
+    scope: ClinicalAccessScope,
   ) {
-    const caseFile = this.isAdmin(user)
-      ? await this.prisma.caseFile.findUnique({ where: { id } })
-      : await this.prisma.caseFile.findFirst({
-          where: {
-            id,
-            patient: {
-              psychologistId: user.id,
-            },
-          },
-        });
+    const caseFile = await this.prisma.caseFile.findFirst({
+      where: {
+        id,
+        organizationId: scope.organizationId,
+        patient: this.clinicalPolicy.tenantPatientWhere(scope),
+      },
+    });
 
     if (!caseFile) {
-      throw new NotFoundException(`Case file with id "${id}" not found`);
+      throw this.caseFileNotFound();
     }
 
     return caseFile;
   }
 
-  private async getAccessibleCaseFileWorkspaceOrThrow(
+  private async getAssignedCaseFileOrThrow(
     id: string,
-    user: AuthenticatedUser,
+    scope: ClinicalAccessScope,
   ) {
-    const caseFile = this.isAdmin(user)
-      ? await this.prisma.caseFile.findUnique({
-          where: { id },
-          select: caseFileWorkspaceSelect,
-        })
-      : await this.prisma.caseFile.findFirst({
-          where: {
-            id,
-            patient: {
-              psychologistId: user.id,
-            },
-          },
-          select: caseFileWorkspaceSelect,
-        });
+    const caseFile = await this.prisma.caseFile.findFirst({
+      where: {
+        id,
+        organizationId: scope.organizationId,
+        patient: this.clinicalPolicy.assignedPatientWhere(scope),
+      },
+    });
 
     if (!caseFile) {
-      throw new NotFoundException(`Case file with id "${id}" not found`);
+      throw this.caseFileNotFound();
     }
 
     return caseFile;
+  }
+
+  private async getAssignedCaseFileWorkspaceOrThrow(
+    id: string,
+    scope: ClinicalAccessScope,
+  ) {
+    const caseFile = await this.prisma.caseFile.findFirst({
+      where: {
+        id,
+        organizationId: scope.organizationId,
+        patient: this.clinicalPolicy.assignedPatientWhere(scope),
+      },
+      select: tenantWorkspaceSelect(scope.organizationId),
+    });
+
+    if (!caseFile) {
+      throw this.caseFileNotFound();
+    }
+
+    return caseFile;
+  }
+
+  private async requireAssignment(
+    patientId: string,
+    scope: ClinicalAccessScope,
+  ) {
+    const assignment = await this.prisma.patientAssignment.findFirst({
+      where: {
+        ...this.clinicalPolicy.assignmentWhere(scope),
+        patientId,
+        patient: this.clinicalPolicy.tenantPatientWhere(scope),
+      },
+      select: { id: true },
+    });
+
+    if (!assignment) {
+      throw new ForbiddenException('Clinical assignment is required');
+    }
+  }
+
+  private caseFileNotFound() {
+    return new NotFoundException('Case file not found');
   }
 
   private buildWorkspaceTimeline(
