@@ -2,6 +2,32 @@
 
 ---
 
+# POST-GO-LIVE.2.1D0 Clinical and Financial Tenant Conversion Contract
+
+## Added
+
+* Documentation-only D0 contract for the 2.1D conversion of Patients, Case
+  Files, Workspace, Session Notes, Documents, Appointments, Financial
+  Transactions, and Financial Summary.
+* Approved single-role membership posture: capabilities and clinical assignment
+  express combined responsibilities without accumulated roles.
+* Role, capability, module, legacy-null, projection, observability, HTTP, and
+  test-gate matrices for D1 through D4.
+
+## Security Notes
+
+* `OWNER` and `ADMIN` do not gain clinical-content access by organizational
+  role alone.
+* `AUDITOR` and `READ_ONLY` have no clinical-content, session-note, or document
+  download access during 2.1D.
+* Tenant-aware endpoints must exclude legacy `organizationId = NULL` rows from
+  reads, writes, counts, summaries, and relationships.
+
+## Compatibility
+
+* No runtime code, Prisma schema, migration, seed, production data, deployment,
+  frontend behavior, D1 implementation, or merge behavior changed.
+
 # POST-GO-LIVE.2.1C2 Organization, Membership & Invitation APIs
 
 ## Added

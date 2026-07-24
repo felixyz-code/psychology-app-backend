@@ -540,6 +540,21 @@ filters are deferred until data has been backfilled and validated.
 nor clinical access. `PatientAssignment` is stored for future historical
 professional assignment; it is not yet populated or used by authorization.
 
+### POST-GO-LIVE.2.1D0 assignment and tenant boundary
+
+`POST_GO_LIVE_2_1D0_TENANT_CONVERSION_CONTRACT.md` makes `organizationId` the
+primary tenant isolation boundary for the future D1 through D3 module
+conversion. Nullable `organizationId` remains a legacy state and is not visible
+through tenant-aware endpoints until a separate certified backfill.
+
+Each `OrganizationMembership` stores one organizational role only. Combined
+responsibilities are represented by capabilities plus `PatientAssignment`, not
+by accumulating roles. `PatientAssignment` becomes the required clinical
+condition for clinical content during 2.1D; it must belong to the same
+organization as the patient and membership. `psychologistId` remains only a
+temporary additional assignment restriction and must not be used as a tenant
+fallback.
+
 ### POST-GO-LIVE.1.4 validation
 
 The additive migration was validated against disposable PostgreSQL 16.14

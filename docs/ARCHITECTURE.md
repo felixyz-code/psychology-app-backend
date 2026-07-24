@@ -586,6 +586,22 @@ is warranted. All non-Patients clinical modules continue with legacy ownership
 until explicitly migrated. Deployment requires separate backfill certification
 for the target database.
 
+## POST-GO-LIVE.2.1D0 Tenant Conversion Contract
+
+`POST_GO_LIVE_2_1D0_TENANT_CONVERSION_CONTRACT.md` defines the
+documentation-only architecture contract for converting Patients, Case Files,
+Workspace, Session Notes, Documents, Appointments, Financial Transactions, and
+Financial Summary. It keeps controllers thin, services explicit, and
+authorization local to the converted module shape before any broader helper is
+introduced.
+
+The approved architecture uses `organizationId` as the primary isolation
+boundary, capabilities as explicit permissions, and `PatientAssignment` as the
+clinical-content condition. `psychologistId` remains a temporary additional
+restriction during conversion only. A role such as `OWNER` or `ADMIN` does not
+replace assignment, and a document blob may be opened only after tenant-aware
+metadata authorization succeeds.
+
 ---
 
 # References

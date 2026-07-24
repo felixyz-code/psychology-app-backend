@@ -28,6 +28,28 @@ Tenant resolution requires active membership and active organization. Policy che
 
 Roles receive only capabilities expressly granted in `AUTHORIZATION_CAPABILITY_MATRIX.md`. An `OWNER` alone performs owner-only actions. `ADMIN` is not an owner substitute. `READ_ONLY` and `AUDITOR` never receive write capabilities. Names of roles imply no unstated permission.
 
+## POST-GO-LIVE.2.1D0 clinical and financial conversion contract
+
+`POST_GO_LIVE_2_1D0_TENANT_CONVERSION_CONTRACT.md` is the normative
+documentation-only contract for converting Patients, Case Files, Workspace,
+Session Notes, Documents, Appointments, Financial Transactions, and Financial
+Summary during 2.1D. Where an older target-policy table grants broad clinical
+or document capability to an organizational role, the 2.1D0 contract narrows
+that target: clinical content requires tenant context, active membership,
+active organization, explicit clinical capability, and valid clinical
+assignment.
+
+Each membership has one organizational role. Roles are not accumulated. A
+single freelancer may operate as `OWNER` with administrative, operational,
+clinical, and financial capabilities plus assignment to their own patients, but
+the stored role remains only `OWNER`. A larger organization's `OWNER` or
+`ADMIN` does not gain clinical-content access to unassigned patients through
+hierarchy alone.
+
+`AUDITOR` and `READ_ONLY` have no clinical-content access, no session-note
+access, and no document download access during 2.1D. No redacted clinical
+projection for those roles is authorized in this phase.
+
 ## Resource and legacy rules
 
 Tenant-owned resources belong to `organizationId`. Patient is the clinical root; case files, notes, documents, appointments, and patient-linked finance agree with that tenant. Finance without a patient or appointment is still organization-scoped. During conversion, `psychologistId` is an additional restriction only and never broadens tenant scope.

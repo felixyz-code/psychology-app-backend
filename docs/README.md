@@ -103,11 +103,15 @@ authorization model. Its companion documents are:
 * `AUTHORIZATION_CAPABILITY_MATRIX.md`
 * `TENANT_ENDPOINT_SCOPE_MATRIX.md`
 * `TENANT_SECURITY_TEST_CONTRACT.md`
+* `POST_GO_LIVE_2_1D0_TENANT_CONVERSION_CONTRACT.md`
 * `adr/ADR-TENANT-CONTEXT.md`
 * `adr/ADR-TENANT-DATA-ISOLATION.md`
 
 They specify the approved target design and distinguish it from current runtime
 enforcement. They do not themselves change database, API, or runtime behavior.
+`POST_GO_LIVE_2_1D0_TENANT_CONVERSION_CONTRACT.md` is the normative
+documentation-only contract for the 2.1D clinical and financial module
+conversion sequence.
 
 ---
 

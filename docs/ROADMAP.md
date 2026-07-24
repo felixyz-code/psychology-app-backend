@@ -179,12 +179,19 @@ independent target-database backfill certification before deployment.
 
 POST-GO-LIVE.2.1C0 documents the invitation and membership lifecycle required
 before organization-domain APIs. It introduces no runtime or schema behavior.
-POST-GO-LIVE.2.1C1 now adds only the reviewed local Prisma schema and migration
+POST-GO-LIVE.2.1C1 added only the reviewed local Prisma schema and migration
 for that lifecycle, including a terminal-state constraint and a partial unique
-pending-invitation key. It has no APIs, backfill, production migration or
-deployment. The next eligible action is controlled review and merge of 2.1C1;
-2.1C2 (organization, membership, and invitation APIs) must not start before
-that integration is closed.
+pending-invitation key. It had no production migration or deployment.
+POST-GO-LIVE.2.1C2 completed the organization, membership, and invitation APIs
+before the 2.1D0 documentation contract.
+
+POST-GO-LIVE.2.1D0 defines the documentation-only contract for converting the
+clinical and financial modules after the organization-domain work is closed.
+It establishes one organizational role per membership, explicit capabilities,
+clinical assignment for clinical content, no automatic `OWNER` or `ADMIN`
+clinical access, no 2.1D clinical access for `AUDITOR` or `READ_ONLY`, and the
+D1 through D4 implementation order. It introduces no runtime behavior, schema
+change, migration, production action, deployment, or D1 implementation.
 
 ---
 
@@ -238,6 +245,11 @@ End of document.
 
 ## POST-GO-LIVE.2.1C2
 
-Organization, membership and invitation API implementation is complete locally
-and awaits controlled review and merge. POST-GO-LIVE.2.1D remains ineligible
-until this work is integrated and formally closed.
+Organization, membership and invitation API implementation is integrated and
+closed. POST-GO-LIVE.2.1D0 is eligible as a documentation-only contract phase.
+
+## POST-GO-LIVE.2.1D0
+
+The tenant conversion contract is documentation-only. The next eligible control
+after D0 review and merge is the final contract review before any D1 runtime
+work.

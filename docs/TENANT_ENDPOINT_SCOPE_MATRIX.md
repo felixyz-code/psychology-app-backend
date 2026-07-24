@@ -61,6 +61,22 @@
 
 No backend report-export or dashboard endpoint exists at this checkpoint. Frontend-composed reports remain in scope because every upstream API must become tenant-scoped before they are isolated.
 
+## POST-GO-LIVE.2.1D0 conversion contract
+
+The rows marked for 2.1D remain the route inventory, but their detailed target
+policy is now defined by
+`POST_GO_LIVE_2_1D0_TENANT_CONVERSION_CONTRACT.md`. That contract is
+documentation-only and does not alter the current runtime endpoint matrix.
+
+For D1 through D3, clinical rows must be interpreted as tenant context plus
+explicit module capability plus assignment when clinical content is returned.
+The broad `clinical.read`, `clinical.write`, `document.read`, and `document.upload`
+entries above are placeholders from the earlier target matrix, not automatic
+role grants. Financial rows require financial capabilities and
+`organizationId` predicates, not clinical assignment alone. Legacy
+`organizationId = NULL` rows remain invisible to all tenant-aware endpoint
+rows.
+
 ## POST-GO-LIVE.2.1C2 implementation status
 
 The Organization, Membership, and Invitation rows above are now implemented.

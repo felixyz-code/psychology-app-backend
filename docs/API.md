@@ -1289,6 +1289,21 @@ requires a resolved context and continues to apply its separate legacy
 psychologist ownership condition; all other clinical modules remain legacy
 until 2.1D.
 
+## POST-GO-LIVE.2.1D0 clinical and financial conversion contract
+
+`POST_GO_LIVE_2_1D0_TENANT_CONVERSION_CONTRACT.md` defines the future
+documentation-only contract for converting Patients, Case Files, Workspace,
+Session Notes, Documents, Appointments, Financial Transactions, and Financial
+Summary during 2.1D. It does not change the current routes documented above.
+
+For D1 through D3, converted DTOs must not accept `organizationId`; the server
+derives tenant scope from the validated request context. Clinical content will
+require explicit module capability plus assignment, so `OWNER` and `ADMIN` do
+not read unassigned clinical files by role alone. Financial endpoints will use
+financial capabilities and tenant predicates, not clinical assignment by
+itself. Legacy rows with `organizationId = NULL` remain outside tenant-aware
+lists, details, mutations, and summaries until a separate certified backfill.
+
 `X-Organization-Id` is optional on the Patients pilot only because a caller
 with exactly one eligible membership is resolved automatically. It is a
 selection hint, never authorization evidence, and its UUID value is never
