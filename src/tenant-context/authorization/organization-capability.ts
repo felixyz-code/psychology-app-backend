@@ -40,6 +40,7 @@ export enum OrganizationCapability {
   APPOINTMENT_MANAGE = 'appointment.manage',
   FINANCE_READ = 'finance.read',
   FINANCE_MANAGE = 'finance.manage',
+  FINANCE_SUMMARY_READ = 'finance.summary_read',
   REPORT_READ = 'report.read',
   AUDIT_READ = 'audit.read',
 }

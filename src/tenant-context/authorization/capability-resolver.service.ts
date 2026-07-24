@@ -53,6 +53,7 @@ const ROLE_CAPABILITY_POLICY: Readonly<
       OrganizationCapability.APPOINTMENT_MANAGE,
       OrganizationCapability.FINANCE_READ,
       OrganizationCapability.FINANCE_MANAGE,
+      OrganizationCapability.FINANCE_SUMMARY_READ,
       OrganizationCapability.REPORT_READ,
     ],
     conditional: [
@@ -110,6 +111,7 @@ const ROLE_CAPABILITY_POLICY: Readonly<
       OrganizationCapability.MEMBERSHIP_LEAVE,
       OrganizationCapability.FINANCE_READ,
       OrganizationCapability.FINANCE_MANAGE,
+      OrganizationCapability.FINANCE_SUMMARY_READ,
     ],
     conditional: [OrganizationCapability.REPORT_READ],
   },
