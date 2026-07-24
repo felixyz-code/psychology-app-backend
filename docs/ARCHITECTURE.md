@@ -602,6 +602,22 @@ restriction during conversion only. A role such as `OWNER` or `ADMIN` does not
 replace assignment, and a document blob may be opened only after tenant-aware
 metadata authorization succeeds.
 
+## Tenant-Aware Patients Alignment (POST-GO-LIVE.2.1D1)
+
+Patients now implements the first D0 conversion step. Its controller remains
+tenant-required and passes an immutable request scope to the service. The
+service enforces `organizationId`, active same-tenant assignment, explicit
+`patient.*` capabilities, and the temporary legacy psychologist restriction.
+`OWNER` and `ADMIN` membership roles do not bypass assignment for clinical
+patient access.
+
+Patient creation derives the organization and legacy psychologist from the
+validated request context and creates an active primary assignment for the
+current membership. This supports the freelancer `OWNER` operating through one
+organizational role plus capabilities and assignment. Legacy
+`organizationId = NULL` patients are not included in tenant-aware reads or
+mutations.
+
 ---
 
 # References

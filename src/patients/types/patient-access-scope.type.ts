@@ -1,8 +1,15 @@
+import type { MembershipRole, UserRole } from '@prisma/client';
+import type { TenantResolutionMode } from '../../common/request-context/request-context.service';
+
 /**
- * Immutable, request-validated ownership boundary for the Patients pilot.
- * Both fields are required for every tenant-aware patient operation.
+ * Immutable, request-validated boundary for tenant-aware Patients operations.
+ * The tenant guard has already validated active membership and organization.
  */
 export type PatientAccessScope = Readonly<{
   organizationId: string;
-  psychologistId: string;
+  membershipId: string;
+  organizationRole: MembershipRole;
+  userId: string;
+  legacyUserRole: UserRole;
+  resolutionMode: TenantResolutionMode;
 }>;

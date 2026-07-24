@@ -2,6 +2,37 @@
 
 ---
 
+# POST-GO-LIVE.2.1D1 Patients Tenant Policy Alignment
+
+## Changed
+
+* Aligned the Patients module with the 2.1D0 tenant-aware policy: tenant
+  context, explicit `patient.*` capabilities, active same-tenant membership,
+  active organization, active assignment, and temporary legacy psychologist
+  restriction.
+* Patient creation now derives `organizationId` and legacy `psychologistId`
+  from the validated request context and creates an active primary assignment
+  for the current membership.
+* Patient reads, updates and deletes now require active assignment. Lists only
+  return assigned tenant patients and continue excluding legacy
+  `organizationId = NULL` rows.
+* Patient direct misses and cross-tenant resources use a generic redacted
+  `404`; visible in-tenant capability or assignment failures use `403`.
+
+## Security Notes
+
+* `OWNER` and `ADMIN` no longer bypass patient assignment for clinical patient
+  access.
+* `AUDITOR` and `READ_ONLY` receive no patient clinical/personal projection in
+  this phase.
+
+## Compatibility
+
+* No Prisma schema change, migration, seed, frontend change, production data
+  access, deployment, Case Files, Workspace, Session Notes, Documents,
+  Appointments, Financial Transactions, or Financial Summary conversion was
+  introduced.
+
 # POST-GO-LIVE.2.1D0 Clinical and Financial Tenant Conversion Contract
 
 ## Added

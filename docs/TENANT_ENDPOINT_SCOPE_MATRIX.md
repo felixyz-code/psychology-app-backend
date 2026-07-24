@@ -10,11 +10,11 @@
 | GET | `/health/ready` | Health | No | — | Public | N/A | Public | None |
 | POST | `/auth/login` | Auth | No | — | Public | N/A | Public | None |
 | GET | `/auth/context` | Auth | Optional | `organization.read` when resolved | Caller memberships only | 403 selection | Implemented tenant-optional | 2.1I bootstrap |
-| POST | `/patients` | Patients | Yes | `patient.create` | Current double barrier; target assignment policy | 404 | Implemented pilot | 2.1D align policy |
-| GET | `/patients` | Patients | Yes | `patient.read` | Current double barrier | Empty list | Implemented pilot | 2.1D align policy |
-| GET | `/patients/:id` | Patients | Yes | `patient.read` | Current double barrier | 404 | Implemented pilot | 2.1D align policy |
-| PATCH | `/patients/:id` | Patients | Yes | `patient.update` | Current double barrier | 404 | Implemented pilot | 2.1D align policy |
-| DELETE | `/patients/:id` | Patients | Yes | `patient.delete` | Current double barrier | 404 | Implemented pilot | 2.1D align policy |
+| POST | `/patients` | Patients | Yes | `patient.create` | Creates tenant patient and active self-assignment; temporary legacy psychologist restriction | 404 | D1 aligned | Complete in 2.1D1 |
+| GET | `/patients` | Patients | Yes | `patient.read` | Tenant + active assignment + temporary legacy psychologist restriction | Empty list | D1 aligned | Complete in 2.1D1 |
+| GET | `/patients/:id` | Patients | Yes | `patient.read` | Tenant + active assignment + temporary legacy psychologist restriction | 404 | D1 aligned | Complete in 2.1D1 |
+| PATCH | `/patients/:id` | Patients | Yes | `patient.update` | Tenant + active assignment + temporary legacy psychologist restriction | 404 | D1 aligned | Complete in 2.1D1 |
+| DELETE | `/patients/:id` | Patients | Yes | `patient.delete` | Tenant + active assignment + temporary legacy psychologist restriction; patient assignments removed before physical delete | 404 | D1 aligned | Complete in 2.1D1 |
 | GET | `/organizations` | Organizations | Optional bootstrap | `organization.read` when resolved | Caller eligible memberships only | N/A | 2.1C0 contract approved; no route | 2.1C2 after 2.1C1 |
 | GET | `/organizations/:organizationId` | Organizations | Yes | `organization.read` | Path must match resolved tenant | 404 | 2.1C0 contract approved; no route | 2.1C2 after 2.1C1 |
 | GET | `/organizations/:organizationId/memberships` | Memberships | Yes | `membership.read` | Selected tenant only; AUDITOR gets sanitized metadata and no complete emails | 404 | 2.1C0 contract approved; no route | 2.1C2 after 2.1C1 |

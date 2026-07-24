@@ -1,5 +1,36 @@
 # Decision Log
 
+## ADR-POST-GO-LIVE.2.1D1: Patients Tenant Policy Alignment
+
+### Status
+
+Implemented for the Patients module only. No production access, deployment,
+Prisma schema change, migration, seed change, frontend change, or additional
+clinical/financial module conversion is included.
+
+### Decision
+
+Patients now enforces the D0 runtime policy locally: resolved tenant context,
+active membership and active organization from the tenant guard, explicit
+`patient.*` capability checks, active same-tenant `PatientAssignment`, and the
+temporary legacy `psychologistId` restriction. `organizationId` remains the
+tenant isolation boundary and legacy `organizationId = NULL` rows remain
+invisible through Patients endpoints.
+
+Patient creation supports the freelancer `OWNER` flow by deriving tenant and
+legacy psychologist scope from the validated request and creating an active
+primary assignment for the current membership. A single membership role remains
+sufficient; role accumulation is not introduced.
+
+### Boundary
+
+No route accepts `organizationId` or `psychologistId` as authorization input.
+`OWNER` and `ADMIN` roles do not bypass assignment for patient reads, updates
+or deletes. `AUDITOR` and `READ_ONLY` receive no patient clinical/personal
+projection during this phase. Case Files, Workspace, Session Notes, Documents,
+Appointments, Financial Transactions, and Financial Summary remain on their
+pre-D1 behavior until their approved phases.
+
 ## ADR-POST-GO-LIVE.2.1D0: Clinical and Financial Tenant Conversion Contract
 
 ### Status
