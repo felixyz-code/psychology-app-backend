@@ -140,6 +140,24 @@ Public endpoint.
 
 # Patients
 
+POST-GO-LIVE.2.1D1: Patients is tenant-required and tenant-aware. The server
+derives `organizationId`, membership, role and legacy user identity from the
+validated JWT plus tenant context. Patient DTOs do not accept `organizationId`
+or `psychologistId`.
+
+Patients access requires:
+
+* valid tenant context;
+* active membership and active organization;
+* explicit `patient.*` capability;
+* active same-tenant `PatientAssignment`;
+* temporary legacy `psychologistId === authenticated user id` restriction.
+
+Legacy patients with `organizationId = null` are excluded from lists, direct
+reads, updates, deletes and relationship traversal. Cross-tenant or otherwise
+inaccessible patient IDs return redacted `404`. Visible in-tenant actions
+without capability or assignment return `403`.
+
 ## `POST /patients`
 
 Creates a patient.
@@ -152,7 +170,6 @@ Bearer Token required.
 
 ```json
 {
-  "psychologistId": "uuid",
   "firstName": "string",
   "lastName": "string",
   "phoneNumber": "string | optional",
@@ -163,8 +180,14 @@ Bearer Token required.
 
 ### Ownership
 
-* `ADMIN` can use `psychologistId` from the request body.
-* `PSYCHOLOGIST` ignores `psychologistId` from the body and uses `user.id`.
+* Requires `patient.create`.
+* The backend assigns `organizationId` from the resolved tenant context.
+* The backend sets the temporary legacy `psychologistId` to the authenticated
+  user ID.
+* The backend creates an active same-tenant primary `PatientAssignment` for the
+  current membership.
+* A freelancer with one `OWNER` membership can create and self-assign patients
+  through this flow without accumulating roles.
 
 ---
 
@@ -178,8 +201,9 @@ Bearer Token required.
 
 ### Ownership
 
-* `ADMIN` sees all patients.
-* `PSYCHOLOGIST` only sees patients where `patient.psychologistId === user.id`.
+* Requires `patient.read`.
+* Returns only patients in the selected tenant that are assigned to the current
+  membership and still match the temporary legacy psychologist restriction.
 
 ---
 
@@ -197,8 +221,9 @@ Bearer Token required.
 
 ### Ownership
 
-* `ADMIN` can access any patient.
-* `PSYCHOLOGIST` can only access owned patients.
+* Requires `patient.read`.
+* Requires active same-tenant assignment and the temporary legacy psychologist
+  restriction.
 
 ---
 
@@ -229,9 +254,10 @@ Bearer Token required.
 
 ### Ownership
 
-* `ADMIN` can update any patient.
-* `PSYCHOLOGIST` can only update owned patients.
-* `PSYCHOLOGIST` cannot reassign ownership to another psychologist.
+* Requires `patient.update`.
+* Requires active same-tenant assignment and the temporary legacy psychologist
+  restriction.
+* Ownership fields in the request body are ignored.
 
 ---
 
@@ -249,8 +275,12 @@ Bearer Token required.
 
 ### Ownership
 
-* `ADMIN` can delete any patient.
-* `PSYCHOLOGIST` can only delete owned patients.
+* Requires `patient.delete`.
+* Requires active same-tenant assignment and the temporary legacy psychologist
+  restriction.
+* Current backend behavior remains physical deletion; same-tenant patient
+  assignments are removed before deleting the patient record to preserve
+  referential integrity.
 
 ---
 

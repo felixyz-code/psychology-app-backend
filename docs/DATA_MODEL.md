@@ -555,6 +555,18 @@ organization as the patient and membership. `psychologistId` remains only a
 temporary additional assignment restriction and must not be used as a tenant
 fallback.
 
+### POST-GO-LIVE.2.1D1 Patients runtime alignment
+
+Patients is the first module aligned with the 2.1D0 runtime policy. Tenant-aware
+patient reads and mutations use `Patient.organizationId` as the outer boundary
+and require an active same-tenant `PatientAssignment` for the current
+membership. The legacy `Patient.psychologistId` column is still enforced as a
+temporary additional restriction and does not broaden tenant scope.
+
+Creating a patient derives `organizationId` from tenant context and creates an
+active `PRIMARY` assignment for the current membership. No Prisma schema change,
+new migration, or legacy null backfill is introduced by this runtime alignment.
+
 ### POST-GO-LIVE.1.4 validation
 
 The additive migration was validated against disposable PostgreSQL 16.14

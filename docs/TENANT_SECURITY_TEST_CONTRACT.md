@@ -48,6 +48,17 @@ before any physical file access.
 Financial-summary coverage must prove all aggregates include `organizationId`
 and exclude legacy null rows.
 
+### POST-GO-LIVE.2.1D1 Patients coverage
+
+Patients certification covers tenant-required HTTP access, selected-tenant
+isolation, cross-tenant direct IDs, legacy `organizationId = NULL` direct IDs,
+body manipulation of `organizationId`/`psychologistId`, freelancer `OWNER`
+create plus self-assignment, assignment-required denials for otherwise visible
+patients, capability denials for non-clinical roles, suspended membership, and
+suspended organization. There is no Patients search, count, assign, or reassign
+endpoint in 2.1D1; those controls remain not applicable until such routes are
+approved.
+
 ## POST-GO-LIVE.2.1C0 future organization-domain gate
 
 Before any organization, membership, or invitation endpoint may be marked

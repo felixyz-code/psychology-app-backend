@@ -53,6 +53,17 @@ may be added in D1 through D3 without changing this D0 documentation task:
 downloads, or partial clinical redaction during 2.1D. Unknown capabilities and
 conditional capabilities without a module policy remain denied.
 
+### POST-GO-LIVE.2.1D1 Patients runtime status
+
+Patients now implements the `patient.read`, `patient.create`,
+`patient.update`, and `patient.delete` checks locally in the Patients service.
+Unconditional role capability is still not sufficient for patient clinical
+access: detail, update, and delete also require an active same-tenant
+`PatientAssignment`, and list results are constrained to assigned patients.
+Conditional patient capability is accepted only for the module-approved
+assigned `PSYCHOLOGIST` policy. `AUDITOR` and `READ_ONLY` remain denied for
+patient clinical/personal projections in 2.1D1.
+
 ## POST-GO-LIVE.2.1C0 approved contract — invitation and membership mutations
 
 This table is an approved 2.1C0 contract, not a runtime grant. The typed catalog
