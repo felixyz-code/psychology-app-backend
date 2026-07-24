@@ -3,15 +3,18 @@ import { access, mkdir, realpath, unlink, writeFile } from 'node:fs/promises';
 import { extname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   InternalServerErrorException,
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { UserRole } from '@prisma/client';
-import { AuthenticatedUser } from '../auth/types/authenticated-user.type';
+import { Prisma } from '@prisma/client';
 import { AppConfigService } from '../config/configuration';
 import { PrismaService } from '../prisma/prisma.service';
+import { ClinicalAccessPolicyService } from '../tenant-context/clinical-access-policy.service';
+import type { ClinicalAccessScope } from '../tenant-context/clinical-access.types';
+import { OrganizationCapability } from '../tenant-context/authorization/organization-capability';
 import { CreateDocumentDto } from './dto/create-document.dto';
 import { UpdateDocumentDto } from './dto/update-document.dto';
 import { UploadDocumentDto } from './dto/upload-document.dto';
@@ -30,23 +33,33 @@ export class DocumentsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly config: AppConfigService,
+    private readonly clinicalPolicy: ClinicalAccessPolicyService,
   ) {}
 
-  async create(createDocumentDto: CreateDocumentDto, user: AuthenticatedUser) {
-    await this.getAccessibleCaseFileOrThrow(createDocumentDto.caseFileId, user);
-
-    const uploadedById = this.isAdmin(user)
-      ? createDocumentDto.uploadedById
-      : user.id;
-
-    if (this.isAdmin(user)) {
-      await this.ensureUserExists(uploadedById);
-    }
+  async create(
+    createDocumentDto: CreateDocumentDto,
+    scope: ClinicalAccessScope,
+  ) {
+    const caseFile = await this.getVisibleCaseFileOrThrow(
+      createDocumentDto.caseFileId,
+      scope,
+    );
+    this.clinicalPolicy.requireCapability(
+      scope,
+      OrganizationCapability.DOCUMENT_UPLOAD,
+      'documents.create',
+    );
+    await this.requireAssignment(caseFile.patientId, scope);
+    this.assertSafeStoredDocumentPath(
+      createDocumentDto.filePath,
+      caseFile.patientId,
+    );
 
     return this.prisma.document.create({
       data: {
-        ...createDocumentDto,
-        uploadedById,
+        ...this.withoutServerFields(createDocumentDto),
+        organizationId: scope.organizationId,
+        uploadedById: scope.userId,
       },
     });
   }
@@ -54,15 +67,19 @@ export class DocumentsService {
   async upload(
     uploadDocumentDto: UploadDocumentDto,
     file: Express.Multer.File,
-    user: AuthenticatedUser,
+    scope: ClinicalAccessScope,
   ) {
-    const caseFile = await this.getAccessibleCaseFileOrThrow(
+    const caseFile = await this.getVisibleCaseFileOrThrow(
       uploadDocumentDto.caseFileId,
-      user,
+      scope,
     );
+    this.clinicalPolicy.requireCapability(
+      scope,
+      OrganizationCapability.DOCUMENT_UPLOAD,
+      'documents.upload',
+    );
+    await this.requireAssignment(caseFile.patientId, scope);
     validateDocumentFileContent(file);
-
-    const uploadedById = user.id;
 
     const extension = extname(file.originalname).toLowerCase();
     const safeFileName = `${randomUUID()}${extension}`;
@@ -76,6 +93,10 @@ export class DocumentsService {
       caseFile.patientId,
     );
     const absoluteFilePath = join(patientDirectory, safeFileName);
+    const storedFilePath = this.toStoredPath(
+      absoluteUploadRoot,
+      absoluteFilePath,
+    );
 
     await mkdir(patientDirectory, { recursive: true });
     await writeFile(absoluteFilePath, file.buffer, { flag: 'wx' });
@@ -84,44 +105,65 @@ export class DocumentsService {
       return await this.prisma.document.create({
         data: {
           caseFileId: uploadDocumentDto.caseFileId,
-          uploadedById,
+          organizationId: scope.organizationId,
+          uploadedById: scope.userId,
           fileName: file.originalname,
-          filePath: this.toRelativePath(absoluteFilePath),
+          filePath: storedFilePath,
           mimeType: file.mimetype,
         },
       });
     } catch (error) {
-      await this.cleanupDocumentFiles([this.toRelativePath(absoluteFilePath)]);
+      await this.cleanupDocumentFiles([storedFilePath]);
       throw error;
     }
   }
 
-  findAll(user: AuthenticatedUser) {
+  findAll(scope: ClinicalAccessScope) {
+    this.clinicalPolicy.requireCapability(
+      scope,
+      OrganizationCapability.DOCUMENT_METADATA_READ,
+      'documents.find_all',
+    );
+
     return this.prisma.document.findMany({
-      where: this.isAdmin(user)
-        ? undefined
-        : {
-            caseFile: {
-              patient: {
-                psychologistId: user.id,
-              },
-            },
-          },
+      where: {
+        organizationId: scope.organizationId,
+        caseFile: {
+          organizationId: scope.organizationId,
+          patient: this.clinicalPolicy.assignedPatientWhere(scope),
+        },
+      },
       orderBy: {
         uploadedAt: 'desc',
       },
     });
   }
 
-  async findOne(id: string, user: AuthenticatedUser) {
-    return this.getDocumentOrThrow(id, user);
+  async findOne(id: string, scope: ClinicalAccessScope) {
+    const document = await this.getVisibleDocumentOrThrow(id, scope);
+    this.clinicalPolicy.requireCapability(
+      scope,
+      OrganizationCapability.DOCUMENT_METADATA_READ,
+      'documents.find_one',
+    );
+    await this.requireAssignment(document.caseFile.patientId, scope);
+    return stripDocumentRelations(document);
   }
 
-  async findByCaseFileId(caseFileId: string, user: AuthenticatedUser) {
-    await this.getAccessibleCaseFileOrThrow(caseFileId, user);
+  async findByCaseFileId(caseFileId: string, scope: ClinicalAccessScope) {
+    const caseFile = await this.getVisibleCaseFileOrThrow(caseFileId, scope);
+    this.clinicalPolicy.requireCapability(
+      scope,
+      OrganizationCapability.DOCUMENT_METADATA_READ,
+      'documents.find_by_case_file',
+    );
+    await this.requireAssignment(caseFile.patientId, scope);
 
     return this.prisma.document.findMany({
-      where: { caseFileId },
+      where: {
+        caseFileId,
+        organizationId: scope.organizationId,
+      },
       orderBy: {
         uploadedAt: 'desc',
       },
@@ -131,59 +173,123 @@ export class DocumentsService {
   async update(
     id: string,
     updateDocumentDto: UpdateDocumentDto,
-    user: AuthenticatedUser,
+    scope: ClinicalAccessScope,
   ) {
-    await this.findOne(id, user);
+    const document = await this.getVisibleDocumentOrThrow(id, scope);
+    this.clinicalPolicy.requireCapability(
+      scope,
+      OrganizationCapability.DOCUMENT_UPDATE,
+      'documents.update',
+    );
+    await this.requireAssignment(document.caseFile.patientId, scope);
+    if (updateDocumentDto.filePath) {
+      this.assertSafeStoredDocumentPath(
+        updateDocumentDto.filePath,
+        document.caseFile.patientId,
+      );
+    }
 
-    return this.prisma.document.update({
-      where: { id },
-      data: updateDocumentDto,
+    const result = await this.prisma.document.updateMany({
+      where: {
+        id,
+        organizationId: scope.organizationId,
+        caseFile: {
+          organizationId: scope.organizationId,
+          patient: this.clinicalPolicy.assignedPatientWhere(scope),
+        },
+      },
+      data: this.withoutServerFields(updateDocumentDto),
     });
+
+    if (result.count !== 1) {
+      throw this.documentNotFound();
+    }
+
+    return this.getAssignedDocumentMetadataOrThrow(id, scope);
   }
 
-  async remove(id: string, user: AuthenticatedUser) {
-    const document = await this.findOne(id, user);
-    const deletedDocument = await this.prisma.document.delete({
-      where: { id },
+  async remove(id: string, scope: ClinicalAccessScope) {
+    const document = await this.getVisibleDocumentOrThrow(id, scope);
+    this.clinicalPolicy.requireCapability(
+      scope,
+      OrganizationCapability.DOCUMENT_DELETE,
+      'documents.remove',
+    );
+    await this.requireAssignment(document.caseFile.patientId, scope);
+
+    const result = await this.prisma.document.deleteMany({
+      where: {
+        id,
+        organizationId: scope.organizationId,
+        caseFile: {
+          organizationId: scope.organizationId,
+          patient: this.clinicalPolicy.assignedPatientWhere(scope),
+        },
+      },
     });
 
-    await this.cleanupDocumentFiles([document.filePath]);
+    if (result.count !== 1) {
+      throw this.documentNotFound();
+    }
 
-    return deletedDocument;
+    await this.cleanupDocumentFile(
+      document.filePath,
+      document.caseFile.patientId,
+    );
+
+    return stripDocumentRelations(document);
   }
 
   async cleanupDocumentFiles(filePaths: string[]) {
     for (const filePath of filePaths) {
-      try {
-        await this.removeDocumentFile(filePath);
-      } catch (error) {
-        this.logger.error(
-          JSON.stringify({
-            event: 'document_cleanup_failed',
-            errorType: error instanceof Error ? error.name : 'UnknownError',
-          }),
-        );
-      }
+      await this.cleanupDocumentFile(filePath);
     }
   }
 
-  async getDownloadFile(id: string, user: AuthenticatedUser) {
-    const document = await this.getDocumentOrThrow(id, user);
+  private async cleanupDocumentFile(filePath: string, patientId?: string) {
+    try {
+      await this.removeDocumentFile(filePath, patientId);
+    } catch (error) {
+      this.logger.error(
+        JSON.stringify({
+          event: 'document_cleanup_failed',
+          errorType: error instanceof Error ? error.name : 'UnknownError',
+        }),
+      );
+    }
+  }
+
+  async getDownloadFile(id: string, scope: ClinicalAccessScope) {
+    const document = await this.getVisibleDocumentOrThrow(id, scope);
+    this.clinicalPolicy.requireCapability(
+      scope,
+      OrganizationCapability.DOCUMENT_DOWNLOAD,
+      'documents.download',
+    );
+    await this.requireAssignment(document.caseFile.patientId, scope);
     const absoluteFilePath = await this.resolveDocumentFilePath(
       document.filePath,
+      document.caseFile.patientId,
     );
 
     return {
-      document,
+      document: stripDocumentRelations(document),
       absoluteFilePath,
       mimeType: document.mimeType ?? 'application/octet-stream',
     };
   }
 
-  async getViewFile(id: string, user: AuthenticatedUser) {
-    const document = await this.getDocumentOrThrow(id, user);
+  async getViewFile(id: string, scope: ClinicalAccessScope) {
+    const document = await this.getVisibleDocumentOrThrow(id, scope);
+    this.clinicalPolicy.requireCapability(
+      scope,
+      OrganizationCapability.DOCUMENT_DOWNLOAD,
+      'documents.view',
+    );
+    await this.requireAssignment(document.caseFile.patientId, scope);
     const absoluteFilePath = await this.resolveDocumentFilePath(
       document.filePath,
+      document.caseFile.patientId,
     );
 
     if (!document.mimeType || !allowedInlineMimeTypes.has(document.mimeType)) {
@@ -193,71 +299,76 @@ export class DocumentsService {
     }
 
     return {
-      document,
+      document: stripDocumentRelations(document),
       absoluteFilePath,
       mimeType: document.mimeType,
     };
   }
 
-  private isAdmin(user: AuthenticatedUser) {
-    return user.role === UserRole.ADMIN;
-  }
-
-  private async getAccessibleCaseFileOrThrow(
+  private async getVisibleCaseFileOrThrow(
     caseFileId: string,
-    user: AuthenticatedUser,
+    scope: ClinicalAccessScope,
   ) {
-    const caseFile = this.isAdmin(user)
-      ? await this.prisma.caseFile.findUnique({ where: { id: caseFileId } })
-      : await this.prisma.caseFile.findFirst({
-          where: {
-            id: caseFileId,
-            patient: {
-              psychologistId: user.id,
-            },
-          },
-        });
+    const caseFile = await this.prisma.caseFile.findFirst({
+      where: {
+        id: caseFileId,
+        organizationId: scope.organizationId,
+        patient: this.clinicalPolicy.tenantPatientWhere(scope),
+      },
+      select: { id: true, patientId: true },
+    });
 
     if (!caseFile) {
-      throw new NotFoundException(
-        `Case file with id "${caseFileId}" not found`,
-      );
+      throw new NotFoundException('Case file not found');
     }
 
     return caseFile;
   }
 
-  private async ensureUserExists(userId: string) {
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      select: { id: true },
+  private toStoredPath(absoluteUploadRoot: string, absoluteFilePath: string) {
+    return relative(absoluteUploadRoot, absoluteFilePath).split(sep).join('/');
+  }
+
+  private async getVisibleDocumentOrThrow(
+    id: string,
+    scope: ClinicalAccessScope,
+  ) {
+    const document = await this.prisma.document.findFirst({
+      where: {
+        id,
+        organizationId: scope.organizationId,
+        caseFile: {
+          organizationId: scope.organizationId,
+          patient: this.clinicalPolicy.tenantPatientWhere(scope),
+        },
+      },
+      include: { caseFile: { select: { patientId: true } } },
     });
 
-    if (!user) {
-      throw new NotFoundException(`User with id "${userId}" not found`);
+    if (!document) {
+      throw this.documentNotFound();
     }
+
+    return document;
   }
 
-  private toRelativePath(absoluteFilePath: string) {
-    return relative(process.cwd(), absoluteFilePath).split(sep).join('/');
-  }
-
-  private async getDocumentOrThrow(id: string, user: AuthenticatedUser) {
-    const document = this.isAdmin(user)
-      ? await this.prisma.document.findUnique({ where: { id } })
-      : await this.prisma.document.findFirst({
-          where: {
-            id,
-            caseFile: {
-              patient: {
-                psychologistId: user.id,
-              },
-            },
-          },
-        });
+  private async getAssignedDocumentMetadataOrThrow(
+    id: string,
+    scope: ClinicalAccessScope,
+  ) {
+    const document = await this.prisma.document.findFirst({
+      where: {
+        id,
+        organizationId: scope.organizationId,
+        caseFile: {
+          organizationId: scope.organizationId,
+          patient: this.clinicalPolicy.assignedPatientWhere(scope),
+        },
+      },
+    });
 
     if (!document) {
-      throw new NotFoundException(`Document with id "${id}" not found`);
+      throw this.documentNotFound();
     }
 
     return document;
@@ -271,9 +382,12 @@ export class DocumentsService {
       : resolve(process.cwd(), uploadRoot);
   }
 
-  private async resolveDocumentFilePath(filePath: string) {
-    const { uploadsRoot, candidatePath } =
-      this.getConfinedDocumentPath(filePath);
+  private async resolveDocumentFilePath(filePath: string, patientId: string) {
+    this.assertSafeStoredDocumentPath(filePath, patientId);
+    const { uploadsRoot, candidatePath } = this.getConfinedDocumentPath(
+      filePath,
+      patientId,
+    );
 
     try {
       await access(candidatePath);
@@ -288,11 +402,9 @@ export class DocumentsService {
     return candidatePath;
   }
 
-  private getConfinedDocumentPath(filePath: string) {
+  private getConfinedDocumentPath(filePath: string, patientId?: string) {
     const uploadsRoot = this.getUploadsRoot();
-    const candidatePath = isAbsolute(filePath)
-      ? resolve(filePath)
-      : resolve(process.cwd(), filePath);
+    const candidatePath = this.resolveStoredDocumentPath(filePath, uploadsRoot);
     const relativeToUploadsRoot = relative(uploadsRoot, candidatePath);
 
     if (
@@ -302,12 +414,38 @@ export class DocumentsService {
       throw new NotFoundException('Document file not found');
     }
 
+    if (patientId) {
+      const normalizedRelativePath = relativeToUploadsRoot.split(sep).join('/');
+      if (!normalizedRelativePath.startsWith(`patients/${patientId}/`)) {
+        throw new NotFoundException('Document file not found');
+      }
+    }
+
     return { uploadsRoot, candidatePath };
   }
 
-  private async removeDocumentFile(filePath: string) {
-    const { uploadsRoot, candidatePath } =
-      this.getConfinedDocumentPath(filePath);
+  private resolveStoredDocumentPath(filePath: string, uploadsRoot: string) {
+    if (isAbsolute(filePath)) {
+      return resolve(filePath);
+    }
+
+    const legacyProcessRelativePath = resolve(process.cwd(), filePath);
+    const relativeLegacyPath = relative(uploadsRoot, legacyProcessRelativePath);
+    if (
+      !relativeLegacyPath.startsWith('..') &&
+      !isAbsolute(relativeLegacyPath)
+    ) {
+      return legacyProcessRelativePath;
+    }
+
+    return resolve(uploadsRoot, filePath);
+  }
+
+  private async removeDocumentFile(filePath: string, patientId?: string) {
+    const { uploadsRoot, candidatePath } = this.getConfinedDocumentPath(
+      filePath,
+      patientId,
+    );
 
     try {
       await this.assertResolvedPathIsWithinUploadsRoot(
@@ -348,6 +486,69 @@ export class DocumentsService {
       throw new NotFoundException('Document file not found');
     }
   }
+
+  private async requireAssignment(
+    patientId: string,
+    scope: ClinicalAccessScope,
+  ) {
+    const assignment = await this.prisma.patientAssignment.findFirst({
+      where: {
+        ...this.clinicalPolicy.assignmentWhere(scope),
+        patientId,
+        patient: this.clinicalPolicy.tenantPatientWhere(scope),
+      },
+      select: { id: true },
+    });
+
+    if (!assignment) {
+      throw new ForbiddenException('Clinical assignment is required');
+    }
+  }
+
+  private assertSafeStoredDocumentPath(filePath: string, patientId: string) {
+    if (filePath.includes('\0') || isAbsolute(filePath)) {
+      throw new BadRequestException('Invalid document storage path');
+    }
+
+    let decodedPath = filePath;
+    try {
+      decodedPath = decodeURIComponent(filePath);
+    } catch {
+      throw new BadRequestException('Invalid document storage path');
+    }
+
+    if (
+      decodedPath.includes('\0') ||
+      isAbsolute(decodedPath) ||
+      hasParentTraversal(decodedPath)
+    ) {
+      throw new BadRequestException('Invalid document storage path');
+    }
+
+    const { uploadsRoot, candidatePath } = this.getConfinedDocumentPath(
+      filePath,
+      patientId,
+    );
+    const relativeToUploadsRoot = relative(uploadsRoot, candidatePath)
+      .split(sep)
+      .join('/');
+    if (!relativeToUploadsRoot.startsWith(`patients/${patientId}/`)) {
+      throw new BadRequestException('Invalid document storage path');
+    }
+  }
+
+  private withoutServerFields<T extends object>(
+    dto: T,
+  ): Omit<T, 'organizationId' | 'uploadedById'> {
+    const documentData = { ...dto };
+    Reflect.deleteProperty(documentData, 'organizationId');
+    Reflect.deleteProperty(documentData, 'uploadedById');
+    return documentData;
+  }
+
+  private documentNotFound() {
+    return new NotFoundException('Document not found');
+  }
 }
 
 function getFileSystemErrorCode(error: unknown) {
@@ -356,4 +557,21 @@ function getFileSystemErrorCode(error: unknown) {
   }
 
   return undefined;
+}
+
+function hasParentTraversal(filePath: string) {
+  return filePath
+    .replace(/\\/g, '/')
+    .split('/')
+    .some((segment) => segment === '..');
+}
+
+type AuthorizedDocument = Prisma.DocumentGetPayload<{
+  include: { caseFile: { select: { patientId: true } } };
+}>;
+
+function stripDocumentRelations(document: AuthorizedDocument) {
+  const metadata = { ...document };
+  Reflect.deleteProperty(metadata, 'caseFile');
+  return metadata;
 }
