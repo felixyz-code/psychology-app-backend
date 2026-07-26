@@ -23,7 +23,7 @@ MVP Development
 Tenant platform checkpoint:
 
 ```text
-POST-GO-LIVE.2.1D4 Integrated Tenant Certification completed locally
+POST-GO-LIVE.2.1D5 Tenant Platform Certification published for review
 ```
 
 Current priorities:
@@ -48,8 +48,8 @@ POST-GO-LIVE.2
  ├── 2.1D1 Patients                      ✅ COMPLETADO
  ├── 2.1D2 Clinical Core                 ✅ COMPLETADO
  ├── 2.1D3 Scheduling & Financial        COMPLETADO
- ├── 2.1D4 Cross Validation              ⏳ PENDIENTE
- └── 2.1D5 Tenant Certification          ⏳ PENDIENTE
+ ├── 2.1D4 Cross Validation              COMPLETADO
+ └── 2.1D5 Tenant Certification          D5-R REVIEW
 
 POST-GO-LIVE.3                           ⏳
 POST-GO-LIVE.4                           ⏳
@@ -59,6 +59,11 @@ POST-GO-LIVE.7                           ⏳
 ```
 
 ---
+
+D5 status note: Cross Validation / POST-GO-LIVE.2.1D4 is completed and merged.
+Tenant Certification / POST-GO-LIVE.2.1D5 is published for D5-R review. The
+broader POST-GO-LIVE.2.1D closure remains pending D5-R review, controlled
+merge, and post-merge verification.
 
 # Completed Milestones
 
@@ -240,13 +245,16 @@ while Finance uses `finance.read`, `finance.manage`, and
 `finance.summary_read` with immutable `organizationId` predicates and
 server-derived `createdById`.
 
-POST-GO-LIVE.2.1D4 completed local integrated tenant certification for the
-D1 through D3 converted modules. It validates the combined PostgreSQL contract
-for tenant context, capabilities, assignments, cross-tenant isolation,
-legacy-null exclusion, document blobs, appointment notes, server-owned fields,
-financial summaries, OpenAPI/decorator coverage, and sanitized observability.
-It does not close POST-GO-LIVE.2.1D; final closure remains pending D-M after
-D4 review and controlled merge.
+POST-GO-LIVE.2.1D4 completed integrated tenant certification for the D1 through
+D3 converted modules and is merged to `development`.
+
+POST-GO-LIVE.2.1D5 publishes the final tenant platform certification package
+for D5-R review. It validates representative final-platform gates for tenant
+context, capabilities, assignments, cross-tenant isolation, legacy-null
+exclusion, document blobs, appointment notes, server-owned fields, financial
+summaries, OpenAPI server-owned contracts, and readiness reporting. It does
+not close POST-GO-LIVE.2.1D; final closure remains pending D5-R review,
+controlled merge, post-merge verification, and an explicit closure decision.
 
 ## Tenant Platform Milestones
 
@@ -256,15 +264,18 @@ Completed:
 * ✓ Clinical Core
 * Scheduling
 * Financial
+* Cross Validation
+* Tenant Certification package published
 
 Remaining:
 
-* Cross Validation
-* Certification
+* D5-R review
+* Controlled merge and post-merge verification
 
 Certification note: Cross Validation maps to POST-GO-LIVE.2.1D4 and is
-completed locally pending D4 review and controlled merge. The broader
-Certification / D-M closure remains pending.
+completed and merged. Certification maps to POST-GO-LIVE.2.1D5 and is
+published for D5-R review. The broader POST-GO-LIVE.2.1D closure remains
+pending D5-R review, controlled merge, and post-merge verification.
 
 ## Tenant-Aware Module Matrix
 
@@ -287,26 +298,27 @@ Certification / D-M closure remains pending.
 | Clinical Core | ✅ |
 | Scheduling | Completed in 2.1D3 |
 | Financial | Completed in 2.1D3 |
-| Cross Validation | ⏳ |
-| Certification | ⏳ |
+| Cross Validation | Completed |
+| Certification | Published for D5-R review |
 
 Using the five POST-GO-LIVE.2.1D execution stages as the roadmap reference:
 
-D4 status note: POST-GO-LIVE.2.1D4 is completed locally and awaits D4-R review
-and merge. D5 / D-M closure remains pending.
+D5 status note: POST-GO-LIVE.2.1D5 is published for D5-R review. Final
+POST-GO-LIVE.2.1D closure remains pending controlled review, merge, and
+post-merge verification.
 
 | Stage | Status |
 | --- | --- |
 | D1 | ✅ |
 | D2 | ✅ |
 | D3 | Completed |
-| D4 | ⏳ |
-| D5 | ⏳ |
+| D4 | Completed |
+| D5 | Published for D5-R review |
 
-The tenant-aware conversion is approximately 80% complete: four of five
-POST-GO-LIVE.2.1D stages are closed. This is a technical roadmap reference,
-not a productivity metric, and may be adjusted if later stages differ
-materially in size.
+The tenant-aware conversion implementation is complete for D1 through D5 from
+a local certification perspective, but the broader POST-GO-LIVE.2.1D phase is
+not closed until D5-R review, controlled merge, and post-merge verification
+are accepted.
 
 ---
 
@@ -381,13 +393,16 @@ certified, merged, and closed.
 ## POST-GO-LIVE.2.1D3
 
 Scheduling and Financial tenant conversion is implemented and certified
-locally for Appointments, Financial Transactions, and Financial Summary. The
-next eligible control is POST-GO-LIVE.2.1D3-R final review, PostgreSQL
-certification evidence review, and merge.
+locally for Appointments, Financial Transactions, and Financial Summary, and
+is merged before D5.
 
 ## POST-GO-LIVE.2.1D4
 
-Integrated tenant certification is implemented and locally certified for the
-converted D1 through D3 modules. The next eligible control is
-POST-GO-LIVE.2.1D4-R final integrated review and merge. D-M remains the closure
-control for POST-GO-LIVE.2.1D as a whole.
+Integrated tenant certification is completed and merged for the converted D1
+through D3 modules.
+
+## POST-GO-LIVE.2.1D5
+
+Tenant platform certification is published for D5-R review. The next eligible
+control is D5-R review, controlled merge, post-merge verification, and the
+explicit POST-GO-LIVE.2.1D closure decision. POST-GO-LIVE.3 remains unstarted.

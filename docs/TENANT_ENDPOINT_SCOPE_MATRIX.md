@@ -91,4 +91,14 @@ D4 adds no new endpoint rows. It certifies the existing D1, D2, and D3 rows
 as one integrated tenant-aware contract, including cross-module relationship
 validation, legacy-null exclusion, document blob authorization, appointment
 notes, financial `createdById`, Financial Summary filters, and shared tenant
-context semantics. Final POST-GO-LIVE.2.1D closure remains pending D-M.
+context semantics. Final POST-GO-LIVE.2.1D closure remains pending D5-R review,
+controlled merge, and post-merge verification.
+
+## POST-GO-LIVE.2.1D5 tenant platform certification status
+
+D5 adds no new endpoint rows and does not change any public API contract. It
+certifies the converted endpoint matrix as a final platform readiness package,
+including tenant context, suspended membership denial, cross-tenant `404`,
+clinical assignment, role boundaries, document blob blocking, server-owned
+financial fields, summary isolation, legacy-null exclusion, default-deny
+capabilities, and representative OpenAPI server-owned DTO assertions.

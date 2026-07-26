@@ -630,8 +630,23 @@ sanitized observability.
 D4 is a certification layer only. It introduces no new architecture primitive,
 Prisma schema change, migration, deployment, frontend behavior, production data
 operation, global Prisma middleware, or broader authorization bypass. Final
-POST-GO-LIVE.2.1D closure remains reserved for the later D-M controlled merge
-step.
+POST-GO-LIVE.2.1D closure remains reserved for D5-R review, controlled merge,
+and post-merge verification.
+
+## Tenant Platform Certification (POST-GO-LIVE.2.1D5)
+
+D5 is the final local readiness layer for the converted tenant-aware clinical
+and financial backend platform. It adds an opt-in certification suite and a
+readiness report that confirm the composed architecture still depends on
+validated tenant context, explicit capability checks, scoped repository
+predicates, server-owned tenant fields, assignment for clinical content, and
+document metadata authorization before blob access.
+
+D5 introduces no new architecture primitive, public endpoint, Prisma schema
+change, migration, deployment, frontend behavior, production data operation,
+global Prisma middleware, RLS policy, tenant administration product expansion,
+or POST-GO-LIVE.3 work. Final closure remains pending controlled review and
+merge evidence.
 
 ---
 

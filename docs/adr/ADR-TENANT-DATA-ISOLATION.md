@@ -40,3 +40,10 @@ PostgreSQL RLS may be evaluated later as defense in depth only. It needs `SET LO
 ## Testing gate
 
 Every converted module must prove list/read/create/update/delete isolation, foreign relation rejection, aggregate/export scope, null legacy behavior, and parallel two-organization requests. Tests must cover direct IDs and included relations; happy-path filtering is insufficient.
+
+POST-GO-LIVE.2.1D5 certifies the final converted tenant platform with an
+additional opt-in readiness suite. That suite does not change the isolation
+strategy; it confirms the application-enforced repository and policy approach
+continues to hold across representative clinical, document, scheduling,
+financial, OpenAPI, and default-deny capability gates. PostgreSQL RLS remains
+deferred as defense in depth only.

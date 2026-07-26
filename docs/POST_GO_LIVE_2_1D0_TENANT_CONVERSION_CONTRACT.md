@@ -411,6 +411,18 @@ document metadata-before-blob authorization, appointment notes separation,
 server-owned `createdById`, financial filters and summaries, and sanitized
 observability.
 
-D4 does not close POST-GO-LIVE.2.1D as a whole. Closure remains pending D4
+D4 closed the integrated D1 through D3 certification layer after review and
+controlled merge.
+
+## POST-GO-LIVE.2.1D5 certification status
+
+POST-GO-LIVE.2.1D5 publishes the final tenant platform certification suite and
+readiness report for D5-R review. It certifies representative platform gates
+for tenant context, suspended memberships, cross-tenant redaction, clinical
+assignment, role boundaries, document blobs, server-owned finance fields,
+summary isolation, legacy-null exclusion, default-deny capabilities, and
+OpenAPI server-owned request contracts.
+
+D5 does not close POST-GO-LIVE.2.1D as a whole. Closure remains pending D5-R
 review, controlled merge, development synchronization, post-merge verification,
-and the explicit D-M closure step.
+and the explicit closure decision.
