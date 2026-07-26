@@ -27,6 +27,9 @@ import { UserRole } from '@prisma/client';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import type { AuthenticatedUser } from '../auth/types/authenticated-user.type';
+import { CurrentTenant } from '../tenant-context/decorators/current-tenant.decorator';
+import { TenantRequired } from '../tenant-context/decorators/tenant-required.decorator';
+import type { TenantContext } from '../tenant-context/tenant-context.types';
 import { AppointmentsService } from './appointments.service';
 import { CreateAppointmentDto } from './dto/create-appointment.dto';
 import { UpdateAppointmentDto } from './dto/update-appointment.dto';
@@ -40,6 +43,7 @@ import { AppointmentResponseDto } from './dto/appointment-response.dto';
 @ApiForbiddenResponse({
   description: 'Authenticated user lacks a permitted role',
 })
+@TenantRequired()
 @Controller('appointments')
 @Roles(UserRole.ADMIN, UserRole.PSYCHOLOGIST)
 @UsePipes(
@@ -63,8 +67,12 @@ export class AppointmentsController {
   create(
     @Body() createAppointmentDto: CreateAppointmentDto,
     @CurrentUser() user: AuthenticatedUser,
+    @CurrentTenant(true) tenant: TenantContext,
   ) {
-    return this.appointmentsService.create(createAppointmentDto, user);
+    return this.appointmentsService.create(
+      createAppointmentDto,
+      this.createScope(tenant, user),
+    );
   }
 
   @Get()
@@ -74,8 +82,11 @@ export class AppointmentsController {
     type: AppointmentResponseDto,
     isArray: true,
   })
-  findAll(@CurrentUser() user: AuthenticatedUser) {
-    return this.appointmentsService.findAll(user);
+  findAll(
+    @CurrentUser() user: AuthenticatedUser,
+    @CurrentTenant(true) tenant: TenantContext,
+  ) {
+    return this.appointmentsService.findAll(this.createScope(tenant, user));
   }
 
   @Get('patient/:patientId')
@@ -96,8 +107,12 @@ export class AppointmentsController {
   findByPatientId(
     @Param('patientId', ParseUUIDPipe) patientId: string,
     @CurrentUser() user: AuthenticatedUser,
+    @CurrentTenant(true) tenant: TenantContext,
   ) {
-    return this.appointmentsService.findByPatientId(patientId, user);
+    return this.appointmentsService.findByPatientId(
+      patientId,
+      this.createScope(tenant, user),
+    );
   }
 
   @Get(':id')
@@ -117,8 +132,9 @@ export class AppointmentsController {
   findOne(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser() user: AuthenticatedUser,
+    @CurrentTenant(true) tenant: TenantContext,
   ) {
-    return this.appointmentsService.findOne(id, user);
+    return this.appointmentsService.findOne(id, this.createScope(tenant, user));
   }
 
   @Patch(':id')
@@ -142,8 +158,13 @@ export class AppointmentsController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updateAppointmentDto: UpdateAppointmentDto,
     @CurrentUser() user: AuthenticatedUser,
+    @CurrentTenant(true) tenant: TenantContext,
   ) {
-    return this.appointmentsService.update(id, updateAppointmentDto, user);
+    return this.appointmentsService.update(
+      id,
+      updateAppointmentDto,
+      this.createScope(tenant, user),
+    );
   }
 
   @Delete(':id')
@@ -163,7 +184,19 @@ export class AppointmentsController {
   remove(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser() user: AuthenticatedUser,
+    @CurrentTenant(true) tenant: TenantContext,
   ) {
-    return this.appointmentsService.remove(id, user);
+    return this.appointmentsService.remove(id, this.createScope(tenant, user));
+  }
+
+  private createScope(tenant: TenantContext, user: AuthenticatedUser) {
+    return {
+      organizationId: tenant.organizationId,
+      membershipId: tenant.membershipId,
+      organizationRole: tenant.organizationRole,
+      userId: user.id,
+      legacyUserRole: tenant.legacyUserRole,
+      resolutionMode: tenant.resolutionMode,
+    };
   }
 }
