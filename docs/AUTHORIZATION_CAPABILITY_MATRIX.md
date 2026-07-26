@@ -97,6 +97,15 @@ the selected organization and financial capability, not clinical assignment or
 `report.read`. `createdById` is derived server-side from the authenticated
 request scope and request payload values cannot choose it.
 
+### POST-GO-LIVE.2.1D4 integrated runtime certification
+
+D4 certifies the D1 through D3 capability behavior together. Capabilities still
+remain explicit and default-deny: read does not imply write, document metadata
+does not imply blob access, `appointment.read` / `appointment.manage` do not
+grant notes, `finance.read` and `report.read` do not grant
+`finance.summary_read`, and role eligibility does not replace clinical
+assignment where clinical content is involved.
+
 ## POST-GO-LIVE.2.1C0 approved contract — invitation and membership mutations
 
 This table is an approved 2.1C0 contract, not a runtime grant. The typed catalog

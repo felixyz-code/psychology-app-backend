@@ -84,3 +84,11 @@ The Organization, Membership, and Invitation rows above are now implemented.
 required resolved tenant context. Recipient accept/reject explicitly skip
 tenant resolution so a pending invitation cannot establish tenant authority.
 All organization-path mismatches are redacted as `404`.
+
+## POST-GO-LIVE.2.1D4 integrated certification status
+
+D4 adds no new endpoint rows. It certifies the existing D1, D2, and D3 rows
+as one integrated tenant-aware contract, including cross-module relationship
+validation, legacy-null exclusion, document blob authorization, appointment
+notes, financial `createdById`, Financial Summary filters, and shared tenant
+context semantics. Final POST-GO-LIVE.2.1D closure remains pending D-M.

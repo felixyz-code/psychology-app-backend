@@ -23,7 +23,7 @@ MVP Development
 Tenant platform checkpoint:
 
 ```text
-POST-GO-LIVE.2.1D3 Scheduling & Financial completed
+POST-GO-LIVE.2.1D4 Integrated Tenant Certification completed locally
 ```
 
 Current priorities:
@@ -240,6 +240,14 @@ while Finance uses `finance.read`, `finance.manage`, and
 `finance.summary_read` with immutable `organizationId` predicates and
 server-derived `createdById`.
 
+POST-GO-LIVE.2.1D4 completed local integrated tenant certification for the
+D1 through D3 converted modules. It validates the combined PostgreSQL contract
+for tenant context, capabilities, assignments, cross-tenant isolation,
+legacy-null exclusion, document blobs, appointment notes, server-owned fields,
+financial summaries, OpenAPI/decorator coverage, and sanitized observability.
+It does not close POST-GO-LIVE.2.1D; final closure remains pending D-M after
+D4 review and controlled merge.
+
 ## Tenant Platform Milestones
 
 Completed:
@@ -253,6 +261,10 @@ Remaining:
 
 * Cross Validation
 * Certification
+
+Certification note: Cross Validation maps to POST-GO-LIVE.2.1D4 and is
+completed locally pending D4 review and controlled merge. The broader
+Certification / D-M closure remains pending.
 
 ## Tenant-Aware Module Matrix
 
@@ -280,6 +292,9 @@ Remaining:
 
 Using the five POST-GO-LIVE.2.1D execution stages as the roadmap reference:
 
+D4 status note: POST-GO-LIVE.2.1D4 is completed locally and awaits D4-R review
+and merge. D5 / D-M closure remains pending.
+
 | Stage | Status |
 | --- | --- |
 | D1 | ✅ |
@@ -288,7 +303,7 @@ Using the five POST-GO-LIVE.2.1D execution stages as the roadmap reference:
 | D4 | ⏳ |
 | D5 | ⏳ |
 
-The tenant-aware conversion is approximately 60% complete: three of five
+The tenant-aware conversion is approximately 80% complete: four of five
 POST-GO-LIVE.2.1D stages are closed. This is a technical roadmap reference,
 not a productivity metric, and may be adjusted if later stages differ
 materially in size.
@@ -369,3 +384,10 @@ Scheduling and Financial tenant conversion is implemented and certified
 locally for Appointments, Financial Transactions, and Financial Summary. The
 next eligible control is POST-GO-LIVE.2.1D3-R final review, PostgreSQL
 certification evidence review, and merge.
+
+## POST-GO-LIVE.2.1D4
+
+Integrated tenant certification is implemented and locally certified for the
+converted D1 through D3 modules. The next eligible control is
+POST-GO-LIVE.2.1D4-R final integrated review and merge. D-M remains the closure
+control for POST-GO-LIVE.2.1D as a whole.

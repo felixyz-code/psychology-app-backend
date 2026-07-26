@@ -618,6 +618,21 @@ organizational role plus capabilities and assignment. Legacy
 `organizationId = NULL` patients are not included in tenant-aware reads or
 mutations.
 
+## Integrated Tenant Certification (POST-GO-LIVE.2.1D4)
+
+The converted D1 through D3 modules are certified together by an opt-in
+PostgreSQL E2E suite that exercises tenant context resolution, role and
+capability boundaries, clinical assignment, cross-tenant redaction, legacy-null
+exclusion, document blob authorization, appointment notes projections,
+server-owned ownership fields, financial filters, summary totals, and
+sanitized observability.
+
+D4 is a certification layer only. It introduces no new architecture primitive,
+Prisma schema change, migration, deployment, frontend behavior, production data
+operation, global Prisma middleware, or broader authorization bypass. Final
+POST-GO-LIVE.2.1D closure remains reserved for the later D-M controlled merge
+step.
+
 ---
 
 # References

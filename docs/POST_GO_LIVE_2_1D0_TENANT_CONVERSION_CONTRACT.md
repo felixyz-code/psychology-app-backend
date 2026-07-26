@@ -399,3 +399,18 @@ production access, deployments, migrations, Prisma schema changes, capability
 runtime enum changes, global Prisma middleware, redacted clinical access for
 `AUDITOR` or `READ_ONLY`, platform administrator bypasses, billing SaaS,
 patient portal behavior, or merge to `development`.
+
+## POST-GO-LIVE.2.1D4 certification status
+
+POST-GO-LIVE.2.1D4 locally certifies the integrated D1 through D3 tenant
+contract using an opt-in PostgreSQL E2E suite and the existing four migrations.
+The suite exercises the freelancer `OWNER` flow, role and capability limits,
+tenant context selection, cross-tenant isolation, legacy-null exclusion,
+same-tenant relationship validation, assignment enforcement, projections,
+document metadata-before-blob authorization, appointment notes separation,
+server-owned `createdById`, financial filters and summaries, and sanitized
+observability.
+
+D4 does not close POST-GO-LIVE.2.1D as a whole. Closure remains pending D4
+review, controlled merge, development synchronization, post-merge verification,
+and the explicit D-M closure step.
