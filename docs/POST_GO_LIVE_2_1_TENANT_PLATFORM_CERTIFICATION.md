@@ -32,6 +32,12 @@ gate is set.
 
 ## Readiness Decision
 
+Formal classification:
+
+```text
+READY FOR TENANT ADMINISTRATION DEVELOPMENT
+```
+
 The backend tenant platform is ready for D5-R review.
 
 The platform is considered ready for controlled review because the converted
@@ -39,6 +45,13 @@ clinical and financial modules now consistently require validated tenant
 context, active organization membership, explicit capability grants, scoped
 repository predicates, server-owned tenant fields, and clinical assignment
 where documented.
+
+This means the backend tenant-aware clinical and financial conversion is
+certified for isolation and contract integrity, and POST-GO-LIVE.3 can begin
+after D5-R closure. It does not imply production tenant enforcement,
+production deployment, data backfill, implemented Organization or Membership
+Administration, invitations, switch-tenant UX, or tenant-aware frontend
+completion.
 
 ## Certified Gates
 
