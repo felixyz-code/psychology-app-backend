@@ -22,6 +22,7 @@
 | `appointment.manage` | Allow | Allow | Conditional | Conditional | Deny | Deny | Deny | Receptionist cannot alter clinical notes/assignment |
 | `finance.read` | Allow | Allow | Deny | Deny | Allow | Conditional | Deny | Auditor is read-only |
 | `finance.manage` | Allow | Allow | Deny | Deny | Allow | Deny | Deny | Organization-scoped only |
+| `finance.summary_read` | Allow | Allow | Deny | Deny | Allow | Deny | Deny | Organization-scoped aggregates only |
 | `report.read` | Allow | Allow | Conditional | Conditional | Conditional | Conditional | Conditional | Capability/redaction scoped |
 | `audit.read` | Allow | Deny | Deny | Deny | Deny | Allow | Deny | Metadata only |
 
@@ -79,6 +80,22 @@ psychologist restriction.
 `AUDITOR` and `READ_ONLY` continue to receive no clinical content, session
 notes, document metadata, document blob download, or redacted clinical
 projection during 2.1D2.
+
+### POST-GO-LIVE.2.1D3 scheduling and financial runtime status
+
+Appointments now implement `appointment.read` and `appointment.manage` with a
+resolved tenant context and `organizationId` predicates. Operational
+appointment projections are tenant-scoped; `Appointment.notes` is clinical
+content and is returned or mutated only when the actor has clinical capability
+and an active same-tenant assignment. `RECEPTIONIST` may operate scheduling
+fields through the conditional appointment policy, but cannot read or change
+notes. `OWNER` and `ADMIN` do not receive notes by role alone.
+
+Financial Transactions and Financial Summary now implement `finance.read`,
+`finance.manage`, and `finance.summary_read`. Financial access is scoped by
+the selected organization and financial capability, not clinical assignment or
+`report.read`. `createdById` is derived server-side from the authenticated
+request scope and request payload values cannot choose it.
 
 ## POST-GO-LIVE.2.1C0 approved contract — invitation and membership mutations
 

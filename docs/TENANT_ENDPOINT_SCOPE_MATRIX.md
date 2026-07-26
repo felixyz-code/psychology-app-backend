@@ -46,18 +46,18 @@
 | GET | `/documents/:id/download` | Documents | Yes | `document.download` | Document metadata authorized before filesystem; path constrained to tenant patient folder | 404 | D2 aligned | Complete in 2.1D2 |
 | PATCH | `/documents/:id` | Documents | Yes | `document.update` | Document tenant + active assignment + temporary legacy psychologist restriction | 404 | D2 aligned | Complete in 2.1D2 |
 | DELETE | `/documents/:id` | Documents | Yes | `document.delete` | Document tenant + active assignment + temporary legacy psychologist restriction; metadata delete before best-effort blob cleanup | 404 | D2 aligned | Complete in 2.1D2 |
-| POST | `/appointments` | Appointments | Target yes | `appointment.manage` | Patient/professional same tenant | 404/400 mismatch | Legacy global/psychologist | 2.1D |
-| GET | `/appointments` | Appointments | Target yes | `appointment.read` | Tenant; field minimization | Empty list | Legacy global/psychologist | 2.1D |
-| GET | `/appointments/patient/:patientId` | Appointments | Target yes | `appointment.read` | Patient tenant | 404 | Legacy global/psychologist | 2.1D |
-| GET | `/appointments/:id` | Appointments | Target yes | `appointment.read` | Appointment tenant | 404 | Legacy global/psychologist | 2.1D |
-| PATCH | `/appointments/:id` | Appointments | Target yes | `appointment.manage` | Tenant + relation consistency | 404/400 mismatch | Legacy global/psychologist | 2.1D |
-| DELETE | `/appointments/:id` | Appointments | Target yes | `appointment.manage` | Appointment tenant | 404 | Legacy global/psychologist | 2.1D |
-| POST | `/financial-transactions` | Finance | Target yes | `finance.manage` | Tenant; patient/appointment match | 404/400 mismatch | Legacy global/psychologist | 2.1D |
-| GET | `/financial-transactions` | Finance | Target yes | `finance.read` | Tenant predicate | Empty list | Legacy global/psychologist | 2.1D |
-| GET | `/financial-transactions/summary` | Finance/report | Target yes | `finance.read`, `report.read` | Tenant-scoped groupBy | Empty summary | Legacy global/psychologist | 2.1D |
-| GET | `/financial-transactions/:id` | Finance | Target yes | `finance.read` | Transaction tenant | 404 | Legacy global/psychologist | 2.1D |
-| PATCH | `/financial-transactions/:id` | Finance | Target yes | `finance.manage` | Tenant + relation consistency | 404/400 mismatch | Legacy global/psychologist | 2.1D |
-| DELETE | `/financial-transactions/:id` | Finance | Target yes | `finance.manage` | Transaction tenant | 404 | Legacy global/psychologist | 2.1D |
+| POST | `/appointments` | Appointments | Yes | `appointment.manage`; notes require clinical capability + assignment | Patient/professional same tenant; server tenant only | 404/403 | D3 aligned | Complete in 2.1D3 |
+| GET | `/appointments` | Appointments | Yes | `appointment.read`; notes require clinical capability + assignment | Tenant; operational projection; notes minimized | Empty list | D3 aligned | Complete in 2.1D3 |
+| GET | `/appointments/patient/:patientId` | Appointments | Yes | `appointment.read`; notes require clinical capability + assignment | Patient tenant; psychologist assignment for patient route | 404 | D3 aligned | Complete in 2.1D3 |
+| GET | `/appointments/:id` | Appointments | Yes | `appointment.read`; notes require clinical capability + assignment | Appointment tenant; operational projection | 404 | D3 aligned | Complete in 2.1D3 |
+| PATCH | `/appointments/:id` | Appointments | Yes | `appointment.manage`; notes require clinical capability + assignment | Tenant + relation consistency; receptionist cannot mutate notes | 404/403 | D3 aligned | Complete in 2.1D3 |
+| DELETE | `/appointments/:id` | Appointments | Yes | `appointment.manage` | Appointment tenant | 404 | D3 aligned | Complete in 2.1D3 |
+| POST | `/financial-transactions` | Finance | Yes | `finance.manage` | Tenant; patient/appointment match; server-derived creator | 404/400 mismatch | D3 aligned | Complete in 2.1D3 |
+| GET | `/financial-transactions` | Finance | Yes | `finance.read` | Tenant predicate | Empty list | D3 aligned | Complete in 2.1D3 |
+| GET | `/financial-transactions/summary` | Finance | Yes | `finance.summary_read` | Tenant-scoped groupBy | Empty summary | D3 aligned | Complete in 2.1D3 |
+| GET | `/financial-transactions/:id` | Finance | Yes | `finance.read` | Transaction tenant | 404 | D3 aligned | Complete in 2.1D3 |
+| PATCH | `/financial-transactions/:id` | Finance | Yes | `finance.manage` | Tenant + relation consistency; server-owned creator | 404/400 mismatch | D3 aligned | Complete in 2.1D3 |
+| DELETE | `/financial-transactions/:id` | Finance | Yes | `finance.manage` | Transaction tenant | 404 | D3 aligned | Complete in 2.1D3 |
 
 No backend report-export or dashboard endpoint exists at this checkpoint. Frontend-composed reports remain in scope because every upstream API must become tenant-scoped before they are isolated.
 
