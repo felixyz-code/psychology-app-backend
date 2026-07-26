@@ -136,14 +136,4 @@ export class CreateFinancialTransactionDto {
   @IsOptional()
   @IsUUID()
   appointmentId?: string;
-
-  @ApiPropertyOptional({
-    description:
-      'Creator user ID. Ignored for PSYCHOLOGIST and accepted for ADMIN',
-    format: 'uuid',
-    example: '550e8400-e29b-41d4-a716-446655440002',
-  })
-  @IsOptional()
-  @IsUUID()
-  createdById?: string;
 }

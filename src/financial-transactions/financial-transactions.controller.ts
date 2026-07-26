@@ -28,6 +28,9 @@ import { UserRole } from '@prisma/client';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import type { AuthenticatedUser } from '../auth/types/authenticated-user.type';
+import { CurrentTenant } from '../tenant-context/decorators/current-tenant.decorator';
+import { TenantRequired } from '../tenant-context/decorators/tenant-required.decorator';
+import type { TenantContext } from '../tenant-context/tenant-context.types';
 import { CreateFinancialTransactionDto } from './dto/create-financial-transaction.dto';
 import { FindFinancialTransactionsQueryDto } from './dto/find-financial-transactions-query.dto';
 import { FinancialTransactionSummaryDto } from './dto/financial-transaction-summary.dto';
@@ -43,6 +46,7 @@ import { FinancialTransactionsService } from './financial-transactions.service';
 @ApiForbiddenResponse({
   description: 'Authenticated user lacks a permitted role',
 })
+@TenantRequired()
 @Controller('financial-transactions')
 @Roles(UserRole.ADMIN, UserRole.PSYCHOLOGIST)
 @UsePipes(
@@ -72,9 +76,10 @@ export class FinancialTransactionsController {
   create(
     @Body() createFinancialTransactionDto: CreateFinancialTransactionDto,
     @CurrentUser() user: AuthenticatedUser,
+    @CurrentTenant(true) tenant: TenantContext,
   ) {
     return this.financialTransactionsService.create(
-      user,
+      this.createScope(tenant, user),
       createFinancialTransactionDto,
     );
   }
@@ -88,9 +93,13 @@ export class FinancialTransactionsController {
   })
   findAll(
     @CurrentUser() user: AuthenticatedUser,
+    @CurrentTenant(true) tenant: TenantContext,
     @Query() query: FindFinancialTransactionsQueryDto,
   ) {
-    return this.financialTransactionsService.findAll(user, query);
+    return this.financialTransactionsService.findAll(
+      this.createScope(tenant, user),
+      query,
+    );
   }
 
   @Get('summary')
@@ -101,9 +110,13 @@ export class FinancialTransactionsController {
   })
   getSummary(
     @CurrentUser() user: AuthenticatedUser,
+    @CurrentTenant(true) tenant: TenantContext,
     @Query() query: FindFinancialTransactionsQueryDto,
   ) {
-    return this.financialTransactionsService.getSummary(user, query);
+    return this.financialTransactionsService.getSummary(
+      this.createScope(tenant, user),
+      query,
+    );
   }
 
   @Get(':id')
@@ -123,8 +136,12 @@ export class FinancialTransactionsController {
   findOne(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser() user: AuthenticatedUser,
+    @CurrentTenant(true) tenant: TenantContext,
   ) {
-    return this.financialTransactionsService.findOne(user, id);
+    return this.financialTransactionsService.findOne(
+      this.createScope(tenant, user),
+      id,
+    );
   }
 
   @Patch(':id')
@@ -151,9 +168,10 @@ export class FinancialTransactionsController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updateFinancialTransactionDto: UpdateFinancialTransactionDto,
     @CurrentUser() user: AuthenticatedUser,
+    @CurrentTenant(true) tenant: TenantContext,
   ) {
     return this.financialTransactionsService.update(
-      user,
+      this.createScope(tenant, user),
       id,
       updateFinancialTransactionDto,
     );
@@ -176,7 +194,22 @@ export class FinancialTransactionsController {
   remove(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser() user: AuthenticatedUser,
+    @CurrentTenant(true) tenant: TenantContext,
   ) {
-    return this.financialTransactionsService.remove(user, id);
+    return this.financialTransactionsService.remove(
+      this.createScope(tenant, user),
+      id,
+    );
+  }
+
+  private createScope(tenant: TenantContext, user: AuthenticatedUser) {
+    return {
+      organizationId: tenant.organizationId,
+      membershipId: tenant.membershipId,
+      organizationRole: tenant.organizationRole,
+      userId: user.id,
+      legacyUserRole: tenant.legacyUserRole,
+      resolutionMode: tenant.resolutionMode,
+    };
   }
 }
