@@ -104,7 +104,10 @@ describe('CapabilityResolverService', () => {
 
   it('does not treat report.read as a financial summary substitute', () => {
     expect(
-      resolver.resolve(MembershipRole.RECEPTIONIST, OrganizationCapability.REPORT_READ),
+      resolver.resolve(
+        MembershipRole.RECEPTIONIST,
+        OrganizationCapability.REPORT_READ,
+      ),
     ).toBe(CapabilityDecision.CONDITIONAL);
     expect(
       resolver.resolve(
