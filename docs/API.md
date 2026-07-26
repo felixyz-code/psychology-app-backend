@@ -1412,8 +1412,14 @@ Financial Summary were converted in D3.
 POST-GO-LIVE.2.1D4 locally certifies those converted endpoint contracts
 together through an integrated opt-in PostgreSQL E2E suite. D4 does not add
 routes, DTO fields, response fields, Prisma schema changes, migrations,
-frontend behavior, deployment steps, or production data actions. D4 closure
-remains pending its final review and controlled merge.
+frontend behavior, deployment steps, or production data actions.
+
+POST-GO-LIVE.2.1D5 publishes the tenant platform certification suite and
+readiness report for the converted clinical and financial endpoint contracts.
+D5 adds no routes, DTO fields, response fields, Prisma schema changes,
+migrations, frontend behavior, deployment steps, production data actions, or
+POST-GO-LIVE.3 work. POST-GO-LIVE.2.1D closure remains pending D5-R review,
+controlled merge, post-merge verification, and an explicit closure decision.
 
 For D1 through D3, converted DTOs must not accept `organizationId`; the server
 derives tenant scope from the validated request context. Clinical content will

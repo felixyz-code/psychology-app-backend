@@ -106,6 +106,14 @@ grant notes, `finance.read` and `report.read` do not grant
 `finance.summary_read`, and role eligibility does not replace clinical
 assignment where clinical content is involved.
 
+### POST-GO-LIVE.2.1D5 tenant platform certification
+
+D5 adds no new capability rows or role grants. It certifies the final converted
+platform readiness with a representative default-deny check for unknown future
+capabilities, suspended membership denial, role separation for `RECEPTIONIST`
+and `BILLING`, assignment enforcement for clinical content, and server-owned
+finance fields.
+
 ## POST-GO-LIVE.2.1C0 approved contract — invitation and membership mutations
 
 This table is an approved 2.1C0 contract, not a runtime grant. The typed catalog

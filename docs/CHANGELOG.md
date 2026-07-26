@@ -2,11 +2,40 @@
 
 ---
 
+# POST-GO-LIVE.2.1D5 Tenant Platform Certification
+
+## Status
+
+Published for D5-R review; no production rollout, merge, or closure performed.
+
+## Highlights
+
+* Added an opt-in tenant platform certification E2E suite gated by
+  `RUN_TENANT_PLATFORM_CERTIFICATION_TESTS=true`.
+* Published the D5 readiness report in
+  `POST_GO_LIVE_2_1_TENANT_PLATFORM_CERTIFICATION.md`.
+* Certified representative final-platform gates for tenant context,
+  suspended access, cross-tenant Patient redaction, clinical assignment,
+  role boundaries, blob isolation, server-owned financial fields, tenant
+  summary filters, legacy-null exclusion, default-deny capabilities, and
+  OpenAPI server-owned DTO contracts.
+* No Prisma schema changes.
+* No new migrations.
+
+## Compatibility
+
+* D5 is certification and documentation only. It does not add endpoints, change
+  public response contracts, touch frontend behavior, access production data,
+  deploy infrastructure, run backfills, merge the branch, or start
+  POST-GO-LIVE.3.
+
+---
+
 # POST-GO-LIVE.2.1D4 Integrated Tenant Certification
 
 ## Status
 
-Certified locally; draft PR pending review and merge.
+Certified locally and merged before D5.
 
 ## Highlights
 
@@ -42,7 +71,7 @@ Certified locally; draft PR pending review and merge.
 
 * No business functionality, frontend, production access, deployment,
   backfill, Prisma schema change, migration, global Prisma middleware, RLS, or
-  D-M merge/closure action was introduced.
+  POST-GO-LIVE.2.1D closure action was introduced.
 
 # POST-GO-LIVE.2.1D3 Scheduling and Financial Tenant Conversion
 

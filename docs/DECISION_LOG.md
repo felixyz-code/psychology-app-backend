@@ -1,13 +1,49 @@
 # Decision Log
 
+## ADR-POST-GO-LIVE.2.1D5: Tenant Platform Certification
+
+### Status
+
+Published for D5-R review. POST-GO-LIVE.2.1D remains open until controlled
+review, merge, and closure evidence are accepted.
+
+### Decision
+
+D5 adds a final opt-in tenant platform certification suite and readiness report
+for the converted clinical and financial backend surfaces. The certification
+validates representative platform invariants instead of adding new product
+features or duplicating every D1 through D4 assertion.
+
+The readiness report is
+`POST_GO_LIVE_2_1_TENANT_PLATFORM_CERTIFICATION.md`.
+
+### Reason
+
+D1 through D4 independently and jointly certified the converted module
+behavior. D5 provides the final review package that confirms the backend
+tenant platform is coherent, opt-in testable, and bounded before any broader
+closure decision.
+
+### Consequences
+
+Release review must run the D1, D2, D3, D4, D5, tenant PostgreSQL, tenant HTTP,
+OpenAPI, and regression gates explicitly because default test commands skip
+opt-in suites by design.
+
+### Boundary
+
+No Prisma schema, migration, seed, frontend, infrastructure, production data,
+deployment, backfill, global Prisma middleware, RLS, business feature,
+auto-merge, merge, or POST-GO-LIVE.3 work is included.
+
 ## ADR-POST-GO-LIVE.2.1D4: Integrated Tenant Certification
 
 ### Status
 
 Certified locally for integrated D1 through D3 tenant-aware behavior with a
-disposable PostgreSQL database. Publication as a draft PR remains required
-before final D4 review. POST-GO-LIVE.2.1D itself remains open until the later
-D-M merge and closure control.
+disposable PostgreSQL database and merged before D5. POST-GO-LIVE.2.1D itself
+remains open until the later D5-R review, controlled merge, and closure
+control.
 
 ### Decision
 
@@ -41,7 +77,7 @@ context, and D4 opt-ins explicitly.
 
 No Prisma schema, migration, seed, frontend, infrastructure, production data,
 deployment, backfill, global Prisma middleware, RLS, business feature, PR ready
-transition, merge, or POST-GO-LIVE.2.1D-M work is included.
+transition, merge, or POST-GO-LIVE.2.1D closure work is included.
 
 ## ADR-POST-GO-LIVE.2.1D3: Scheduling and Financial Tenant Conversion
 

@@ -89,6 +89,21 @@ The D4 suite intentionally does not replace the D1, D2, D3, tenant PostgreSQL,
 or tenant HTTP opt-in suites. Those remain explicit certification gates for
 their narrower surfaces.
 
+### POST-GO-LIVE.2.1D5 tenant platform certification coverage
+
+D5 tenant platform certification is gated by
+`RUN_TENANT_PLATFORM_CERTIFICATION_TESTS=true`. It validates the final
+readiness package for tenant context resolution, suspended access denial,
+cross-tenant Patient redaction, clinical assignment, receptionist appointment
+notes projection, billing clinical denial, document blob isolation,
+server-owned Financial Transaction fields, tenant-scoped Financial Summary,
+legacy-null exclusion, unknown capability DENY, and representative OpenAPI
+server-owned request schemas.
+
+The D5 suite intentionally does not replace the D1, D2, D3, D4, tenant
+PostgreSQL, tenant HTTP, OpenAPI, or default regression gates. Those remain
+explicit certification inputs for D5-R review.
+
 ## POST-GO-LIVE.2.1C0 future organization-domain gate
 
 Before any organization, membership, or invitation endpoint may be marked

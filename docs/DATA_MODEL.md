@@ -581,6 +581,18 @@ D4 does not add or modify tables, columns, enums, indexes, relations, Prisma
 schema definitions, migrations, seed data, production data, or backfill
 behavior.
 
+### POST-GO-LIVE.2.1D5 tenant platform certification
+
+D5 certifies the same tenant-aware data model as a final readiness package. The
+certification confirms that the platform still uses the existing four Prisma
+migrations only, keeps `organizationId = NULL` legacy rows excluded from
+tenant-aware runtime access, derives server-owned tenant fields from request
+scope, and preserves clinical assignment plus tenant predicates across the
+converted clinical, document, scheduling, and financial models.
+
+D5 does not add or modify tables, columns, enums, indexes, relations, Prisma
+schema definitions, migrations, seeds, production data, or backfill behavior.
+
 ### POST-GO-LIVE.1.4 validation
 
 The additive migration was validated against disposable PostgreSQL 16.14
