@@ -1,5 +1,69 @@
 # Decision Log
 
+## ADR-POST-GO-LIVE.2.1D3: Scheduling and Financial Tenant Conversion
+
+### Status
+
+Certified locally for Appointments, Financial Transactions, and Financial
+Summary with disposable PostgreSQL and full local regression. Publication and
+draft PR remain required before D3 can be treated as closed. No Prisma schema
+change, migration, production access, deployment, frontend change, or D4 work
+is included.
+
+### Decision
+
+Appointments now enforce tenant-aware scheduling policy locally. The selected
+`organizationId` is derived from resolved tenant context, related patients and
+professionals must belong to the selected active organization, and legacy
+`organizationId = NULL` appointments remain invisible to lists, direct reads,
+updates, and deletes. Appointment scheduling metadata is operational, while
+`Appointment.notes` is clinical content.
+
+`RECEPTIONIST` may read and manage operational appointment fields through the
+conditional appointment policy, but cannot read, create, or update notes.
+`OWNER` and `ADMIN` do not receive appointment notes by role alone. Notes are
+projected or mutated only when the actor also has clinical capability plus an
+active same-tenant patient assignment. Logs and capability-denial telemetry
+must remain sanitized and must never contain notes.
+
+Financial Transactions now enforce tenant-aware CRUD with immutable
+`organizationId` predicates. `createdById` is derived server-side from the
+authenticated request scope (`scope.userId`); request payload values cannot
+choose the creator. Related `patientId` and `appointmentId` values must exist
+inside the selected tenant, and a visible but incompatible patient/appointment
+pair is rejected as a bad request. General transactions without a patient or
+appointment remain permitted.
+
+Financial Summary now requires the explicit `finance.summary_read` capability.
+`report.read` and `finance.read` are not substitutes. Summary aggregates and
+all supported filters carry the selected `organizationId` predicate, excluding
+cross-tenant and legacy-null transactions from counts, sums, and balances.
+
+### Reason
+
+D3 completes the scheduled and financial module conversion required by the D0
+contract without changing the database model. It separates operational
+scheduling access from clinical notes access, keeps finance authorization based
+on financial capabilities rather than clinical assignment, and preserves the
+legacy-null fail-closed posture until a separate certified backfill changes
+that data state.
+
+### Consequences
+
+Tenant-aware D3 endpoints now converge cross-tenant and legacy-null direct IDs
+to redacted `404` responses and use `403` for visible in-tenant capability or
+notes-policy denials. Financial writes are attributable to the authenticated
+server-side actor, and aggregate calculations cannot broaden beyond the
+selected organization through date, type, category, payment-method, patient,
+appointment, or creator filters.
+
+### Boundary
+
+No Prisma schema, migration, seed, frontend, infrastructure, production data,
+deployment, global Prisma middleware, RLS, backfill, D4 cross-validation, or D5
+certification is included. D3 does not create public dashboard/export routes,
+tax invoicing, bank reconciliation, billing subscriptions, or a patient portal.
+
 ## ADR-POST-GO-LIVE.2.1D2: Clinical Core and Documents Tenant Conversion
 
 ### Status

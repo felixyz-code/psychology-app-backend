@@ -944,6 +944,14 @@ Bearer Token required.
 
 # Appointments
 
+POST-GO-LIVE.2.1D3: Appointments are tenant-required and tenant-aware. The
+server derives `organizationId` from the resolved tenant context and legacy
+`organizationId = NULL` appointments are invisible to lists, details, and
+mutations. Scheduling fields are operational data; `notes` is clinical content.
+`RECEPTIONIST` can read and manage operational appointment fields but cannot
+read or mutate notes. `OWNER` and `ADMIN` do not receive notes by role alone;
+notes require clinical capability plus an active same-tenant assignment.
+
 ## `POST /appointments`
 
 Creates an appointment.
@@ -967,9 +975,16 @@ Bearer Token required.
 
 ### Ownership
 
-* `ADMIN` can use `psychologistId` from the body.
-* `PSYCHOLOGIST` must own the patient.
-* For `PSYCHOLOGIST`, `psychologistId` is replaced with `user.id`.
+* Requires `appointment.manage`.
+* The related patient must belong to the selected organization.
+* The target professional must have an active membership in the selected
+  organization.
+* `PSYCHOLOGIST` can only create appointments for themself.
+* `RECEPTIONIST` can create operational appointments only when `notes` is not
+  provided.
+* `notes` requires clinical capability plus active same-tenant assignment.
+* Request payload `organizationId` is ignored if present; tenant scope is
+  server-derived.
 
 ---
 
@@ -983,8 +998,13 @@ Bearer Token required.
 
 ### Ownership
 
-* `ADMIN` sees all appointments.
-* `PSYCHOLOGIST` only sees appointments where `appointment.psychologistId === user.id`.
+* Requires `appointment.read`.
+* Results always include `organizationId = selected tenant`.
+* `PSYCHOLOGIST` sees appointments where they are the scheduled professional
+  or where the patient is assigned to their membership.
+* `RECEPTIONIST`, `ADMIN`, and `OWNER` receive operational tenant appointments.
+* `notes` is omitted unless the actor also has clinical capability and active
+  same-tenant assignment to the patient.
 
 ---
 
@@ -1002,8 +1022,10 @@ Bearer Token required.
 
 ### Ownership
 
-* `ADMIN` can access any patient's appointments.
-* `PSYCHOLOGIST` can only access appointments if the patient belongs to them.
+* Requires `appointment.read`.
+* The patient must belong to the selected organization.
+* `PSYCHOLOGIST` must have active same-tenant assignment for the patient route.
+* `notes` follows the clinical capability plus assignment rule.
 
 ---
 
@@ -1021,8 +1043,10 @@ Bearer Token required.
 
 ### Ownership
 
-* `ADMIN` can access any appointment.
-* `PSYCHOLOGIST` can only access owned appointments.
+* Requires `appointment.read`.
+* The appointment must belong to the selected organization.
+* Cross-tenant and legacy-null appointment IDs return `404`.
+* `notes` follows the clinical capability plus assignment rule.
 
 ---
 
@@ -1053,9 +1077,15 @@ Bearer Token required.
 
 ### Ownership
 
-* `ADMIN` can update any appointment.
-* `PSYCHOLOGIST` can only update owned appointments.
-* `PSYCHOLOGIST` cannot reassign ownership to another psychologist.
+* Requires `appointment.manage`.
+* The appointment must belong to the selected organization.
+* Any changed patient or professional must belong to the selected organization.
+* `PSYCHOLOGIST` cannot assign the appointment to another professional.
+* `RECEPTIONIST` can update operational fields only and receives `403` for
+  `notes`.
+* `notes` requires clinical capability plus active same-tenant assignment.
+* Request payload `organizationId` is ignored if present; tenant scope is
+  server-derived.
 
 ---
 
@@ -1073,12 +1103,20 @@ Bearer Token required.
 
 ### Ownership
 
-* `ADMIN` can delete any appointment.
-* `PSYCHOLOGIST` can only delete owned appointments.
+* Requires `appointment.manage`.
+* The appointment must belong to the selected organization.
+* Cross-tenant and legacy-null appointment IDs return `404`.
 
 ---
 
 # Financial Transactions
+
+POST-GO-LIVE.2.1D3: Financial Transactions and Financial Summary are
+tenant-required and tenant-aware. Financial access uses financial capabilities
+and `organizationId` predicates, not clinical assignment. The server derives
+`organizationId` and `createdById` from the validated request scope. Legacy
+`organizationId = NULL` transactions are invisible to lists, direct access,
+mutations, and summaries.
 
 ## `POST /financial-transactions`
 
@@ -1104,8 +1142,7 @@ Bearer Token required.
   "paymentMethod": "CASH | CARD | TRANSFER | CHECK | OTHER | optional",
   "notes": "string | optional",
   "patientId": "uuid | optional",
-  "appointmentId": "uuid | optional",
-  "createdById": "uuid | optional"
+  "appointmentId": "uuid | optional"
 }
 ```
 
@@ -1114,21 +1151,28 @@ Bearer Token required.
 * `amount` must be positive.
 * `type`, `amount`, `concept` and `occurredAt` are required.
 * Prisma applies defaults for `status`, `category` and `currency`.
-* If `patientId` is provided, the patient must exist.
-* If `appointmentId` is provided, the appointment must exist.
+* If `patientId` is provided, the patient must exist in the selected
+  organization.
+* If `appointmentId` is provided, the appointment must exist in the selected
+  organization.
 * If both are provided, the appointment must belong to the same patient.
-* If `createdById` is provided by `ADMIN`, the user must exist.
+* `createdById` is always derived from the authenticated user in the tenant
+  scope; client-provided values are not part of the public contract.
 
 ### Ownership
 
-* `ADMIN` can create transactions for any valid user, patient or appointment.
-* `PSYCHOLOGIST` ignores `createdById` from the body and always uses `user.id`.
-* `PSYCHOLOGIST` can only associate owned patients and owned appointments.
+* Requires `finance.manage`.
+* `OWNER`, `ADMIN`, and `BILLING` can create transactions inside the selected
+  organization.
+* Clinical assignment does not grant finance access.
+* Request payload `organizationId` is ignored if present; tenant scope is
+  server-derived.
 
 ### Errors
 
 * `400 Bad Request` for invalid payloads or mismatched `patientId` / `appointmentId`.
-* `404 Not Found` when a related patient, appointment or user does not exist or is not accessible.
+* `404 Not Found` when a related patient, appointment, or transaction does not
+  exist inside the selected tenant.
 
 ---
 
@@ -1142,11 +1186,10 @@ Bearer Token required.
 
 ### Ownership
 
-* `ADMIN` sees all transactions.
-* `PSYCHOLOGIST` sees transactions when:
-  * `createdById === user.id`, or
-  * the transaction belongs to an owned patient, or
-  * the transaction belongs to an owned appointment.
+* Requires `finance.read`.
+* Results always include `organizationId = selected tenant`.
+* `OWNER`, `ADMIN`, and `BILLING` can read tenant transactions.
+* Clinical assignment does not grant finance access.
 
 ### Query Params
 
@@ -1165,15 +1208,15 @@ Bearer Token required.
 * Date filters apply to `occurredAt`.
 * `from` maps to `gte`.
 * `to` maps to `lte`.
-* `ADMIN` may filter by any supported field.
-* `PSYCHOLOGIST` may only see owned records under the existing ownership rules.
-* If `PSYCHOLOGIST` sends `createdById`, the backend constrains it to `user.id`.
-* If `PSYCHOLOGIST` sends `patientId` or `appointmentId`, non-owned values return an empty result set instead of exposing resource existence.
+* Every filter is combined with the immutable selected-tenant predicate.
+* Foreign `patientId`, `appointmentId`, and `createdById` filters return an
+  empty list rather than broadening scope.
 
 ### Notes
 
 * This module now supports basic filtering.
-* Pagination, tax invoicing, bank reconciliation and advanced dashboards remain out of scope.
+* Pagination, tax invoicing, bank reconciliation and advanced dashboards remain
+  out of scope.
 
 ---
 
@@ -1199,7 +1242,10 @@ Bearer Token required.
 
 ### Ownership
 
-* Uses the same visibility and filter rules as `GET /financial-transactions`.
+* Requires `finance.summary_read`.
+* Uses the same tenant predicate and filter rules as
+  `GET /financial-transactions`.
+* `report.read` is not a substitute for `finance.summary_read`.
 
 ### Response
 
@@ -1219,7 +1265,8 @@ Bearer Token required.
 * The summary is calculated using `occurredAt`, not `createdAt`.
 * It includes every visible status unless `status` is explicitly filtered.
 * This is not tax invoicing, bank reconciliation or an advanced financial dashboard.
-* For `PSYCHOLOGIST`, non-owned `patientId` and `appointmentId` filters resolve to an empty summary instead of exposing resource existence.
+* Foreign `patientId`, `appointmentId`, and legacy-null rows do not contribute
+  to counts, sums, or balances.
 
 ---
 
@@ -1237,9 +1284,9 @@ Bearer Token required.
 
 ### Ownership
 
-* `ADMIN` can access any transaction.
-* `PSYCHOLOGIST` can only access transactions visible under the base ownership rules.
-* If the transaction exists but is not accessible, the API returns `404 Not Found`.
+* Requires `finance.read`.
+* The transaction must belong to the selected organization.
+* Cross-tenant and legacy-null transaction IDs return `404`.
 
 ---
 
@@ -1271,23 +1318,23 @@ Bearer Token required.
   "paymentMethod": "CASH | CARD | TRANSFER | CHECK | OTHER | optional",
   "notes": "string | optional",
   "patientId": "uuid | optional",
-  "appointmentId": "uuid | optional",
-  "createdById": "uuid | optional"
+  "appointmentId": "uuid | optional"
 }
 ```
 
 ### Behavior
 
 * Relational validations from creation also apply on update.
-* `ADMIN` may change `createdById` only to an existing user.
-* `PSYCHOLOGIST` cannot change ownership through `createdById`.
-* Reassignments remain conservative and must stay within accessible relations.
+* `createdById` and `organizationId` are server-owned and cannot be changed
+  through the request payload.
+* Reassignments remain conservative and must stay within tenant relations.
 
 ### Ownership
 
-* `ADMIN` can update any transaction.
-* `PSYCHOLOGIST` can only update transactions visible under the base ownership rules.
-* If the transaction exists but is not accessible, the API returns `404 Not Found`.
+* Requires `finance.manage`.
+* The transaction must belong to the selected organization.
+* Any changed patient or appointment must belong to the selected organization.
+* Cross-tenant and legacy-null transaction IDs return `404`.
 
 ### Errors
 
@@ -1314,9 +1361,9 @@ Bearer Token required.
 
 ### Ownership
 
-* `ADMIN` can delete any transaction.
-* `PSYCHOLOGIST` can only delete transactions visible under the base ownership rules.
-* If the transaction exists but is not accessible, the API returns `404 Not Found`.
+* Requires `finance.manage`.
+* The transaction must belong to the selected organization.
+* Cross-tenant and legacy-null transaction IDs return `404`.
 
 ### Notes
 
@@ -1348,10 +1395,10 @@ exists.
 
 If no header is sent, a user with one eligible membership is resolved
 automatically. A user with several eligible memberships must make an explicit
-selection. Patients, Case Files, Workspace, Session Notes, and Documents now
-require a resolved context and continue to apply the temporary legacy
-psychologist ownership condition. Appointments and financial modules remain
-legacy until their approved 2.1D phase.
+selection. Patients, Case Files, Workspace, Session Notes, Documents,
+Appointments, Financial Transactions, and Financial Summary now require a
+resolved context. Clinical modules continue to apply the temporary legacy
+psychologist ownership condition where documented.
 
 ## POST-GO-LIVE.2.1D0 clinical and financial conversion contract
 
@@ -1360,7 +1407,7 @@ contract for Patients, Case Files, Workspace, Session Notes, Documents,
 Appointments, Financial Transactions, and Financial Summary during 2.1D.
 Patients were converted in D1. Case Files, Workspace, Session Notes, and
 Documents were converted in D2. Appointments, Financial Transactions, and
-Financial Summary remain pending.
+Financial Summary were converted in D3.
 
 For D1 through D3, converted DTOs must not accept `organizationId`; the server
 derives tenant scope from the validated request context. Clinical content will

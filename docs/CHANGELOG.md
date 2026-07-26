@@ -2,6 +2,55 @@
 
 ---
 
+# POST-GO-LIVE.2.1D3 Scheduling and Financial Tenant Conversion
+
+## Status
+
+Certified locally
+
+## Highlights
+
+* Converted Appointments to tenant-aware scheduling.
+* Protected `Appointment.notes` as clinical content.
+* Converted Financial Transactions to tenant-aware CRUD.
+* Converted Financial Summary to tenant-aware aggregates.
+* Added explicit `finance.summary_read` capability.
+* Added scheduling and financial tenant certification E2E coverage.
+* Certified D3 against disposable local PostgreSQL with opt-in E2E coverage.
+* No Prisma schema changes.
+* No new migrations.
+
+## Changed
+
+* Appointment controllers now require resolved tenant context and pass immutable
+  request scope to the service.
+* Appointment reads and mutations use `organizationId` as the primary boundary
+  and exclude legacy `organizationId = NULL` rows.
+* Appointment operational projections omit notes unless clinical capability and
+  active same-tenant assignment are both present.
+* Receptionist scheduling access is limited to operational fields and cannot
+  read or mutate appointment notes.
+* Financial transaction reads, writes, deletes, filters, and summaries are
+  scoped by selected `organizationId`.
+* Financial transaction creation derives `createdById` from the authenticated
+  request scope; the client no longer owns that field.
+* Financial summary uses `finance.summary_read`; `report.read` is not a
+  substitute.
+
+## Security Notes
+
+* Cross-tenant and legacy-null appointment and financial direct resources
+  return redacted `404`.
+* Cross-tenant mutations perform no side effects.
+* Financial aggregates exclude foreign and legacy-null rows.
+* Clinical assignment does not grant finance access.
+
+## Compatibility
+
+* No Prisma schema change, migration, seed, frontend change, production data
+  access, deployment, global Prisma middleware, RLS, or infrastructure change
+  was introduced.
+
 # POST-GO-LIVE.2.1D2 Clinical Core and Documents Tenant Conversion
 
 ## Status

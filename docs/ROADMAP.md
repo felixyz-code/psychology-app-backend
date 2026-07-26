@@ -23,7 +23,7 @@ MVP Development
 Tenant platform checkpoint:
 
 ```text
-POST-GO-LIVE.2.1D2 Clinical Core completed
+POST-GO-LIVE.2.1D3 Scheduling & Financial completed
 ```
 
 Current priorities:
@@ -47,7 +47,7 @@ POST-GO-LIVE.2
  ├── 2.0 Preparación                     ✅ COMPLETADO
  ├── 2.1D1 Patients                      ✅ COMPLETADO
  ├── 2.1D2 Clinical Core                 ✅ COMPLETADO
- ├── 2.1D3 Scheduling & Financial        ⏳ PENDIENTE
+ ├── 2.1D3 Scheduling & Financial        COMPLETADO
  ├── 2.1D4 Cross Validation              ⏳ PENDIENTE
  └── 2.1D5 Tenant Certification          ⏳ PENDIENTE
 
@@ -233,17 +233,24 @@ a shared `ClinicalAccessPolicyService`, completed the D2 capability catalog,
 passed PostgreSQL certification and full regression, and introduced no Prisma
 schema changes or migrations.
 
+POST-GO-LIVE.2.1D3 completed and locally certified Scheduling and Financial
+tenant conversion for Appointments, Financial Transactions, and Financial
+Summary. Appointments now separate operational scheduling from clinical notes,
+while Finance uses `finance.read`, `finance.manage`, and
+`finance.summary_read` with immutable `organizationId` predicates and
+server-derived `createdById`.
+
 ## Tenant Platform Milestones
 
 Completed:
 
 * ✓ Patients
 * ✓ Clinical Core
+* Scheduling
+* Financial
 
 Remaining:
 
-* Scheduling
-* Financial
 * Cross Validation
 * Certification
 
@@ -256,9 +263,9 @@ Remaining:
 | Workspace | Yes | ✅ |
 | Session Notes | Yes | ✅ |
 | Documents | Yes | ✅ |
-| Appointments | No | ⏳ |
-| Financial Transactions | No | ⏳ |
-| Financial Summary | No | ⏳ |
+| Appointments | Yes | Completed in 2.1D3 |
+| Financial Transactions | Yes | Completed in 2.1D3 |
+| Financial Summary | Yes | Completed in 2.1D3 |
 
 ## Tenant Platform Conversion Progress
 
@@ -266,8 +273,8 @@ Remaining:
 | --- | --- |
 | Patients | ✅ |
 | Clinical Core | ✅ |
-| Scheduling | ⏳ |
-| Financial | ⏳ |
+| Scheduling | Completed in 2.1D3 |
+| Financial | Completed in 2.1D3 |
 | Cross Validation | ⏳ |
 | Certification | ⏳ |
 
@@ -277,11 +284,11 @@ Using the five POST-GO-LIVE.2.1D execution stages as the roadmap reference:
 | --- | --- |
 | D1 | ✅ |
 | D2 | ✅ |
-| D3 | ⏳ |
+| D3 | Completed |
 | D4 | ⏳ |
 | D5 | ⏳ |
 
-The tenant-aware conversion is approximately 40% complete: two of five
+The tenant-aware conversion is approximately 60% complete: three of five
 POST-GO-LIVE.2.1D stages are closed. This is a technical roadmap reference,
 not a productivity metric, and may be adjusted if later stages differ
 materially in size.
@@ -354,5 +361,11 @@ Patients tenant policy alignment is integrated, merged, and closed.
 ## POST-GO-LIVE.2.1D2
 
 Clinical Core and Documents tenant conversion is integrated, PostgreSQL
-certified, merged, and closed. POST-GO-LIVE.2.1D3 Scheduling & Financial
-Tenant Conversion is the next eligible phase.
+certified, merged, and closed.
+
+## POST-GO-LIVE.2.1D3
+
+Scheduling and Financial tenant conversion is implemented and certified
+locally for Appointments, Financial Transactions, and Financial Summary. The
+next eligible control is POST-GO-LIVE.2.1D3-R final review, PostgreSQL
+certification evidence review, and merge.

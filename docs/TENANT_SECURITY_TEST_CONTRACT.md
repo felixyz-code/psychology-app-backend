@@ -59,6 +59,21 @@ suspended organization. There is no Patients search, count, assign, or reassign
 endpoint in 2.1D1; those controls remain not applicable until such routes are
 approved.
 
+### POST-GO-LIVE.2.1D3 Scheduling and Financial coverage
+
+Scheduling and financial certification covers tenant-required HTTP access,
+cross-tenant and legacy-null direct IDs, tenant-scoped appointment lists,
+appointment mutation side effects, operational appointment projections,
+clinical-note denial for `RECEPTIONIST`, no appointment-note access for
+unassigned `ADMIN`, server-derived appointment and transaction organization,
+server-derived financial `createdById`, foreign patient/appointment relation
+denial, tenant-scoped transaction lists, tenant-scoped summary `groupBy`, and
+explicit `finance.summary_read` denial for non-financial roles.
+
+Financial summary coverage must continue to prove `report.read` is not a
+substitute for `finance.summary_read`, and that legacy null rows never
+contribute to counts, sums, or balances.
+
 ## POST-GO-LIVE.2.1C0 future organization-domain gate
 
 Before any organization, membership, or invitation endpoint may be marked
