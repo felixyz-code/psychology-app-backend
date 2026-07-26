@@ -1,5 +1,48 @@
 # Decision Log
 
+## ADR-POST-GO-LIVE.2.1D4: Integrated Tenant Certification
+
+### Status
+
+Certified locally for integrated D1 through D3 tenant-aware behavior with a
+disposable PostgreSQL database. Publication as a draft PR remains required
+before final D4 review. POST-GO-LIVE.2.1D itself remains open until the later
+D-M merge and closure control.
+
+### Decision
+
+D4 adds an opt-in integrated E2E certification suite that validates the
+converted Patients, Case Files, Workspace, Session Notes, Documents/blob
+access, Appointments, Financial Transactions, and Financial Summary surfaces
+as one tenant-aware contract. It focuses on cross-module invariants rather than
+duplicating every D1, D2, and D3 scenario.
+
+The certification keeps `organizationId` as the primary isolation boundary,
+requires clinical assignment for clinical content, preserves role/capability
+separation, treats appointment notes as clinical content, derives financial
+`createdById` server-side, and keeps financial summaries behind
+`finance.summary_read`.
+
+### Reason
+
+D1, D2, and D3 were certified independently. D4 proves the independently
+converted modules compose correctly for the freelancer owner flow, multi-role
+tenant behavior, cross-tenant denial, legacy-null exclusion, document blob
+authorization, appointment notes, and financial aggregates.
+
+### Consequences
+
+The backend now has one integrated opt-in certification gate for D1 through D3
+tenant behavior. Default Jest and default E2E commands may still skip opt-in
+certification suites, so release review must run the D1, D2, D3, tenant
+context, and D4 opt-ins explicitly.
+
+### Boundary
+
+No Prisma schema, migration, seed, frontend, infrastructure, production data,
+deployment, backfill, global Prisma middleware, RLS, business feature, PR ready
+transition, merge, or POST-GO-LIVE.2.1D-M work is included.
+
 ## ADR-POST-GO-LIVE.2.1D3: Scheduling and Financial Tenant Conversion
 
 ### Status

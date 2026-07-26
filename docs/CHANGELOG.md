@@ -2,6 +2,48 @@
 
 ---
 
+# POST-GO-LIVE.2.1D4 Integrated Tenant Certification
+
+## Status
+
+Certified locally; draft PR pending review and merge.
+
+## Highlights
+
+* Added an opt-in integrated tenant contract E2E suite for D1 through D3
+  surfaces.
+* Certified the freelancer `OWNER` flow across Patients, Case Files,
+  Workspace, Session Notes, Documents/blob access, Appointments with notes,
+  Financial Transactions, and Financial Summary.
+* Certified multi-role boundaries, cross-tenant isolation, legacy
+  `organizationId = NULL` exclusion, clinical assignment, document storage-key
+  defenses, appointment-note projection, server-owned `createdById`, and
+  tenant-scoped financial summaries in one disposable PostgreSQL database.
+* No Prisma schema changes.
+* No new migrations.
+
+## Changed
+
+* Added `test/integrated-tenant-contract.e2e-spec.ts` as an explicit opt-in
+  certification suite gated by `RUN_INTEGRATED_TENANT_CONTRACT_TESTS=true`.
+* Recorded the D4 integrated certification boundary without declaring
+  POST-GO-LIVE.2.1D closed.
+
+## Security Notes
+
+* The integrated suite uses synthetic data only and verifies sanitized
+  telemetry does not contain appointment notes, clinical content, filenames,
+  tokens, passwords, database URLs, SQL, Prisma internals, or upload paths.
+* Document blob access remains authorized through tenant-aware metadata before
+  filesystem access. Missing blobs and cross-tenant blobs return sanitized
+  denials.
+
+## Compatibility
+
+* No business functionality, frontend, production access, deployment,
+  backfill, Prisma schema change, migration, global Prisma middleware, RLS, or
+  D-M merge/closure action was introduced.
+
 # POST-GO-LIVE.2.1D3 Scheduling and Financial Tenant Conversion
 
 ## Status

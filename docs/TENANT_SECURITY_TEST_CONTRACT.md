@@ -74,6 +74,21 @@ Financial summary coverage must continue to prove `report.read` is not a
 substitute for `finance.summary_read`, and that legacy null rows never
 contribute to counts, sums, or balances.
 
+### POST-GO-LIVE.2.1D4 integrated coverage
+
+D4 integrated certification covers the composed D1 through D3 tenant-aware
+contract in one disposable PostgreSQL database. The opt-in suite validates a
+freelancer `OWNER` creating and using a full clinical/financial workflow,
+multi-role separation, two-tenant list/detail/mutation behavior, legacy
+`organizationId = NULL` exclusion, clinical assignment denials, document
+metadata-before-blob authorization, appointment-note projection, server-owned
+financial `createdById`, tenant-scoped Financial Summary filters, tenant
+context errors, and sanitized observability.
+
+The D4 suite intentionally does not replace the D1, D2, D3, tenant PostgreSQL,
+or tenant HTTP opt-in suites. Those remain explicit certification gates for
+their narrower surfaces.
+
 ## POST-GO-LIVE.2.1C0 future organization-domain gate
 
 Before any organization, membership, or invitation endpoint may be marked

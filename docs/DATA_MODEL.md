@@ -567,6 +567,20 @@ Creating a patient derives `organizationId` from tenant context and creates an
 active `PRIMARY` assignment for the current membership. No Prisma schema change,
 new migration, or legacy null backfill is introduced by this runtime alignment.
 
+### POST-GO-LIVE.2.1D4 integrated certification
+
+D4 certifies the existing tenant-aware data model across Patients, Case Files,
+Session Notes, Documents, Appointments, Financial Transactions, Financial
+Summary, memberships, assignments, and legacy-null rows in one disposable
+PostgreSQL database. The certification uses the existing four migrations only
+and confirms that `organizationId`, `createdById`, `authorId`, `uploadedById`,
+clinical assignment, and document file paths remain server-owned or
+tenant-scoped where documented.
+
+D4 does not add or modify tables, columns, enums, indexes, relations, Prisma
+schema definitions, migrations, seed data, production data, or backfill
+behavior.
+
 ### POST-GO-LIVE.1.4 validation
 
 The additive migration was validated against disposable PostgreSQL 16.14
