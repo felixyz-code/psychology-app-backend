@@ -26,14 +26,22 @@ Tenant platform checkpoint:
 POST-GO-LIVE.2.1D5 Tenant Platform Certification published for review
 ```
 
+Tooling checkpoint:
+
+```text
+POST-GO-LIVE.2.2A Tenant Development Seed certified locally
+POST-GO-LIVE.2.2B Postman Collection Refresh implemented and statically validated
+Postman functional runner certification deferred
+```
+
 Current priorities:
 
-* Backend stabilization
-* Frontend development
-* Clinical workflow validation
-* Docker deployment
-* Documentation standardization
-* Financial CRUD validation
+- Backend stabilization
+- Frontend development
+- Clinical workflow validation
+- Docker deployment
+- Documentation standardization
+- Financial CRUD validation
 
 ---
 
@@ -49,9 +57,12 @@ POST-GO-LIVE.2
  ├── 2.1D2 Clinical Core                 ✅ COMPLETADO
  ├── 2.1D3 Scheduling & Financial        COMPLETADO
  ├── 2.1D4 Cross Validation              COMPLETADO
- └── 2.1D5 Tenant Certification          D5-R REVIEW
+ ├── 2.1D5 Tenant Certification          D5-R REVIEW
+ └── 2.2 Seed & Postman Tooling
+      ├── 2.2A Tenant Development Seed   CERTIFIED
+      └── 2.2B Postman Collection        STATIC VALIDATION; RUNNER DEFERRED
 
-POST-GO-LIVE.3                           ⏳
+POST-GO-LIVE.3                           NEXT ELIGIBLE PHASE
 POST-GO-LIVE.4                           ⏳
 POST-GO-LIVE.5                           ⏳
 POST-GO-LIVE.6                           ⏳
@@ -69,42 +80,42 @@ merge, and post-merge verification.
 
 ## Core Infrastructure
 
-* NestJS backend
-* PostgreSQL integration
-* Prisma ORM
-* JWT authentication
-* Swagger documentation
-* Docker Compose environment
+- NestJS backend
+- PostgreSQL integration
+- Prisma ORM
+- JWT authentication
+- Swagger documentation
+- Docker Compose environment
 
 ---
 
 ## Clinical Modules
 
-* Authentication
-* Users
-* Patients
-* Case Files
-* Session Notes
-* Documents
-* Appointments
+- Authentication
+- Users
+- Patients
+- Case Files
+- Session Notes
+- Documents
+- Appointments
 
 ---
 
 ## Security
 
-* JWT authentication
-* Roles
-* Ownership filtering
-* UUID identifiers
+- JWT authentication
+- Roles
+- Ownership filtering
+- UUID identifiers
 
 ---
 
 ## Infrastructure
 
-* Docker Compose
-* Persistent uploads
-* PostgreSQL volumes
-* Seed support
+- Docker Compose
+- Persistent uploads
+- PostgreSQL volumes
+- Seed support
 
 ---
 
@@ -112,12 +123,12 @@ merge, and post-merge verification.
 
 Current development efforts include:
 
-* Angular frontend
-* UI refinement
-* Clinical workflow validation
-* Documentation improvements
-* Financial transactions CRUD validation and basic reporting follow-up
-* Controlled legacy SaaS organization backfill validation before any tenant enforcement
+- Angular frontend
+- UI refinement
+- Clinical workflow validation
+- Documentation improvements
+- Financial transactions CRUD validation and basic reporting follow-up
+- Controlled legacy SaaS organization backfill validation before any tenant enforcement
 
 ---
 
@@ -125,39 +136,39 @@ Current development efforts include:
 
 ## Security
 
-* Refresh Tokens
-* Password Reset
-* Audit Logs
-* Standardized Error Responses
+- Refresh Tokens
+- Password Reset
+- Audit Logs
+- Standardized Error Responses
 
 ---
 
 ## Infrastructure
 
-* VPS Deployment
-* Production Backups
-* External Storage evaluation
+- VPS Deployment
+- Production Backups
+- External Storage evaluation
 
 ---
 
 ## Quality
 
-* Unit Tests
-* Integration Tests
-* Upload Tests
-* Ownership Tests
+- Unit Tests
+- Integration Tests
+- Upload Tests
+- Ownership Tests
 
 ---
 
 ## Product
 
-* Search
-* Filtering
-* Pagination
-* User Management improvements
-* Advanced financial dashboards
-* Bank reconciliation
-* Fiscal invoicing support
+- Search
+- Filtering
+- Pagination
+- User Management improvements
+- Advanced financial dashboards
+- Bank reconciliation
+- Fiscal invoicing support
 
 ---
 
@@ -165,12 +176,12 @@ Current development efforts include:
 
 Potential additions after MVP completion:
 
-* Clinical Templates
-* Notifications
-* Calendar improvements
-* Reporting
-* Dashboard enhancements
-* Financial reporting
+- Clinical Templates
+- Notifications
+- Calendar improvements
+- Reporting
+- Dashboard enhancements
+- Financial reporting
 
 ---
 
@@ -180,14 +191,14 @@ The backend should evolve toward a SaaS platform.
 
 Potential future features:
 
-* Organizations
-* Multiple Psychologists
-* Multi-tenancy
-* Billing
-* Subscription Plans
-* AI-assisted documentation
-* External Object Storage
-* Advanced Permissions
+- Organizations
+- Multiple Psychologists
+- Multi-tenancy
+- Billing
+- Subscription Plans
+- AI-assisted documentation
+- External Object Storage
+- Advanced Permissions
 
 These features are intentionally outside the current MVP.
 
@@ -260,17 +271,17 @@ controlled merge, post-merge verification, and an explicit closure decision.
 
 Completed:
 
-* ✓ Patients
-* ✓ Clinical Core
-* Scheduling
-* Financial
-* Cross Validation
-* Tenant Certification package published
+- ✓ Patients
+- ✓ Clinical Core
+- Scheduling
+- Financial
+- Cross Validation
+- Tenant Certification package published
 
 Remaining:
 
-* D5-R review
-* Controlled merge and post-merge verification
+- D5-R review
+- Controlled merge and post-merge verification
 
 Certification note: Cross Validation maps to POST-GO-LIVE.2.1D4 and is
 completed and merged. Certification maps to POST-GO-LIVE.2.1D5 and is
@@ -279,27 +290,27 @@ pending D5-R review, controlled merge, and post-merge verification.
 
 ## Tenant-Aware Module Matrix
 
-| Module | Tenant-Aware | Status |
-| --- | --- | --- |
-| Patients | Yes | ✅ |
-| Case Files | Yes | ✅ |
-| Workspace | Yes | ✅ |
-| Session Notes | Yes | ✅ |
-| Documents | Yes | ✅ |
-| Appointments | Yes | Completed in 2.1D3 |
-| Financial Transactions | Yes | Completed in 2.1D3 |
-| Financial Summary | Yes | Completed in 2.1D3 |
+| Module                 | Tenant-Aware | Status             |
+| ---------------------- | ------------ | ------------------ |
+| Patients               | Yes          | ✅                 |
+| Case Files             | Yes          | ✅                 |
+| Workspace              | Yes          | ✅                 |
+| Session Notes          | Yes          | ✅                 |
+| Documents              | Yes          | ✅                 |
+| Appointments           | Yes          | Completed in 2.1D3 |
+| Financial Transactions | Yes          | Completed in 2.1D3 |
+| Financial Summary      | Yes          | Completed in 2.1D3 |
 
 ## Tenant Platform Conversion Progress
 
-| Stage | Status |
-| --- | --- |
-| Patients | ✅ |
-| Clinical Core | ✅ |
-| Scheduling | Completed in 2.1D3 |
-| Financial | Completed in 2.1D3 |
-| Cross Validation | Completed |
-| Certification | Published for D5-R review |
+| Stage            | Status                    |
+| ---------------- | ------------------------- |
+| Patients         | ✅                        |
+| Clinical Core    | ✅                        |
+| Scheduling       | Completed in 2.1D3        |
+| Financial        | Completed in 2.1D3        |
+| Cross Validation | Completed                 |
+| Certification    | Published for D5-R review |
 
 Using the five POST-GO-LIVE.2.1D execution stages as the roadmap reference:
 
@@ -307,13 +318,13 @@ D5 status note: POST-GO-LIVE.2.1D5 is published for D5-R review. Final
 POST-GO-LIVE.2.1D closure remains pending controlled review, merge, and
 post-merge verification.
 
-| Stage | Status |
-| --- | --- |
-| D1 | ✅ |
-| D2 | ✅ |
-| D3 | Completed |
-| D4 | Completed |
-| D5 | Published for D5-R review |
+| Stage | Status                    |
+| ----- | ------------------------- |
+| D1    | ✅                        |
+| D2    | ✅                        |
+| D3    | Completed                 |
+| D4    | Completed                 |
+| D5    | Published for D5-R review |
 
 The tenant-aware conversion implementation is complete for D1 through D5 from
 a local certification perspective, but the broader POST-GO-LIVE.2.1D phase is
@@ -326,18 +337,18 @@ are accepted.
 
 Current technical debt includes:
 
-* Prisma migrations
-* Standard error contract
-* Seed improvements
-* API examples
-* Frontend integration documentation
-* Financial reporting and dashboard layers
+- Prisma migrations
+- Standard error contract
+- Seed improvements
+- API examples
+- Frontend integration documentation
+- Financial reporting and dashboard layers
 
 Recent backend progress:
 
-* Financial transactions CRUD base completed
-* Financial transaction filters completed
-* Basic financial summary endpoint completed
+- Financial transactions CRUD base completed
+- Financial transaction filters completed
+- Basic financial summary endpoint completed
 
 Technical debt should be addressed incrementally.
 
@@ -347,12 +358,12 @@ Technical debt should be addressed incrementally.
 
 The MVP will be considered complete when:
 
-* Clinical workflow is fully operational.
-* Frontend and backend are integrated.
-* Documentation is complete.
-* Docker deployment is stable.
-* VPS deployment is validated.
-* The application is ready for production use by an independent psychologist.
+- Clinical workflow is fully operational.
+- Frontend and backend are integrated.
+- Documentation is complete.
+- Docker deployment is stable.
+- VPS deployment is validated.
+- The application is ready for production use by an independent psychologist.
 
 ---
 
@@ -360,11 +371,11 @@ The MVP will be considered complete when:
 
 Related documentation:
 
-* PROJECT.md
-* ARCHITECTURE.md
-* DATA_MODEL.md
-* API.md
-* DOCKER.md
+- PROJECT.md
+- ARCHITECTURE.md
+- DATA_MODEL.md
+- API.md
+- DOCKER.md
 
 End of document.
 
@@ -406,3 +417,57 @@ through D3 modules.
 Tenant platform certification is published for D5-R review. The next eligible
 control is D5-R review, controlled merge, post-merge verification, and the
 explicit POST-GO-LIVE.2.1D closure decision. POST-GO-LIVE.3 remains unstarted.
+
+## POST-GO-LIVE.2.2
+
+Tenant Development Seed & Postman Collection Refresh is an auxiliary tooling
+and DX stage after the tenant platform certification package. It does not
+reopen POST-GO-LIVE.2, does not start POST-GO-LIVE.3, and introduces no Prisma
+schema change, migration, frontend change, infrastructure change, production
+access, Organization CRUD, Membership Administration, Invitations, or Switch
+Organization behavior.
+
+POST-GO-LIVE.2.2A - Tenant Development Seed:
+
+```text
+Status: CERTIFIED
+```
+
+Evidence:
+
+- PostgreSQL 16 local real;
+- exactly 4 migrations applied;
+- seed executed twice;
+- deterministic reset;
+- `seed:certify` passed twice;
+- tenant integrity validated;
+- no legacy-null rows created by the seed;
+- expected Financial Summary confirmed.
+
+POST-GO-LIVE.2.2B - Postman Collection Refresh:
+
+```text
+Status: IMPLEMENTED AND STATICALLY VALIDATED
+Postman functional runner certification: DEFERRED
+```
+
+Evidence:
+
+- Postman v2.1 collection is valid JSON;
+- 13 folders and 68 requests;
+- local environment is sanitized;
+- URLs use `{{baseUrl}}`;
+- dynamic JWT and runtime ID variables are empty in exports;
+- endpoints align with the converted tenant-aware clinical and financial
+  backend routes.
+
+The functional Postman runner certification is deferred because Newman added an
+unacceptable critical dependency risk, Postman CLI requested authentication /
+cloud publication behavior during the observed local run, and Postman Desktop
+would require using or altering a personal signed-in session. The collection is
+published as a development artifact with that limitation explicit. It does not
+replace D1-D5 certification, PostgreSQL E2E, Jest regression, or OpenAPI
+contract tests.
+
+POST-GO-LIVE.3 remains the next eligible phase, subject to review acceptance of
+the deferred Postman runner risk.
