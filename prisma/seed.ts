@@ -1,1577 +1,1043 @@
-import "dotenv/config";
-import * as bcrypt from "bcrypt";
-import { realpath, unlink } from "node:fs/promises";
-import { isAbsolute, relative, resolve } from "node:path";
-import { requireDemoSeedPassword } from "./seed-demo-password";
-import { PrismaPg } from "@prisma/adapter-pg";
+import 'dotenv/config';
+import * as bcrypt from 'bcrypt';
+import { mkdir, rm, writeFile } from 'node:fs/promises';
+import { dirname, resolve } from 'node:path';
+import { requireDemoSeedPassword } from './seed-demo-password';
+import { PrismaPg } from '@prisma/adapter-pg';
 import {
   AppointmentStatus,
   FinancialTransactionCategory,
   FinancialTransactionStatus,
   FinancialTransactionType,
+  MembershipRole,
+  MembershipStatus,
+  OrganizationStatus,
+  PatientAssignmentRole,
+  PatientAssignmentStatus,
   PaymentMethod,
   Prisma,
   PrismaClient,
+  PsychologistProfileStatus,
   UserRole,
-} from "@prisma/client";
+} from '@prisma/client';
 
 const connectionString = process.env.DATABASE_URL;
 
 if (!connectionString) {
-  throw new Error("DATABASE_URL is not defined.");
+  throw new Error('DATABASE_URL is not defined.');
 }
 
-if (process.env.NODE_ENV === "production") {
-  throw new Error("The demo seed must not run with NODE_ENV=production.");
+if (process.env.NODE_ENV === 'production') {
+  throw new Error(
+    'The development seed must not run with NODE_ENV=production.',
+  );
 }
 
 const adapter = new PrismaPg(connectionString);
 const prisma = new PrismaClient({ adapter });
 
-const DEMO_TAG = "[demo-seed]";
+const DEFAULT_LOCAL_PASSWORD = 'LocalSeedPassword123!';
+const SEED_TAG = '[tenant-dev-seed]';
 
-const ADMIN_USER_ID = "1b5d4d7c-b7e6-4d8b-9b3d-a3b12f1e1001";
-const PSYCHOLOGIST_USER_ID = "1b5d4d7c-b7e6-4d8b-9b3d-a3b12f1e1002";
-
-const now = new Date();
-
-type AppointmentTemplate = {
-  daysFromNow: number;
-  hour: number;
-  minute: number;
-  durationMinutes: number;
-  status: AppointmentStatus;
-  notes: string;
-  fee?: number;
-  paymentMethod?: PaymentMethod;
-  createPendingCharge?: boolean;
-};
-
-type SessionNoteTemplate = {
-  daysAgo: number;
-  hour: number;
-  minute: number;
-  title: string;
-  content: string;
-};
-
-type DocumentTemplate = {
-  daysAgo: number;
-  fileName: string;
-  mimeType: string;
-};
-
-type PatientBlueprint = {
-  code: number;
-  firstName: string;
-  lastName: string;
-  phoneNumber: string;
-  email: string;
-  birthDate: Date;
-  diagnosis?: string;
-  treatmentPlan?: string;
-  appointments: AppointmentTemplate[];
-  sessionNotes?: SessionNoteTemplate[];
-  documents?: DocumentTemplate[];
-};
-
-type DemoFinancialTransaction = Prisma.FinancialTransactionCreateManyInput;
-
-function addDays(baseDate: Date, days: number) {
-  const date = new Date(baseDate);
-  date.setDate(date.getDate() + days);
-  return date;
-}
-
-function addMinutes(baseDate: Date, minutes: number) {
-  const date = new Date(baseDate);
-  date.setMinutes(date.getMinutes() + minutes);
-  return date;
-}
-
-function setTime(date: Date, hour: number, minute: number) {
-  const nextDate = new Date(date);
-  nextDate.setHours(hour, minute, 0, 0);
-  return nextDate;
-}
-
-function dateFromNow(days: number, hour: number, minute: number) {
-  return setTime(addDays(now, days), hour, minute);
-}
-
-function birthDate(year: number, month: number, day: number) {
-  return new Date(Date.UTC(year, month - 1, day));
-}
-
-function demoUuid(namespace: number, value: number) {
-  return `${namespace.toString().padStart(8, "0")}-0000-4000-8000-${value
+function seedUuid(namespace: number, value: number) {
+  return `${namespace.toString().padStart(8, '0')}-0000-4000-8000-${value
     .toString()
-    .padStart(12, "0")}`;
+    .padStart(12, '0')}`;
 }
 
-const patientBlueprints: PatientBlueprint[] = [
-  {
-    code: 1,
-    firstName: "Sofia",
-    lastName: "Ramirez",
-    phoneNumber: "+526621110001",
-    email: "sofia.ramirez@psychology-app.local",
-    birthDate: birthDate(1998, 4, 12),
-    diagnosis:
-      "Consulta por estres academico, dificultad para sostener descanso y tendencia a sobrecarga en semanas de evaluaciones.",
-    treatmentPlan:
-      "Psicoeducacion sobre estres, rutina de descanso, registro semanal y tecnicas breves de regulacion.",
-    appointments: [
-      {
-        daysFromNow: -42,
-        hour: 10,
-        minute: 0,
-        durationMinutes: 60,
-        status: AppointmentStatus.COMPLETED,
-        notes: "Entrevista inicial y encuadre.",
-        fee: 700,
-        paymentMethod: PaymentMethod.TRANSFER,
-      },
-      {
-        daysFromNow: -14,
-        hour: 10,
-        minute: 0,
-        durationMinutes: 50,
-        status: AppointmentStatus.COMPLETED,
-        notes: "Seguimiento de rutina de descanso.",
-        fee: 700,
-        paymentMethod: PaymentMethod.CARD,
-      },
-      {
-        daysFromNow: 5,
-        hour: 11,
-        minute: 0,
-        durationMinutes: 50,
-        status: AppointmentStatus.SCHEDULED,
-        notes: "Revision de habitos y carga academica.",
-        fee: 700,
-        createPendingCharge: true,
-      },
-    ],
-    sessionNotes: [
-      {
-        daysAgo: 42,
-        hour: 10,
-        minute: 0,
-        title: "Evaluacion inicial",
-        content:
-          "Se explora motivo de consulta, presiones academicas y habitos de descanso. Se acuerda registro breve de sueno.",
-      },
-      {
-        daysAgo: 14,
-        hour: 10,
-        minute: 0,
-        title: "Seguimiento de habitos",
-        content:
-          "Refiere mayor orden semanal. Se refuerzan pausas breves y respiracion diafragmatica antes de estudiar.",
-      },
-    ],
-    documents: [
-      {
-        daysAgo: 40,
-        fileName: "consentimiento-informado-sofia.pdf",
-        mimeType: "application/pdf",
-      },
-    ],
-  },
-  {
-    code: 2,
-    firstName: "Carlos",
-    lastName: "Navarro",
-    phoneNumber: "+526621110002",
-    email: "carlos.navarro@psychology-app.local",
-    birthDate: birthDate(1989, 9, 23),
-    diagnosis:
-      "Dificultades de comunicacion laboral y tension sostenida ante conversaciones dificiles.",
-    treatmentPlan:
-      "Entrenamiento en comunicacion asertiva, identificacion de pensamientos automaticos y planeacion conductual.",
-    appointments: [
-      {
-        daysFromNow: -49,
-        hour: 9,
-        minute: 30,
-        durationMinutes: 60,
-        status: AppointmentStatus.COMPLETED,
-        notes: "Historia del problema y objetivos iniciales.",
-        fee: 800,
-        paymentMethod: PaymentMethod.TRANSFER,
-      },
-      {
-        daysFromNow: -18,
-        hour: 9,
-        minute: 30,
-        durationMinutes: 45,
-        status: AppointmentStatus.NO_SHOW,
-        notes: "No se presento a la cita programada.",
-      },
-      {
-        daysFromNow: 12,
-        hour: 12,
-        minute: 0,
-        durationMinutes: 60,
-        status: AppointmentStatus.SCHEDULED,
-        notes: "Seguimiento de comunicacion asertiva.",
-        fee: 800,
-        createPendingCharge: true,
-      },
-    ],
-    sessionNotes: [
-      {
-        daysAgo: 49,
-        hour: 9,
-        minute: 30,
-        title: "Historia del problema",
-        content:
-          "Se revisan situaciones laborales recientes y respuestas de tension. Se propone observar detonantes.",
-      },
-      {
-        daysAgo: 28,
-        hour: 9,
-        minute: 30,
-        title: "Comunicacion asertiva",
-        content:
-          "Se practica estructura de mensajes en primera persona y preparacion previa de conversaciones.",
-      },
-      {
-        daysAgo: 7,
-        hour: 9,
-        minute: 30,
-        title: "Revision de acuerdos",
-        content:
-          "Se refuerzan avances y se ajusta tarea de registrar conversaciones breves.",
-      },
-    ],
-    documents: [
-      {
-        daysAgo: 46,
-        fileName: "plan-objetivos-carlos.pdf",
-        mimeType: "application/pdf",
-      },
-    ],
-  },
-  {
-    code: 3,
-    firstName: "Mariana",
-    lastName: "Lopez",
-    phoneNumber: "+526621110003",
-    email: "mariana.lopez@psychology-app.local",
-    birthDate: birthDate(1995, 1, 30),
-    diagnosis:
-      "Ajuste a cambios de rutina y fortalecimiento de limites personales.",
-    treatmentPlan:
-      "Trabajo en limites saludables, actividades gratificantes y seguimiento quincenal de avances.",
-    appointments: [
-      {
-        daysFromNow: -24,
-        hour: 16,
-        minute: 0,
-        durationMinutes: 50,
-        status: AppointmentStatus.COMPLETED,
-        notes: "Definicion de objetivos terapeuticos.",
-        fee: 750,
-        paymentMethod: PaymentMethod.CASH,
-      },
-      {
-        daysFromNow: 0,
-        hour: 16,
-        minute: 30,
-        durationMinutes: 50,
-        status: AppointmentStatus.SCHEDULED,
-        notes: "Sesion programada para hoy por la tarde.",
-        fee: 750,
-        createPendingCharge: true,
-      },
-    ],
-    sessionNotes: [
-      {
-        daysAgo: 24,
-        hour: 16,
-        minute: 0,
-        title: "Objetivos terapeuticos",
-        content:
-          "Se delimitan objetivos iniciales y se acuerda observacion de necesidades y limites.",
-      },
-    ],
-  },
-  {
-    code: 4,
-    firstName: "Diego",
-    lastName: "Torres",
-    phoneNumber: "+526621110004",
-    email: "diego.torres@psychology-app.local",
-    birthDate: birthDate(1992, 6, 5),
-    diagnosis:
-      "Adaptacion a nuevo empleo con preocupacion recurrente por desempeno.",
-    treatmentPlan:
-      "Psicoeducacion, solucion de problemas y registro de logros diarios.",
-    appointments: [
-      {
-        daysFromNow: -36,
-        hour: 13,
-        minute: 0,
-        durationMinutes: 60,
-        status: AppointmentStatus.COMPLETED,
-        notes: "Evaluacion de adaptacion laboral.",
-        fee: 800,
-        paymentMethod: PaymentMethod.TRANSFER,
-      },
-      {
-        daysFromNow: -3,
-        hour: 13,
-        minute: 0,
-        durationMinutes: 60,
-        status: AppointmentStatus.COMPLETED,
-        notes: "Revision de pensamientos automaticos.",
-        fee: 800,
-        paymentMethod: PaymentMethod.CARD,
-      },
-      {
-        daysFromNow: 21,
-        hour: 13,
-        minute: 30,
-        durationMinutes: 60,
-        status: AppointmentStatus.SCHEDULED,
-        notes: "Seguimiento de metas laborales.",
-        fee: 800,
-        createPendingCharge: true,
-      },
-    ],
-    sessionNotes: [
-      {
-        daysAgo: 36,
-        hour: 13,
-        minute: 0,
-        title: "Adaptacion laboral",
-        content:
-          "Se identifican fuentes de presion y recursos ya disponibles. Se registra evidencia de desempeno suficiente.",
-      },
-      {
-        daysAgo: 3,
-        hour: 13,
-        minute: 0,
-        title: "Flexibilidad cognitiva",
-        content:
-          "Se revisan pensamientos de exigencia elevada y se construyen alternativas mas realistas.",
-      },
-    ],
-    documents: [
-      {
-        daysAgo: 2,
-        fileName: "registro-logros-diego.png",
-        mimeType: "image/png",
-      },
-    ],
-  },
-  {
-    code: 5,
-    firstName: "Valeria",
-    lastName: "Mendoza",
-    phoneNumber: "+526621110005",
-    email: "valeria.mendoza@psychology-app.local",
-    birthDate: birthDate(2001, 11, 18),
-    diagnosis: "Organizacion personal y preocupacion por rendimiento escolar.",
-    treatmentPlan:
-      "Agenda semanal, division de tareas largas y autoinstrucciones funcionales.",
-    appointments: [
-      {
-        daysFromNow: -56,
-        hour: 17,
-        minute: 0,
-        durationMinutes: 50,
-        status: AppointmentStatus.COMPLETED,
-        notes: "Revision de rutina academica.",
-        fee: 650,
-        paymentMethod: PaymentMethod.CASH,
-      },
-      {
-        daysFromNow: -9,
-        hour: 17,
-        minute: 0,
-        durationMinutes: 50,
-        status: AppointmentStatus.CANCELLED,
-        notes: "Cancelada por cambio de horario del paciente.",
-      },
-      {
-        daysFromNow: 28,
-        hour: 17,
-        minute: 30,
-        durationMinutes: 50,
-        status: AppointmentStatus.SCHEDULED,
-        notes: "Seguimiento mensual de organizacion.",
-        fee: 650,
-        createPendingCharge: true,
-      },
-    ],
-    sessionNotes: [
-      {
-        daysAgo: 56,
-        hour: 17,
-        minute: 0,
-        title: "Planeacion academica",
-        content:
-          "Se revisa calendario escolar y se priorizan tareas con bloques cortos de trabajo.",
-      },
-      {
-        daysAgo: 42,
-        hour: 17,
-        minute: 0,
-        title: "Autoinstrucciones",
-        content:
-          "Se practican frases funcionales para iniciar tareas y reducir postergacion.",
-      },
-      {
-        daysAgo: 15,
-        hour: 17,
-        minute: 0,
-        title: "Ajuste de plan",
-        content:
-          "Se ajusta agenda semanal incorporando descansos y metas realistas.",
-      },
-    ],
-  },
-  {
-    code: 6,
-    firstName: "Luis",
-    lastName: "Herrera",
-    phoneNumber: "+526621110006",
-    email: "luis.herrera@psychology-app.local",
-    birthDate: birthDate(1984, 2, 2),
-    diagnosis:
-      "Desequilibrio entre trabajo y vida personal, con baja recuperacion semanal.",
-    treatmentPlan:
-      "Definir limites de disponibilidad, agenda de recuperacion y comunicacion familiar.",
-    appointments: [
-      {
-        daysFromNow: -30,
-        hour: 8,
-        minute: 30,
-        durationMinutes: 45,
-        status: AppointmentStatus.COMPLETED,
-        notes: "Exploracion de balance trabajo-vida.",
-        fee: 850,
-        paymentMethod: PaymentMethod.TRANSFER,
-      },
-      {
-        daysFromNow: 7,
-        hour: 8,
-        minute: 30,
-        durationMinutes: 45,
-        status: AppointmentStatus.SCHEDULED,
-        notes: "Seguimiento de limites de disponibilidad.",
-        fee: 850,
-      },
-    ],
-    sessionNotes: [
-      {
-        daysAgo: 30,
-        hour: 8,
-        minute: 30,
-        title: "Balance personal",
-        content:
-          "Se revisan horarios y responsabilidades. Se identifican dos espacios semanales de recuperacion personal.",
-      },
-      {
-        daysAgo: 3,
-        hour: 8,
-        minute: 30,
-        title: "Limites de disponibilidad",
-        content:
-          "Reporta mejora al cerrar jornada en horario definido. Se practica comunicacion clara de limites.",
-      },
-    ],
-  },
-  {
-    code: 7,
-    firstName: "Ana Paula",
-    lastName: "Castro",
-    phoneNumber: "+526621110007",
-    email: "ana.castro@psychology-app.local",
-    birthDate: birthDate(1990, 7, 14),
-    diagnosis:
-      "Ajuste a cambios familiares recientes y fortalecimiento de red de apoyo.",
-    treatmentPlan:
-      "Explorar recursos de apoyo, autocuidado y acuerdos concretos de seguimiento.",
-    appointments: [
-      {
-        daysFromNow: -15,
-        hour: 18,
-        minute: 0,
-        durationMinutes: 60,
-        status: AppointmentStatus.COMPLETED,
-        notes: "Exploracion de red de apoyo.",
-        fee: 780,
-        paymentMethod: PaymentMethod.CARD,
-      },
-      {
-        daysFromNow: 18,
-        hour: 18,
-        minute: 0,
-        durationMinutes: 60,
-        status: AppointmentStatus.SCHEDULED,
-        notes: "Seguimiento de autocuidado y apoyo familiar.",
-        fee: 780,
-      },
-    ],
-    sessionNotes: [
-      {
-        daysAgo: 15,
-        hour: 18,
-        minute: 0,
-        title: "Red de apoyo",
-        content:
-          "Se identifica red cercana y formas practicas de pedir apoyo. Se acuerda una actividad de autocuidado.",
-      },
-    ],
-  },
-  {
-    code: 8,
-    firstName: "Ricardo",
-    lastName: "Salazar",
-    phoneNumber: "+526621110008",
-    email: "ricardo.salazar@psychology-app.local",
-    birthDate: birthDate(1978, 12, 9),
-    diagnosis: "Manejo de preocupaciones cotidianas y mejora de descanso.",
-    treatmentPlan:
-      "Higiene del sueno, registro de preocupaciones y tecnicas de relajacion.",
-    appointments: [
-      {
-        daysFromNow: -60,
-        hour: 12,
-        minute: 30,
-        durationMinutes: 90,
-        status: AppointmentStatus.COMPLETED,
-        notes: "Evaluacion extensa de rutina y descanso.",
-        fee: 950,
-        paymentMethod: PaymentMethod.TRANSFER,
-      },
-      {
-        daysFromNow: -22,
-        hour: 12,
-        minute: 30,
-        durationMinutes: 60,
-        status: AppointmentStatus.COMPLETED,
-        notes: "Revision de registro de preocupaciones.",
-        fee: 850,
-        paymentMethod: PaymentMethod.TRANSFER,
-      },
-      {
-        daysFromNow: 30,
-        hour: 12,
-        minute: 30,
-        durationMinutes: 60,
-        status: AppointmentStatus.SCHEDULED,
-        notes: "Seguimiento a 30 dias.",
-        fee: 850,
-        createPendingCharge: true,
-      },
-    ],
-    sessionNotes: [
-      {
-        daysAgo: 60,
-        hour: 12,
-        minute: 30,
-        title: "Rutina de descanso",
-        content:
-          "Se revisan horarios de sueno y habitos nocturnos. Se acuerda reducir pantallas antes de dormir.",
-      },
-      {
-        daysAgo: 45,
-        hour: 12,
-        minute: 30,
-        title: "Registro de preocupaciones",
-        content:
-          "Se implementa tecnica de posponer preocupaciones y registrar temas recurrentes.",
-      },
-      {
-        daysAgo: 7,
-        hour: 12,
-        minute: 30,
-        title: "Seguimiento",
-        content:
-          "Refiere descanso mas estable y continuidad del plan con ajustes menores.",
-      },
-    ],
-    documents: [
-      {
-        daysAgo: 21,
-        fileName: "higiene-sueno-ricardo.jpg",
-        mimeType: "image/jpeg",
-      },
-    ],
-  },
-  {
-    code: 9,
-    firstName: "Fernanda",
-    lastName: "Rios",
-    phoneNumber: "+526621110009",
-    email: "fernanda.rios@psychology-app.local",
-    birthDate: birthDate(1997, 5, 27),
-    diagnosis:
-      "Toma de decisiones personales con necesidad de mayor claridad de metas.",
-    treatmentPlan:
-      "Ejercicios de valores, matriz de decisiones y seguimiento de acciones pequenas.",
-    appointments: [
-      {
-        daysFromNow: -45,
-        hour: 15,
-        minute: 0,
-        durationMinutes: 60,
-        status: AppointmentStatus.COMPLETED,
-        notes: "Exploracion de metas.",
-        fee: 760,
-        paymentMethod: PaymentMethod.CARD,
-      },
-      {
-        daysFromNow: 10,
-        hour: 15,
-        minute: 0,
-        durationMinutes: 50,
-        status: AppointmentStatus.SCHEDULED,
-        notes: "Seguimiento de acciones concretas.",
-        fee: 760,
-      },
-    ],
-    sessionNotes: [
-      {
-        daysAgo: 45,
-        hour: 15,
-        minute: 0,
-        title: "Claridad de metas",
-        content:
-          "Se exploran metas personales de corto plazo y valores asociados. Se priorizan dos acciones concretas.",
-      },
-      {
-        daysAgo: 15,
-        hour: 15,
-        minute: 0,
-        title: "Matriz de decisiones",
-        content:
-          "Se revisan opciones y costos percibidos. Reporta mayor claridad para decidir gradualmente.",
-      },
-    ],
-  },
-  {
-    code: 10,
-    firstName: "Jorge",
-    lastName: "Molina",
-    phoneNumber: "+526621110010",
-    email: "jorge.molina@psychology-app.local",
-    birthDate: birthDate(1982, 3, 21),
-    diagnosis: "Comunicacion en pareja y manejo de desacuerdos cotidianos.",
-    treatmentPlan:
-      "Entrenar escucha activa, pausa ante discusiones y acuerdos semanales.",
-    appointments: [
-      {
-        daysFromNow: -30,
-        hour: 19,
-        minute: 0,
-        durationMinutes: 60,
-        status: AppointmentStatus.COMPLETED,
-        notes: "Entrenamiento en escucha activa.",
-        fee: 820,
-        paymentMethod: PaymentMethod.TRANSFER,
-      },
-      {
-        daysFromNow: -1,
-        hour: 19,
-        minute: 0,
-        durationMinutes: 60,
-        status: AppointmentStatus.CANCELLED,
-        notes: "Cancelada con anticipacion por agenda laboral.",
-      },
-      {
-        daysFromNow: 24,
-        hour: 19,
-        minute: 0,
-        durationMinutes: 60,
-        status: AppointmentStatus.SCHEDULED,
-        notes: "Seguimiento de acuerdos semanales.",
-        fee: 820,
-      },
-    ],
-    sessionNotes: [
-      {
-        daysAgo: 30,
-        hour: 19,
-        minute: 0,
-        title: "Escucha activa",
-        content:
-          "Se identifica patron de interrupciones y se practica validacion breve.",
-      },
-      {
-        daysAgo: 7,
-        hour: 19,
-        minute: 0,
-        title: "Acuerdos semanales",
-        content:
-          "Se definen acuerdos especificos y uso de pausas antes de responder.",
-      },
-    ],
-    documents: [
-      {
-        daysAgo: 5,
-        fileName: "acuerdos-semanales-jorge.pdf",
-        mimeType: "application/pdf",
-      },
-    ],
-  },
-  {
-    code: 11,
-    firstName: "Camila",
-    lastName: "Ortega",
-    phoneNumber: "+526621110011",
-    email: "camila.ortega@psychology-app.local",
-    birthDate: birthDate(2000, 8, 3),
-    appointments: [
-      {
-        daysFromNow: -15,
-        hour: 11,
-        minute: 30,
-        durationMinutes: 50,
-        status: AppointmentStatus.COMPLETED,
-        notes: "Definicion de metas sociales graduales.",
-        fee: 690,
-        paymentMethod: PaymentMethod.CASH,
-      },
-      {
-        daysFromNow: 14,
-        hour: 11,
-        minute: 30,
-        durationMinutes: 50,
-        status: AppointmentStatus.SCHEDULED,
-        notes: "Seguimiento de exposicion gradual.",
-        fee: 690,
-      },
-    ],
-  },
-  {
-    code: 12,
-    firstName: "Andres",
-    lastName: "Vega",
-    phoneNumber: "+526621110012",
-    email: "andres.vega@psychology-app.local",
-    birthDate: birthDate(1987, 10, 16),
-    diagnosis:
-      "Manejo de frustracion ante cambios de planes y ajuste de expectativas.",
-    treatmentPlan:
-      "Planeacion flexible, registro de avances y reestructuracion de expectativas.",
-    appointments: [
-      {
-        daysFromNow: -60,
-        hour: 14,
-        minute: 0,
-        durationMinutes: 90,
-        status: AppointmentStatus.COMPLETED,
-        notes: "Evaluacion inicial amplia.",
-        fee: 950,
-        paymentMethod: PaymentMethod.TRANSFER,
-      },
-      {
-        daysFromNow: -6,
-        hour: 14,
-        minute: 0,
-        durationMinutes: 60,
-        status: AppointmentStatus.NO_SHOW,
-        notes: "No asistio a seguimiento programado.",
-      },
-      {
-        daysFromNow: 4,
-        hour: 14,
-        minute: 0,
-        durationMinutes: 60,
-        status: AppointmentStatus.SCHEDULED,
-        notes: "Reprogramacion de seguimiento.",
-        fee: 850,
-        createPendingCharge: true,
-      },
-    ],
-    sessionNotes: [
-      {
-        daysAgo: 60,
-        hour: 14,
-        minute: 0,
-        title: "Expectativas y metas",
-        content:
-          "Se identifican expectativas rigidas y se acuerdan metas ajustables.",
-      },
-      {
-        daysAgo: 45,
-        hour: 14,
-        minute: 0,
-        title: "Planeacion flexible",
-        content: "Se practica generar alternativas ante cambios de agenda.",
-      },
-      {
-        daysAgo: 15,
-        hour: 14,
-        minute: 0,
-        title: "Seguimiento de frustracion",
-        content:
-          "Se analizan respuestas ante imprevistos recientes y pausas antes de decidir cambios.",
-      },
-    ],
-  },
-  {
-    code: 13,
-    firstName: "Natalia",
-    lastName: "Paredes",
-    phoneNumber: "+526621110013",
-    email: "natalia.paredes@psychology-app.local",
-    birthDate: birthDate(1993, 4, 6),
-    diagnosis:
-      "Autocuidado y recuperacion de actividades significativas tras periodos de alta demanda.",
-    treatmentPlan:
-      "Agenda de autocuidado, revision de energia disponible y limites en compromisos.",
-    appointments: [
-      {
-        daysFromNow: -30,
-        hour: 10,
-        minute: 30,
-        durationMinutes: 50,
-        status: AppointmentStatus.COMPLETED,
-        notes: "Exploracion de autocuidado.",
-        fee: 720,
-        paymentMethod: PaymentMethod.CARD,
-      },
-      {
-        daysFromNow: 16,
-        hour: 10,
-        minute: 30,
-        durationMinutes: 50,
-        status: AppointmentStatus.SCHEDULED,
-        notes: "Seguimiento de actividades significativas.",
-        fee: 720,
-      },
-    ],
-    sessionNotes: [
-      {
-        daysAgo: 30,
-        hour: 10,
-        minute: 30,
-        title: "Actividades significativas",
-        content:
-          "Se identifican actividades que aportan bienestar y barreras para retomarlas.",
-      },
-      {
-        daysAgo: 7,
-        hour: 10,
-        minute: 30,
-        title: "Energia disponible",
-        content:
-          "Se revisa carga semanal y se ajustan compromisos. Mejora reconocimiento de limites.",
-      },
-    ],
-  },
-  {
-    code: 14,
-    firstName: "Mateo",
-    lastName: "Cardenas",
-    phoneNumber: "+526621110014",
-    email: "mateo.cardenas@psychology-app.local",
-    birthDate: birthDate(1999, 9, 11),
-    appointments: [
-      {
-        daysFromNow: -45,
-        hour: 16,
-        minute: 30,
-        durationMinutes: 60,
-        status: AppointmentStatus.COMPLETED,
-        notes: "Tecnica pausa-respuesta.",
-        fee: 740,
-        paymentMethod: PaymentMethod.CASH,
-      },
-      {
-        daysFromNow: 9,
-        hour: 16,
-        minute: 30,
-        durationMinutes: 60,
-        status: AppointmentStatus.SCHEDULED,
-        notes: "Seguimiento de toma de perspectiva.",
-        fee: 740,
-      },
-    ],
-  },
-  {
-    code: 15,
-    firstName: "Elena",
-    lastName: "Soto",
-    phoneNumber: "+526621110015",
-    email: "elena.soto@psychology-app.local",
-    birthDate: birthDate(1975, 1, 25),
-    diagnosis:
-      "Transicion de etapa personal y redefinicion de rutinas de bienestar.",
-    treatmentPlan:
-      "Explorar prioridades actuales, crear rutina flexible y revisar avances mensuales.",
-    appointments: [
-      {
-        daysFromNow: -60,
-        hour: 9,
-        minute: 0,
-        durationMinutes: 90,
-        status: AppointmentStatus.COMPLETED,
-        notes: "Evaluacion inicial de transicion vital.",
-        fee: 900,
-        paymentMethod: PaymentMethod.TRANSFER,
-      },
-      {
-        daysFromNow: 26,
-        hour: 9,
-        minute: 0,
-        durationMinutes: 60,
-        status: AppointmentStatus.SCHEDULED,
-        notes: "Revision mensual de rutina flexible.",
-        fee: 780,
-      },
-    ],
-    sessionNotes: [
-      {
-        daysAgo: 60,
-        hour: 9,
-        minute: 0,
-        title: "Transicion de etapa",
-        content: "Se exploran cambios recientes y prioridades actuales.",
-      },
-      {
-        daysAgo: 30,
-        hour: 9,
-        minute: 0,
-        title: "Rutina flexible",
-        content:
-          "Se disena rutina semanal con espacios de actividad fisica ligera y contacto social.",
-      },
-      {
-        daysAgo: 7,
-        hour: 9,
-        minute: 0,
-        title: "Revision mensual",
-        content:
-          "Reporta mayor estructura durante la semana y se ajustan metas para sostener consistencia.",
-      },
-    ],
-  },
-  {
-    code: 16,
-    firstName: "Paula",
-    lastName: "Ibarra",
-    phoneNumber: "+526621110016",
-    email: "paula.ibarra@psychology-app.local",
-    birthDate: birthDate(1991, 12, 1),
-    diagnosis:
-      "Seguimiento de ansiedad situacional asociada a presentaciones de trabajo.",
-    treatmentPlan:
-      "Exposicion gradual, ensayo de presentaciones y regulacion fisiologica breve.",
-    appointments: [
-      {
-        daysFromNow: -20,
-        hour: 18,
-        minute: 30,
-        durationMinutes: 50,
-        status: AppointmentStatus.COMPLETED,
-        notes: "Revision de detonantes en presentaciones.",
-        fee: 790,
-        paymentMethod: PaymentMethod.CARD,
-      },
-      {
-        daysFromNow: 2,
-        hour: 18,
-        minute: 30,
-        durationMinutes: 50,
-        status: AppointmentStatus.SCHEDULED,
-        notes: "Ensayo de presentacion proxima.",
-        fee: 790,
-        createPendingCharge: true,
-      },
-    ],
-    sessionNotes: [
-      {
-        daysAgo: 20,
-        hour: 18,
-        minute: 30,
-        title: "Ansiedad situacional",
-        content:
-          "Se identifican detonantes previos a exposiciones y se practica respiracion breve.",
-      },
-    ],
-    documents: [
-      {
-        daysAgo: 18,
-        fileName: "jerarquia-exposicion-paula.pdf",
-        mimeType: "application/pdf",
-      },
-    ],
-  },
-];
+const ids = {
+  orgA: seedUuid(22000000, 1),
+  orgB: seedUuid(22000000, 2),
+  orgSuspended: seedUuid(22000000, 3),
+  ownerA: seedUuid(23000000, 1),
+  adminA: seedUuid(23000000, 2),
+  psychologistAssignedA: seedUuid(23000000, 3),
+  psychologistUnassignedA: seedUuid(23000000, 4),
+  receptionistA: seedUuid(23000000, 5),
+  billingA: seedUuid(23000000, 6),
+  auditorA: seedUuid(23000000, 7),
+  readonlyA: seedUuid(23000000, 8),
+  ownerB: seedUuid(23000000, 9),
+  psychologistB: seedUuid(23000000, 10),
+  multiMember: seedUuid(23000000, 11),
+  suspendedMember: seedUuid(23000000, 12),
+  suspendedOrgUser: seedUuid(23000000, 13),
+  noMembership: seedUuid(23000000, 14),
+  ownerMembershipA: seedUuid(24000000, 1),
+  adminMembershipA: seedUuid(24000000, 2),
+  psychologistAssignedMembershipA: seedUuid(24000000, 3),
+  psychologistUnassignedMembershipA: seedUuid(24000000, 4),
+  receptionistMembershipA: seedUuid(24000000, 5),
+  billingMembershipA: seedUuid(24000000, 6),
+  auditorMembershipA: seedUuid(24000000, 7),
+  readonlyMembershipA: seedUuid(24000000, 8),
+  ownerMembershipB: seedUuid(24000000, 9),
+  psychologistMembershipB: seedUuid(24000000, 10),
+  multiMembershipA: seedUuid(24000000, 11),
+  multiMembershipB: seedUuid(24000000, 12),
+  suspendedMembershipA: seedUuid(24000000, 13),
+  suspendedOrgMembership: seedUuid(24000000, 14),
+  ownerPatientA: seedUuid(25000000, 1),
+  assignedPatientA: seedUuid(25000000, 2),
+  unassignedPatientA: seedUuid(25000000, 3),
+  patientB: seedUuid(25000000, 4),
+  multiPatientA: seedUuid(25000000, 5),
+  multiPatientB: seedUuid(25000000, 6),
+  ownerCaseFileA: seedUuid(26000000, 1),
+  assignedCaseFileA: seedUuid(26000000, 2),
+  unassignedCaseFileA: seedUuid(26000000, 3),
+  caseFileB: seedUuid(26000000, 4),
+  multiCaseFileA: seedUuid(26000000, 5),
+  multiCaseFileB: seedUuid(26000000, 6),
+  ownerSessionNoteA: seedUuid(27000000, 1),
+  assignedSessionNoteA: seedUuid(27000000, 2),
+  sessionNoteB: seedUuid(27000000, 3),
+  ownerDocumentA: seedUuid(28000000, 1),
+  assignedDocumentA: seedUuid(28000000, 2),
+  documentB: seedUuid(28000000, 3),
+  ownerAppointmentA: seedUuid(29000000, 1),
+  assignedAppointmentA: seedUuid(29000000, 2),
+  appointmentWithoutNotesA: seedUuid(29000000, 3),
+  appointmentB: seedUuid(29000000, 4),
+  incomeA: seedUuid(30000000, 1),
+  expenseA: seedUuid(30000000, 2),
+  adjustmentA: seedUuid(30000000, 3),
+  refundA: seedUuid(30000000, 4),
+  pendingIncomeA: seedUuid(30000000, 5),
+  incomeB: seedUuid(30000000, 6),
+  expenseB: seedUuid(30000000, 7),
+};
 
-const demoEmails = patientBlueprints.map((patient) => patient.email);
-
-function buildPatients(psychologistId: string) {
-  return patientBlueprints.map((patient) => ({
-    id: demoUuid(10000000, patient.code),
-    psychologistId,
-    firstName: patient.firstName,
-    lastName: patient.lastName,
-    phoneNumber: patient.phoneNumber,
-    email: patient.email,
-    birthDate: patient.birthDate,
-  }));
-}
-
-function buildCaseFiles() {
-  return patientBlueprints
-    .filter((patient) => patient.diagnosis && patient.treatmentPlan)
-    .map((patient) => ({
-      id: demoUuid(20000000, patient.code),
-      patientId: demoUuid(10000000, patient.code),
-      diagnosis: patient.diagnosis!,
-      treatmentPlan: patient.treatmentPlan!,
-    }));
-}
-
-function buildSessionNotes(psychologistId: string) {
-  return patientBlueprints.flatMap((patient) =>
-    (patient.sessionNotes ?? []).map((note, index) => ({
-      id: demoUuid(30000000 + patient.code, index + 1),
-      caseFileId: demoUuid(20000000, patient.code),
-      authorId: psychologistId,
-      sessionDate: dateFromNow(-note.daysAgo, note.hour, note.minute),
-      title: note.title,
-      content: note.content,
-    })),
-  );
-}
-
-function buildAppointments(psychologistId: string) {
-  return patientBlueprints.flatMap((patient) =>
-    patient.appointments.map((appointment, index) => ({
-      id: demoUuid(50000000 + patient.code, index + 1),
-      patientId: demoUuid(10000000, patient.code),
-      psychologistId,
-      scheduledAt: dateFromNow(
-        appointment.daysFromNow,
-        appointment.hour,
-        appointment.minute,
-      ),
-      durationMinutes: appointment.durationMinutes,
-      status: appointment.status,
-      notes: appointment.notes,
-      patientCode: patient.code,
-      patientName: `${patient.firstName} ${patient.lastName}`,
-      fee: appointment.fee ?? null,
-      paymentMethod: appointment.paymentMethod ?? null,
-      createPendingCharge: appointment.createPendingCharge ?? false,
-    })),
-  );
-}
-
-function buildFinancialTransactions(psychologistId: string) {
-  const appointments = buildAppointments(psychologistId);
-
-  const appointmentTransactions: DemoFinancialTransaction[] = [];
-
-  appointments.forEach((appointment, index) => {
-    if (appointment.status === AppointmentStatus.COMPLETED && appointment.fee) {
-      appointmentTransactions.push({
-        id: demoUuid(60000000, index + 1),
-        type: FinancialTransactionType.INCOME,
-        status: FinancialTransactionStatus.COMPLETED,
-        category: FinancialTransactionCategory.SESSION,
-        amount: appointment.fee,
-        currency: "MXN",
-        concept: `Pago de sesion - ${appointment.patientName}`,
-        description: `${DEMO_TAG} Ingreso registrado por sesion completada.`,
-        occurredAt: addMinutes(
-          appointment.scheduledAt,
-          appointment.durationMinutes,
-        ),
-        dueDate: null,
-        paymentMethod: appointment.paymentMethod,
-        notes: `${DEMO_TAG} Sesion vinculada a cita completada.`,
-        patientId: appointment.patientId,
-        appointmentId: appointment.id,
-        createdById: psychologistId,
-      });
-      return;
-    }
-
-    if (
-      appointment.status === AppointmentStatus.SCHEDULED &&
-      appointment.fee &&
-      appointment.createPendingCharge
-    ) {
-      appointmentTransactions.push({
-        id: demoUuid(61000000, index + 1),
-        type: FinancialTransactionType.INCOME,
-        status: FinancialTransactionStatus.PENDING,
-        category: FinancialTransactionCategory.SESSION,
-        amount: appointment.fee,
-        currency: "MXN",
-        concept: `Cobro pendiente - ${appointment.patientName}`,
-        description: `${DEMO_TAG} Cargo pendiente para sesion programada.`,
-        occurredAt: appointment.scheduledAt,
-        dueDate: appointment.scheduledAt,
-        paymentMethod: null,
-        notes: `${DEMO_TAG} Pendiente de cobro para cita futura.`,
-        patientId: appointment.patientId,
-        appointmentId: appointment.id,
-        createdById: psychologistId,
-      });
-    }
-  });
-
-  const operationalTransactions: DemoFinancialTransaction[] = [
-    {
-      id: demoUuid(62000000, 1),
-      type: FinancialTransactionType.EXPENSE,
-      status: FinancialTransactionStatus.COMPLETED,
-      category: FinancialTransactionCategory.RENT,
-      amount: 8500,
-      currency: "MXN",
-      concept: "Renta del consultorio",
-      description: `${DEMO_TAG} Renta mensual del espacio de consulta.`,
-      occurredAt: dateFromNow(-25, 8, 0),
-      dueDate: null,
-      paymentMethod: PaymentMethod.TRANSFER,
-      notes: `${DEMO_TAG} Gasto operativo mensual.`,
-      patientId: null,
-      appointmentId: null,
-      createdById: psychologistId,
-    },
-    {
-      id: demoUuid(62000000, 2),
-      type: FinancialTransactionType.EXPENSE,
-      status: FinancialTransactionStatus.PENDING,
-      category: FinancialTransactionCategory.RENT,
-      amount: 8500,
-      currency: "MXN",
-      concept: "Renta del consultorio",
-      description: `${DEMO_TAG} Renta mensual del espacio de consulta.`,
-      occurredAt: dateFromNow(5, 8, 0),
-      dueDate: dateFromNow(5, 18, 0),
-      paymentMethod: null,
-      notes: `${DEMO_TAG} Gasto operativo pendiente del mes actual.`,
-      patientId: null,
-      appointmentId: null,
-      createdById: psychologistId,
-    },
-    {
-      id: demoUuid(62000000, 3),
-      type: FinancialTransactionType.EXPENSE,
-      status: FinancialTransactionStatus.COMPLETED,
-      category: FinancialTransactionCategory.SOFTWARE,
-      amount: 349,
-      currency: "MXN",
-      concept: "Suscripcion de videollamadas",
-      description: `${DEMO_TAG} Herramienta para sesiones remotas y seguimiento.`,
-      occurredAt: dateFromNow(-19, 7, 30),
-      dueDate: null,
-      paymentMethod: PaymentMethod.CARD,
-      notes: `${DEMO_TAG} Software mensual.`,
-      patientId: null,
-      appointmentId: null,
-      createdById: psychologistId,
-    },
-    {
-      id: demoUuid(62000000, 4),
-      type: FinancialTransactionType.EXPENSE,
-      status: FinancialTransactionStatus.COMPLETED,
-      category: FinancialTransactionCategory.SOFTWARE,
-      amount: 229,
-      currency: "MXN",
-      concept: "Suscripcion de agenda clinica",
-      description: `${DEMO_TAG} Herramienta de gestion administrativa.`,
-      occurredAt: dateFromNow(-4, 7, 45),
-      dueDate: null,
-      paymentMethod: PaymentMethod.CARD,
-      notes: `${DEMO_TAG} Software de apoyo operativo.`,
-      patientId: null,
-      appointmentId: null,
-      createdById: psychologistId,
-    },
-    {
-      id: demoUuid(62000000, 5),
-      type: FinancialTransactionType.EXPENSE,
-      status: FinancialTransactionStatus.COMPLETED,
-      category: FinancialTransactionCategory.UTILITIES,
-      amount: 1180,
-      currency: "MXN",
-      concept: "Internet y servicios",
-      description: `${DEMO_TAG} Pago de internet y energia del consultorio.`,
-      occurredAt: dateFromNow(-12, 9, 15),
-      dueDate: null,
-      paymentMethod: PaymentMethod.TRANSFER,
-      notes: `${DEMO_TAG} Gasto operativo recurrente.`,
-      patientId: null,
-      appointmentId: null,
-      createdById: psychologistId,
-    },
-    {
-      id: demoUuid(62000000, 6),
-      type: FinancialTransactionType.EXPENSE,
-      status: FinancialTransactionStatus.PENDING,
-      category: FinancialTransactionCategory.SUPPLIES,
-      amount: 540,
-      currency: "MXN",
-      concept: "Material de oficina y papeleria",
-      description: `${DEMO_TAG} Compra pendiente de hojas, carpetas y material impreso.`,
-      occurredAt: dateFromNow(3, 13, 0),
-      dueDate: dateFromNow(6, 18, 0),
-      paymentMethod: null,
-      notes: `${DEMO_TAG} Gasto pendiente por surtir.`,
-      patientId: null,
-      appointmentId: null,
-      createdById: psychologistId,
-    },
-    {
-      id: demoUuid(62000000, 7),
-      type: FinancialTransactionType.ADJUSTMENT,
-      status: FinancialTransactionStatus.COMPLETED,
-      category: FinancialTransactionCategory.MANUAL,
-      amount: 300,
-      currency: "MXN",
-      concept: "Ajuste por redondeo de caja",
-      description: `${DEMO_TAG} Ajuste administrativo menor para cuadrar ingresos en efectivo.`,
-      occurredAt: dateFromNow(-2, 20, 0),
-      dueDate: null,
-      paymentMethod: PaymentMethod.CASH,
-      notes: `${DEMO_TAG} Ajuste manual.`,
-      patientId: null,
-      appointmentId: null,
-      createdById: psychologistId,
-    },
-    {
-      id: demoUuid(62000000, 8),
-      type: FinancialTransactionType.REFUND,
-      status: FinancialTransactionStatus.COMPLETED,
-      category: FinancialTransactionCategory.SESSION,
-      amount: 400,
-      currency: "MXN",
-      concept: "Reembolso parcial por reprogramacion",
-      description: `${DEMO_TAG} Reembolso parcial por cambio de horario solicitado con anticipacion.`,
-      occurredAt: dateFromNow(-8, 12, 15),
-      dueDate: null,
-      paymentMethod: PaymentMethod.TRANSFER,
-      notes: `${DEMO_TAG} Reembolso administrativo.`,
-      patientId: demoUuid(10000000, 5),
-      appointmentId: null,
-      createdById: psychologistId,
-    },
-  ];
-
-  return [...appointmentTransactions, ...operationalTransactions];
-}
-
-async function upsertUser(params: {
+type SeedUser = {
   id: string;
   name: string;
   email: string;
-  passwordHash: string;
   role: UserRole;
-}) {
-  return prisma.user.upsert({
-    where: { email: params.email },
-    update: {
-      name: params.name,
-      passwordHash: params.passwordHash,
-      role: params.role,
-    },
-    create: {
-      id: params.id,
-      name: params.name,
-      email: params.email,
-      passwordHash: params.passwordHash,
-      role: params.role,
-    },
-    select: {
-      id: true,
-      email: true,
-    },
-  });
+};
+
+const organizations = [
+  organization(ids.orgA, 'tenant-dev-a', 'Tenant Development A'),
+  organization(ids.orgB, 'tenant-dev-b', 'Tenant Development B'),
+  organization(
+    ids.orgSuspended,
+    'tenant-dev-suspended',
+    'Tenant Development Suspended',
+    OrganizationStatus.SUSPENDED,
+  ),
+] satisfies Prisma.OrganizationCreateManyInput[];
+
+const users: SeedUser[] = [
+  user(ids.ownerA, 'Owner A', 'owner.a@example.test'),
+  user(ids.adminA, 'Admin A', 'admin.a@example.test', UserRole.ADMIN),
+  user(
+    ids.psychologistAssignedA,
+    'Psychologist Assigned A',
+    'psychologist.assigned.a@example.test',
+  ),
+  user(
+    ids.psychologistUnassignedA,
+    'Psychologist Unassigned A',
+    'psychologist.unassigned.a@example.test',
+  ),
+  user(ids.receptionistA, 'Receptionist A', 'receptionist.a@example.test'),
+  user(ids.billingA, 'Billing A', 'billing.a@example.test'),
+  user(ids.auditorA, 'Auditor A', 'auditor.a@example.test'),
+  user(ids.readonlyA, 'Read Only A', 'readonly.a@example.test'),
+  user(ids.ownerB, 'Owner B', 'owner.b@example.test'),
+  user(ids.psychologistB, 'Psychologist B', 'psychologist.b@example.test'),
+  user(ids.multiMember, 'Multi Member', 'multi.member@example.test'),
+  user(
+    ids.suspendedMember,
+    'Suspended Membership A',
+    'suspended.membership.a@example.test',
+  ),
+  user(
+    ids.suspendedOrgUser,
+    'Suspended Organization User',
+    'suspended.organization@example.test',
+  ),
+  user(ids.noMembership, 'No Membership User', 'no.membership@example.test'),
+];
+
+const memberships = [
+  membership(ids.ownerMembershipA, ids.orgA, ids.ownerA, MembershipRole.OWNER),
+  membership(ids.adminMembershipA, ids.orgA, ids.adminA, MembershipRole.ADMIN),
+  membership(
+    ids.psychologistAssignedMembershipA,
+    ids.orgA,
+    ids.psychologistAssignedA,
+    MembershipRole.PSYCHOLOGIST,
+  ),
+  membership(
+    ids.psychologistUnassignedMembershipA,
+    ids.orgA,
+    ids.psychologistUnassignedA,
+    MembershipRole.PSYCHOLOGIST,
+  ),
+  membership(
+    ids.receptionistMembershipA,
+    ids.orgA,
+    ids.receptionistA,
+    MembershipRole.RECEPTIONIST,
+  ),
+  membership(
+    ids.billingMembershipA,
+    ids.orgA,
+    ids.billingA,
+    MembershipRole.BILLING,
+  ),
+  membership(
+    ids.auditorMembershipA,
+    ids.orgA,
+    ids.auditorA,
+    MembershipRole.AUDITOR,
+  ),
+  membership(
+    ids.readonlyMembershipA,
+    ids.orgA,
+    ids.readonlyA,
+    MembershipRole.READ_ONLY,
+  ),
+  membership(ids.ownerMembershipB, ids.orgB, ids.ownerB, MembershipRole.OWNER),
+  membership(
+    ids.psychologistMembershipB,
+    ids.orgB,
+    ids.psychologistB,
+    MembershipRole.PSYCHOLOGIST,
+  ),
+  membership(
+    ids.multiMembershipA,
+    ids.orgA,
+    ids.multiMember,
+    MembershipRole.PSYCHOLOGIST,
+  ),
+  membership(
+    ids.multiMembershipB,
+    ids.orgB,
+    ids.multiMember,
+    MembershipRole.PSYCHOLOGIST,
+  ),
+  membership(
+    ids.suspendedMembershipA,
+    ids.orgA,
+    ids.suspendedMember,
+    MembershipRole.PSYCHOLOGIST,
+    MembershipStatus.SUSPENDED,
+  ),
+  membership(
+    ids.suspendedOrgMembership,
+    ids.orgSuspended,
+    ids.suspendedOrgUser,
+    MembershipRole.PSYCHOLOGIST,
+  ),
+] satisfies Prisma.OrganizationMembershipCreateManyInput[];
+
+const patients = [
+  patient(
+    ids.ownerPatientA,
+    ids.orgA,
+    ids.ownerA,
+    'Olivia',
+    'Owner',
+    'patient.owner.a@example.test',
+  ),
+  patient(
+    ids.assignedPatientA,
+    ids.orgA,
+    ids.psychologistAssignedA,
+    'Paula',
+    'Assigned',
+    'patient.assigned.a@example.test',
+  ),
+  patient(
+    ids.unassignedPatientA,
+    ids.orgA,
+    ids.psychologistAssignedA,
+    'Uriel',
+    'Unassigned',
+    'patient.unassigned.a@example.test',
+  ),
+  patient(
+    ids.patientB,
+    ids.orgB,
+    ids.psychologistB,
+    'Bruno',
+    'TenantB',
+    'patient.b@example.test',
+  ),
+  patient(
+    ids.multiPatientA,
+    ids.orgA,
+    ids.multiMember,
+    'Mara',
+    'Multi A',
+    'patient.multi.a@example.test',
+  ),
+  patient(
+    ids.multiPatientB,
+    ids.orgB,
+    ids.multiMember,
+    'Mateo',
+    'Multi B',
+    'patient.multi.b@example.test',
+  ),
+] satisfies Prisma.PatientCreateManyInput[];
+
+const assignments = [
+  assignment(ids.orgA, ids.ownerPatientA, ids.ownerMembershipA),
+  assignment(
+    ids.orgA,
+    ids.assignedPatientA,
+    ids.psychologistAssignedMembershipA,
+  ),
+  assignment(ids.orgB, ids.patientB, ids.psychologistMembershipB),
+  assignment(ids.orgA, ids.multiPatientA, ids.multiMembershipA),
+  assignment(ids.orgB, ids.multiPatientB, ids.multiMembershipB),
+] satisfies Prisma.PatientAssignmentCreateManyInput[];
+
+const caseFiles = [
+  caseFile(
+    ids.ownerCaseFileA,
+    ids.orgA,
+    ids.ownerPatientA,
+    'Seed owner diagnosis',
+    'Seed owner treatment plan',
+  ),
+  caseFile(
+    ids.assignedCaseFileA,
+    ids.orgA,
+    ids.assignedPatientA,
+    'Seed assigned diagnosis',
+    'Seed assigned treatment plan',
+  ),
+  caseFile(
+    ids.unassignedCaseFileA,
+    ids.orgA,
+    ids.unassignedPatientA,
+    'Seed unassigned diagnosis',
+    'Seed unassigned treatment plan',
+  ),
+  caseFile(
+    ids.caseFileB,
+    ids.orgB,
+    ids.patientB,
+    'Seed tenant B diagnosis',
+    'Seed tenant B treatment plan',
+  ),
+  caseFile(
+    ids.multiCaseFileA,
+    ids.orgA,
+    ids.multiPatientA,
+    'Seed multi A diagnosis',
+    'Seed multi A plan',
+  ),
+  caseFile(
+    ids.multiCaseFileB,
+    ids.orgB,
+    ids.multiPatientB,
+    'Seed multi B diagnosis',
+    'Seed multi B plan',
+  ),
+] satisfies Prisma.CaseFileCreateManyInput[];
+
+const sessionNotes = [
+  sessionNote(
+    ids.ownerSessionNoteA,
+    ids.orgA,
+    ids.ownerCaseFileA,
+    ids.ownerA,
+    'Owner tenant session',
+  ),
+  sessionNote(
+    ids.assignedSessionNoteA,
+    ids.orgA,
+    ids.assignedCaseFileA,
+    ids.psychologistAssignedA,
+    'Assigned psychologist session',
+  ),
+  sessionNote(
+    ids.sessionNoteB,
+    ids.orgB,
+    ids.caseFileB,
+    ids.psychologistB,
+    'Tenant B session',
+  ),
+] satisfies Prisma.SessionNoteCreateManyInput[];
+
+const documents = [
+  document(
+    ids.ownerDocumentA,
+    ids.orgA,
+    ids.ownerCaseFileA,
+    ids.ownerA,
+    ids.ownerPatientA,
+    'seed-owner-a.pdf',
+  ),
+  document(
+    ids.assignedDocumentA,
+    ids.orgA,
+    ids.assignedCaseFileA,
+    ids.psychologistAssignedA,
+    ids.assignedPatientA,
+    'seed-assigned-a.pdf',
+  ),
+  document(
+    ids.documentB,
+    ids.orgB,
+    ids.caseFileB,
+    ids.psychologistB,
+    ids.patientB,
+    'seed-b.pdf',
+  ),
+] satisfies Prisma.DocumentCreateManyInput[];
+
+const appointments = [
+  appointment(
+    ids.ownerAppointmentA,
+    ids.orgA,
+    ids.ownerPatientA,
+    ids.ownerA,
+    '2026-04-10T10:00:00.000Z',
+    AppointmentStatus.COMPLETED,
+    'Seed owner appointment note',
+  ),
+  appointment(
+    ids.assignedAppointmentA,
+    ids.orgA,
+    ids.assignedPatientA,
+    ids.psychologistAssignedA,
+    '2026-04-12T11:00:00.000Z',
+    AppointmentStatus.SCHEDULED,
+    'Seed assigned appointment note',
+  ),
+  appointment(
+    ids.appointmentWithoutNotesA,
+    ids.orgA,
+    ids.assignedPatientA,
+    ids.psychologistAssignedA,
+    '2026-04-20T12:00:00.000Z',
+    AppointmentStatus.CANCELLED,
+    null,
+  ),
+  appointment(
+    ids.appointmentB,
+    ids.orgB,
+    ids.patientB,
+    ids.psychologistB,
+    '2026-04-15T09:00:00.000Z',
+    AppointmentStatus.COMPLETED,
+    'Seed tenant B appointment note',
+  ),
+] satisfies Prisma.AppointmentCreateManyInput[];
+
+const transactions = [
+  transaction({
+    id: ids.incomeA,
+    organizationId: ids.orgA,
+    type: FinancialTransactionType.INCOME,
+    status: FinancialTransactionStatus.COMPLETED,
+    category: FinancialTransactionCategory.SESSION,
+    amount: 1200,
+    concept: 'Tenant A session income',
+    occurredAt: '2026-04-10T11:00:00.000Z',
+    paymentMethod: PaymentMethod.TRANSFER,
+    patientId: ids.ownerPatientA,
+    appointmentId: ids.ownerAppointmentA,
+    createdById: ids.billingA,
+  }),
+  transaction({
+    id: ids.expenseA,
+    organizationId: ids.orgA,
+    type: FinancialTransactionType.EXPENSE,
+    status: FinancialTransactionStatus.COMPLETED,
+    category: FinancialTransactionCategory.RENT,
+    amount: 300,
+    concept: 'Tenant A office rent',
+    occurredAt: '2026-04-11T12:00:00.000Z',
+    paymentMethod: PaymentMethod.CASH,
+    createdById: ids.billingA,
+  }),
+  transaction({
+    id: ids.adjustmentA,
+    organizationId: ids.orgA,
+    type: FinancialTransactionType.ADJUSTMENT,
+    status: FinancialTransactionStatus.COMPLETED,
+    category: FinancialTransactionCategory.MANUAL,
+    amount: 50,
+    concept: 'Tenant A manual adjustment',
+    occurredAt: '2026-04-12T12:00:00.000Z',
+    paymentMethod: PaymentMethod.CARD,
+    createdById: ids.billingA,
+  }),
+  transaction({
+    id: ids.refundA,
+    organizationId: ids.orgA,
+    type: FinancialTransactionType.REFUND,
+    status: FinancialTransactionStatus.COMPLETED,
+    category: FinancialTransactionCategory.SESSION,
+    amount: 100,
+    concept: 'Tenant A partial refund',
+    occurredAt: '2026-04-13T12:00:00.000Z',
+    paymentMethod: PaymentMethod.TRANSFER,
+    patientId: ids.assignedPatientA,
+    createdById: ids.billingA,
+  }),
+  transaction({
+    id: ids.pendingIncomeA,
+    organizationId: ids.orgA,
+    type: FinancialTransactionType.INCOME,
+    status: FinancialTransactionStatus.PENDING,
+    category: FinancialTransactionCategory.SESSION,
+    amount: 800,
+    concept: 'Tenant A pending scheduled session',
+    occurredAt: '2026-04-20T12:00:00.000Z',
+    dueDate: '2026-04-20T12:00:00.000Z',
+    patientId: ids.assignedPatientA,
+    appointmentId: ids.appointmentWithoutNotesA,
+    createdById: ids.billingA,
+  }),
+  transaction({
+    id: ids.incomeB,
+    organizationId: ids.orgB,
+    type: FinancialTransactionType.INCOME,
+    status: FinancialTransactionStatus.COMPLETED,
+    category: FinancialTransactionCategory.SESSION,
+    amount: 999,
+    concept: 'Tenant B session income',
+    occurredAt: '2026-04-10T11:00:00.000Z',
+    paymentMethod: PaymentMethod.TRANSFER,
+    patientId: ids.patientB,
+    appointmentId: ids.appointmentB,
+    createdById: ids.ownerB,
+  }),
+  transaction({
+    id: ids.expenseB,
+    organizationId: ids.orgB,
+    type: FinancialTransactionType.EXPENSE,
+    status: FinancialTransactionStatus.COMPLETED,
+    category: FinancialTransactionCategory.SOFTWARE,
+    amount: 111,
+    concept: 'Tenant B software expense',
+    occurredAt: '2026-04-12T11:00:00.000Z',
+    paymentMethod: PaymentMethod.CARD,
+    createdById: ids.ownerB,
+  }),
+] satisfies Prisma.FinancialTransactionCreateManyInput[];
+
+const tenantAExpectedSummary = {
+  incomeTotal: 2000,
+  expenseTotal: 300,
+  adjustmentTotal: 50,
+  refundTotal: 100,
+  netTotal: 1650,
+  transactionCount: 5,
+};
+
+function organization(
+  id: string,
+  slug: string,
+  displayName: string,
+  status: OrganizationStatus = OrganizationStatus.ACTIVE,
+) {
+  return {
+    id,
+    slug,
+    legalName: `${displayName} S.C.`,
+    displayName,
+    status,
+    timezone: 'America/Hermosillo',
+    locale: 'es-MX',
+    currency: 'MXN',
+  };
 }
 
-async function resetDemoClinicalData() {
-  const demoPatients = await prisma.patient.findMany({
-    where: {
-      email: {
-        in: demoEmails,
-      },
-    },
-    select: {
-      id: true,
-      caseFile: {
-        select: {
-          id: true,
-          documents: {
-            select: { filePath: true },
-          },
-        },
-      },
-      appointments: {
-        select: {
-          id: true,
-        },
-      },
-    },
-  });
+function user(
+  id: string,
+  name: string,
+  email: string,
+  role: UserRole = UserRole.PSYCHOLOGIST,
+): SeedUser {
+  return { id, name, email, role };
+}
 
-  const demoPatientIds = demoPatients.map((patient) => patient.id);
-  const demoCaseFileIds = demoPatients
-    .map((patient) => patient.caseFile?.id)
-    .filter((id): id is string => Boolean(id));
-  const demoAppointmentIds = demoPatients.flatMap((patient) =>
-    patient.appointments.map((appointment) => appointment.id),
+function membership(
+  id: string,
+  organizationId: string,
+  userId: string,
+  role: MembershipRole,
+  status: MembershipStatus = MembershipStatus.ACTIVE,
+) {
+  return {
+    id,
+    organizationId,
+    userId,
+    role,
+    status,
+    joinedAt:
+      status === MembershipStatus.ACTIVE
+        ? new Date('2026-01-01T00:00:00.000Z')
+        : null,
+    suspendedAt:
+      status === MembershipStatus.SUSPENDED
+        ? new Date('2026-01-02T00:00:00.000Z')
+        : null,
+  };
+}
+
+function patient(
+  id: string,
+  organizationId: string,
+  psychologistId: string,
+  firstName: string,
+  lastName: string,
+  email: string,
+) {
+  return {
+    id,
+    organizationId,
+    psychologistId,
+    firstName,
+    lastName,
+    email,
+    phoneNumber: '+526621230000',
+    birthDate: new Date('1990-01-01T00:00:00.000Z'),
+  };
+}
+
+function assignment(
+  organizationId: string,
+  patientId: string,
+  membershipId: string,
+) {
+  return {
+    organizationId,
+    patientId,
+    membershipId,
+    role: PatientAssignmentRole.PRIMARY,
+    status: PatientAssignmentStatus.ACTIVE,
+    startedAt: new Date('2026-01-01T00:00:00.000Z'),
+    creationReason: `${SEED_TAG} deterministic development assignment`,
+    createdByMembershipId: membershipId,
+  };
+}
+
+function caseFile(
+  id: string,
+  organizationId: string,
+  patientId: string,
+  diagnosis: string,
+  treatmentPlan: string,
+) {
+  return { id, organizationId, patientId, diagnosis, treatmentPlan };
+}
+
+function sessionNote(
+  id: string,
+  organizationId: string,
+  caseFileId: string,
+  authorId: string,
+  title: string,
+) {
+  return {
+    id,
+    organizationId,
+    caseFileId,
+    authorId,
+    sessionDate: new Date('2026-04-01T10:00:00.000Z'),
+    title,
+    content: `${SEED_TAG} synthetic clinical note for local development only.`,
+  };
+}
+
+function document(
+  id: string,
+  organizationId: string,
+  caseFileId: string,
+  uploadedById: string,
+  patientId: string,
+  fileName: string,
+) {
+  return {
+    id,
+    organizationId,
+    caseFileId,
+    uploadedById,
+    fileName,
+    filePath: `patients/${patientId}/${fileName}`,
+    mimeType: 'application/pdf',
+  };
+}
+
+function appointment(
+  id: string,
+  organizationId: string,
+  patientId: string,
+  psychologistId: string,
+  scheduledAt: string,
+  status: AppointmentStatus,
+  notes: string | null,
+) {
+  return {
+    id,
+    organizationId,
+    patientId,
+    psychologistId,
+    scheduledAt: new Date(scheduledAt),
+    durationMinutes: 50,
+    status,
+    notes,
+  };
+}
+
+function transaction(data: {
+  id: string;
+  organizationId: string;
+  type: FinancialTransactionType;
+  status: FinancialTransactionStatus;
+  category: FinancialTransactionCategory;
+  amount: number;
+  concept: string;
+  occurredAt: string;
+  createdById: string;
+  dueDate?: string;
+  paymentMethod?: PaymentMethod;
+  patientId?: string;
+  appointmentId?: string;
+}) {
+  return {
+    id: data.id,
+    organizationId: data.organizationId,
+    type: data.type,
+    status: data.status,
+    category: data.category,
+    amount: data.amount,
+    currency: 'MXN',
+    concept: data.concept,
+    description: `${SEED_TAG} synthetic financial transaction`,
+    occurredAt: new Date(data.occurredAt),
+    dueDate: data.dueDate ? new Date(data.dueDate) : null,
+    paymentMethod: data.paymentMethod ?? null,
+    notes: `${SEED_TAG} local-only transaction`,
+    patientId: data.patientId ?? null,
+    appointmentId: data.appointmentId ?? null,
+    createdById: data.createdById,
+  };
+}
+
+async function resetTenantDevelopmentSeed() {
+  await cleanupSeedDocumentFiles();
+
+  const organizationIds = organizations.map(
+    (seedOrganization) => seedOrganization.id,
   );
-  const demoDocumentPaths = demoPatients.flatMap((patient) =>
-    patient.caseFile?.documents.map((document) => document.filePath) ?? [],
+  const userIds = users.map((seedUser) => seedUser.id);
+  const membershipIds = memberships.map(
+    (seedMembership) => seedMembership.id as string,
+  );
+  const patientIds = patients.map((seedPatient) => seedPatient.id as string);
+  const caseFileIds = caseFiles.map(
+    (seedCaseFile) => seedCaseFile.id as string,
+  );
+  const appointmentIds = appointments.map(
+    (seedAppointment) => seedAppointment.id as string,
   );
 
   await prisma.$transaction([
     prisma.financialTransaction.deleteMany({
       where: {
         OR: [
-          { patientId: { in: demoPatientIds } },
-          { appointmentId: { in: demoAppointmentIds } },
-          { notes: { contains: DEMO_TAG } },
-          { description: { contains: DEMO_TAG } },
+          {
+            id: {
+              in: transactions.map(
+                (seedTransaction) => seedTransaction.id as string,
+              ),
+            },
+          },
+          { organizationId: { in: organizationIds } },
+          { patientId: { in: patientIds } },
+          { appointmentId: { in: appointmentIds } },
+          { createdById: { in: userIds } },
         ],
       },
     }),
     prisma.document.deleteMany({
-      where: { caseFileId: { in: demoCaseFileIds } },
+      where: {
+        OR: [
+          {
+            id: {
+              in: documents.map((seedDocument) => seedDocument.id as string),
+            },
+          },
+          { organizationId: { in: organizationIds } },
+          { caseFileId: { in: caseFileIds } },
+        ],
+      },
     }),
     prisma.sessionNote.deleteMany({
-      where: { caseFileId: { in: demoCaseFileIds } },
+      where: {
+        OR: [
+          { id: { in: sessionNotes.map((seedNote) => seedNote.id as string) } },
+          { organizationId: { in: organizationIds } },
+          { caseFileId: { in: caseFileIds } },
+          { authorId: { in: userIds } },
+        ],
+      },
     }),
     prisma.appointment.deleteMany({
-      where: { id: { in: demoAppointmentIds } },
+      where: {
+        OR: [
+          { id: { in: appointmentIds } },
+          { organizationId: { in: organizationIds } },
+          { patientId: { in: patientIds } },
+          { psychologistId: { in: userIds } },
+        ],
+      },
     }),
     prisma.caseFile.deleteMany({
-      where: { id: { in: demoCaseFileIds } },
+      where: {
+        OR: [
+          { id: { in: caseFileIds } },
+          { organizationId: { in: organizationIds } },
+          { patientId: { in: patientIds } },
+        ],
+      },
+    }),
+    prisma.patientAssignment.deleteMany({
+      where: {
+        OR: [
+          { organizationId: { in: organizationIds } },
+          { patientId: { in: patientIds } },
+          { membershipId: { in: membershipIds } },
+        ],
+      },
     }),
     prisma.patient.deleteMany({
-      where: { id: { in: demoPatientIds } },
+      where: {
+        OR: [
+          { id: { in: patientIds } },
+          { organizationId: { in: organizationIds } },
+          { psychologistId: { in: userIds } },
+          {
+            email: {
+              in: patients.map((seedPatient) => seedPatient.email as string),
+            },
+          },
+        ],
+      },
+    }),
+    prisma.organizationInvitation.deleteMany({
+      where: { organizationId: { in: organizationIds } },
+    }),
+    prisma.psychologistProfile.deleteMany({
+      where: { userId: { in: userIds } },
+    }),
+    prisma.organizationMembership.deleteMany({
+      where: {
+        OR: [
+          { id: { in: membershipIds } },
+          { organizationId: { in: organizationIds } },
+          { userId: { in: userIds } },
+        ],
+      },
+    }),
+    prisma.organizationSettings.deleteMany({
+      where: { organizationId: { in: organizationIds } },
+    }),
+    prisma.organizationBranding.deleteMany({
+      where: { organizationId: { in: organizationIds } },
+    }),
+    prisma.organization.deleteMany({
+      where: {
+        OR: [
+          { id: { in: organizationIds } },
+          {
+            slug: {
+              in: organizations.map(
+                (seedOrganization) => seedOrganization.slug,
+              ),
+            },
+          },
+        ],
+      },
+    }),
+    prisma.user.deleteMany({
+      where: {
+        OR: [
+          { id: { in: userIds } },
+          { email: { in: users.map((seedUser) => seedUser.email) } },
+        ],
+      },
+    }),
+  ]);
+}
+
+async function cleanupSeedDocumentFiles() {
+  const uploadsRoot = resolve(
+    process.cwd(),
+    process.env.UPLOADS_PATH ?? 'uploads',
+  );
+
+  await Promise.all(
+    documents.map(async (seedDocument) => {
+      await rm(resolve(uploadsRoot, seedDocument.filePath), { force: true });
+    }),
+  );
+}
+
+async function createSeedDocumentFiles() {
+  const uploadsRoot = resolve(
+    process.cwd(),
+    process.env.UPLOADS_PATH ?? 'uploads',
+  );
+
+  await Promise.all(
+    documents.map(async (seedDocument) => {
+      const filePath = resolve(uploadsRoot, seedDocument.filePath);
+      await mkdir(dirname(filePath), { recursive: true });
+      await writeFile(
+        filePath,
+        `%PDF-1.7\n% ${SEED_TAG} synthetic local document\n`,
+      );
+    }),
+  );
+}
+
+async function seedTenantDevelopmentData(passwordHash: string) {
+  await prisma.$transaction([
+    prisma.user.createMany({
+      data: users.map((seedUser) => ({
+        ...seedUser,
+        passwordHash,
+      })),
+    }),
+    prisma.organization.createMany({ data: organizations }),
+  ]);
+
+  await prisma.$transaction([
+    prisma.organizationSettings.createMany({
+      data: organizations.map((seedOrganization) => ({
+        organizationId: seedOrganization.id,
+        weekStartsOn: 1,
+        defaultAppointmentDuration: 50,
+      })),
+    }),
+    prisma.organizationBranding.createMany({
+      data: [
+        {
+          organizationId: ids.orgA,
+          visualName: 'Tenant Dev A',
+          primaryColor: '#2563eb',
+          accentColor: '#16a34a',
+        },
+        {
+          organizationId: ids.orgB,
+          visualName: 'Tenant Dev B',
+          primaryColor: '#0f766e',
+          accentColor: '#ca8a04',
+        },
+      ],
+    }),
+    prisma.psychologistProfile.createMany({
+      data: [
+        psychologistProfile(
+          ids.psychologistAssignedA,
+          'Psychologist Assigned A',
+        ),
+        psychologistProfile(
+          ids.psychologistUnassignedA,
+          'Psychologist Unassigned A',
+        ),
+        psychologistProfile(ids.psychologistB, 'Psychologist B'),
+        psychologistProfile(ids.ownerA, 'Owner A'),
+        psychologistProfile(ids.multiMember, 'Multi Member'),
+      ],
     }),
   ]);
 
-  await cleanupSeedDocumentFiles(demoDocumentPaths);
-}
-
-async function cleanupSeedDocumentFiles(filePaths: string[]) {
-  const uploadsRoot = resolve(
-    process.cwd(),
-    process.env.UPLOADS_PATH ?? "uploads",
-  );
-
-  for (const filePath of filePaths) {
-    const candidatePath = isAbsolute(filePath)
-      ? resolve(filePath)
-      : resolve(process.cwd(), filePath);
-    const relativePath = relative(uploadsRoot, candidatePath);
-
-    if (relativePath.startsWith("..") || isAbsolute(relativePath)) {
-      console.warn("Skipped demo document cleanup outside UPLOADS_PATH.");
-      continue;
-    }
-
-    try {
-      const [resolvedUploadsRoot, resolvedCandidatePath] = await Promise.all([
-        realpath(uploadsRoot),
-        realpath(candidatePath),
-      ]);
-      const resolvedRelativePath = relative(
-        resolvedUploadsRoot,
-        resolvedCandidatePath,
-      );
-
-      if (
-        resolvedRelativePath.startsWith("..") ||
-        isAbsolute(resolvedRelativePath)
-      ) {
-        console.warn("Skipped demo document cleanup outside UPLOADS_PATH.");
-        continue;
-      }
-
-      await unlink(candidatePath);
-    } catch (error) {
-      if (getFileSystemErrorCode(error) !== "ENOENT") {
-        console.warn("Demo document cleanup failed after metadata deletion.");
-      }
-    }
-  }
-}
-
-function getFileSystemErrorCode(error: unknown) {
-  if (error && typeof error === "object" && "code" in error) {
-    return error.code;
-  }
-
-  return undefined;
-}
-
-function countFinancialTransactionsBy<K extends string>(
-  transactions: DemoFinancialTransaction[],
-  getKey: (transaction: DemoFinancialTransaction) => K,
-) {
-  return transactions.reduce(
-    (accumulator, transaction) => {
-      const key = getKey(transaction);
-      accumulator[key] = (accumulator[key] ?? 0) + 1;
-      return accumulator;
-    },
-    {} as Record<K, number>,
-  );
-}
-
-function summarizeFinancialTransactions(
-  transactions: DemoFinancialTransaction[],
-) {
-  return {
-    total: transactions.length,
-    byType: countFinancialTransactionsBy(transactions, (transaction) =>
-      String(transaction.type),
-    ),
-    byStatus: countFinancialTransactionsBy(transactions, (transaction) =>
-      String(transaction.status),
-    ),
-    byCategory: countFinancialTransactionsBy(transactions, (transaction) =>
-      String(transaction.category),
-    ),
-  };
-}
-
-async function seedDemoClinicalData(psychologistId: string) {
-  const patients = buildPatients(psychologistId);
-  const caseFiles = buildCaseFiles();
-  const sessionNotes = buildSessionNotes(psychologistId);
-  const appointments = buildAppointments(psychologistId).map(
-    ({
-      patientCode,
-      patientName,
-      fee,
-      paymentMethod,
-      createPendingCharge,
-      ...appointment
-    }) => appointment,
-  );
-  const financialTransactions = buildFinancialTransactions(psychologistId);
-
-  const [
-    patientsInsert,
-    caseFilesInsert,
-    sessionNotesInsert,
-    appointmentsInsert,
-    financialTransactionsInsert,
-  ] = await prisma.$transaction([
+  await prisma.$transaction([
+    prisma.organizationMembership.createMany({ data: memberships }),
     prisma.patient.createMany({ data: patients }),
-    prisma.caseFile.createMany({ data: caseFiles }),
-    prisma.sessionNote.createMany({ data: sessionNotes }),
-    prisma.appointment.createMany({ data: appointments }),
-    prisma.financialTransaction.createMany({ data: financialTransactions }),
   ]);
 
-  const financialTransactionsSummary = summarizeFinancialTransactions(
-    financialTransactions,
-  );
+  await prisma.$transaction([
+    prisma.patientAssignment.createMany({ data: assignments }),
+    prisma.caseFile.createMany({ data: caseFiles }),
+  ]);
 
-  const appointmentDates = appointments.map(
-    (appointment) => appointment.scheduledAt,
-  );
-  const scheduledAppointments = appointments.filter(
-    (appointment) => appointment.status === AppointmentStatus.SCHEDULED,
-  );
+  await prisma.$transaction([
+    prisma.sessionNote.createMany({ data: sessionNotes }),
+    prisma.appointment.createMany({ data: appointments }),
+  ]);
 
+  await createSeedDocumentFiles();
+
+  await prisma.$transaction([
+    prisma.document.createMany({ data: documents }),
+    prisma.financialTransaction.createMany({ data: transactions }),
+  ]);
+}
+
+function psychologistProfile(userId: string, professionalName: string) {
   return {
-    patients: patients.length,
-    caseFiles: caseFiles.length,
-    sessionNotes: sessionNotes.length,
-    documents: 0,
-    appointments: appointments.length,
-    scheduledAppointments: scheduledAppointments.length,
-    financialTransactions: financialTransactions.length,
-    financialTransactionsInserted: financialTransactionsInsert.count,
-    financialTransactionsByType: financialTransactionsSummary.byType,
-    financialTransactionsByStatus: financialTransactionsSummary.byStatus,
-    financialTransactionsByCategory: financialTransactionsSummary.byCategory,
-    insertedRows: {
-      patients: patientsInsert.count,
-      caseFiles: caseFilesInsert.count,
-      sessionNotes: sessionNotesInsert.count,
-      documents: 0,
-      appointments: appointmentsInsert.count,
-      financialTransactions: financialTransactionsInsert.count,
-    },
-    firstAppointmentDate: new Date(
-      Math.min(...appointmentDates.map((date) => date.getTime())),
-    ),
-    lastAppointmentDate: new Date(
-      Math.max(...appointmentDates.map((date) => date.getTime())),
-    ),
+    userId,
+    professionalName,
+    status: PsychologistProfileStatus.ACTIVE,
+    verifiedAt: new Date('2026-01-01T00:00:00.000Z'),
   };
+}
+
+function countBy<T extends string>(values: T[]) {
+  return values.reduce(
+    (accumulator, value) => ({
+      ...accumulator,
+      [value]: (accumulator[value] ?? 0) + 1,
+    }),
+    {} as Record<T, number>,
+  );
 }
 
 async function main() {
-  const demoPassword = requireDemoSeedPassword();
-  const demoPasswordHash = await bcrypt.hash(demoPassword, 10);
+  const demoPassword = requireDemoSeedPassword(
+    process.env.SEED_DEMO_PASSWORD ?? DEFAULT_LOCAL_PASSWORD,
+  );
+  const passwordHash = await bcrypt.hash(demoPassword, 10);
 
-  const admin = await upsertUser({
-    id: ADMIN_USER_ID,
-    name: "Enrique Felix",
-    email: "admin@psychology-app.local",
-    passwordHash: demoPasswordHash,
-    role: UserRole.ADMIN,
-  });
+  await resetTenantDevelopmentSeed();
+  await seedTenantDevelopmentData(passwordHash);
 
-  const psychologist = await upsertUser({
-    id: PSYCHOLOGIST_USER_ID,
-    name: "Demo Psychologist",
-    email: "psychologist@psychology-app.local",
-    passwordHash: demoPasswordHash,
-    role: UserRole.PSYCHOLOGIST,
-  });
-
-  await resetDemoClinicalData();
-  const seedSummary = await seedDemoClinicalData(psychologist.id);
-
-  console.log("Seed completed successfully.");
-  console.log("Demo credentials were supplied through the environment.");
-  console.log(`Admin user: ${admin.email}`);
-  console.log(`Psychologist user: ${psychologist.email}`);
-  console.log(`Patients seeded: ${seedSummary.patients}`);
-  console.log(`Case files seeded: ${seedSummary.caseFiles}`);
-  console.log(`Session notes seeded: ${seedSummary.sessionNotes}`);
-  console.log(`Documents seeded: ${seedSummary.documents}`);
-  console.log(`Appointments seeded: ${seedSummary.appointments}`);
+  console.log('Tenant-aware development seed completed successfully.');
+  console.log('Data set: synthetic local development fixtures only.');
+  console.log(`Organizations seeded: ${organizations.length}`);
+  console.log(`Users seeded: ${users.length}`);
+  console.log(`Memberships seeded: ${memberships.length}`);
+  console.log(`Patients seeded: ${patients.length}`);
+  console.log(`Case files seeded: ${caseFiles.length}`);
+  console.log(`Session notes seeded: ${sessionNotes.length}`);
+  console.log(`Documents seeded: ${documents.length}`);
+  console.log(`Appointments seeded: ${appointments.length}`);
+  console.log(`Financial transactions seeded: ${transactions.length}`);
   console.log(
-    `Scheduled appointments seeded: ${seedSummary.scheduledAppointments}`,
+    `Membership roles: ${JSON.stringify(countBy(memberships.map((seedMembership) => seedMembership.role)))}`,
   );
   console.log(
-    `Financial transactions built: ${seedSummary.financialTransactions}`,
+    `Financial transactions by type: ${JSON.stringify(countBy(transactions.map((seedTransaction) => seedTransaction.type)))}`,
+  );
+  console.log(`Tenant A organizationId: ${ids.orgA}`);
+  console.log(`Tenant B organizationId: ${ids.orgB}`);
+  console.log(`Suspended organizationId: ${ids.orgSuspended}`);
+  console.log('Local login emails:');
+  users.forEach((seedUser) => console.log(`- ${seedUser.email}`));
+  console.log(
+    `Tenant A expected summary: ${JSON.stringify(tenantAExpectedSummary)}`,
   );
   console.log(
-    `Financial transactions inserted: ${seedSummary.financialTransactionsInserted}`,
-  );
-  console.log(
-    `Financial transactions by type: ${JSON.stringify(seedSummary.financialTransactionsByType)}`,
-  );
-  console.log(
-    `Financial transactions by status: ${JSON.stringify(seedSummary.financialTransactionsByStatus)}`,
-  );
-  console.log(
-    `Financial transactions by category: ${JSON.stringify(seedSummary.financialTransactionsByCategory)}`,
-  );
-  console.log(`Date reference used: ${now.toISOString()}`);
-  console.log(
-    `Appointment date range: ${seedSummary.firstAppointmentDate.toISOString()} - ${seedSummary.lastAppointmentDate.toISOString()}`,
+    'Local password source: SEED_DEMO_PASSWORD or documented fallback for local development.',
   );
 }
 
 main()
   .catch((error) => {
-    console.error("Seed failed:", error);
+    console.error('Seed failed:', error);
     process.exitCode = 1;
   })
   .finally(async () => {
