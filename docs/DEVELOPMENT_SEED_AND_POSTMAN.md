@@ -359,6 +359,8 @@ La ejecucion funcional integral de Postman queda diferida. No se acepto reducir
 controles de seguridad, introducir dependencias criticas ni usar sesiones
 personales para certificar artefactos locales.
 
+Riesgo diferido: ACCEPTED AS DEVELOPMENT TOOLING.
+
 ### Runner Evaluation and Deferred Certification
 
 Newman 6.2.2 fue evaluado y descartado para esta etapa porque su arbol npm

@@ -18,6 +18,7 @@ split:
 - POST-GO-LIVE.2.2B - Postman Collection Refresh: IMPLEMENTED AND STATICALLY
   VALIDATED.
 - Postman functional runner certification: DEFERRED.
+- Deferred risk: ACCEPTED AS DEVELOPMENT TOOLING.
 
 The collection is versioned as a development artifact. It must not be described
 as functionally executed until a runner can execute the full collection without
