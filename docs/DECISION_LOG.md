@@ -1,5 +1,58 @@
 # Decision Log
 
+## ADR-POST-GO-LIVE.2.2: Seed Certified and Postman Runner Deferred
+
+### Status
+
+Seed certification accepted for POST-GO-LIVE.2.2A. Postman collection refresh
+accepted as implemented and statically validated for POST-GO-LIVE.2.2B.
+Functional Postman runner certification is deferred until a local runner is
+approved.
+
+### Decision
+
+Publish POST-GO-LIVE.2.2 as auxiliary development tooling with an explicit
+split:
+
+- POST-GO-LIVE.2.2A - Tenant Development Seed: CERTIFIED.
+- POST-GO-LIVE.2.2B - Postman Collection Refresh: IMPLEMENTED AND STATICALLY
+  VALIDATED.
+- Postman functional runner certification: DEFERRED.
+- Deferred risk: ACCEPTED AS DEVELOPMENT TOOLING.
+
+The collection is versioned as a development artifact. It must not be described
+as functionally executed until a runner can execute the full collection without
+cloud publication, API keys, personal sessions, or unacceptable dependency
+risk.
+
+### Reason
+
+The tenant-aware platform contract was already covered by D1 through D5
+certification, PostgreSQL E2E, Jest regression, and OpenAPI contract tests.
+The development seed is deterministic and passed certification twice against
+PostgreSQL 16 local with the four existing migrations.
+
+Newman 6.2.2 introduced an unacceptable critical dependency risk for tooling.
+Postman CLI 1.44.0 was signed by Postman, Inc., but the observed local run
+requested credentials for cloud publication behavior. Postman Desktop 12.20.4
+was signed by Postman, Inc., but a personal signed-in session was present and
+was not used or modified.
+
+The project should not add critical tooling dependencies, require cloud for
+local data certification, or use personal sessions as release evidence.
+
+### Consequences
+
+Release notes, PR text, and roadmap references must distinguish seed
+certification from Postman functional execution. The Postman collection does
+not replace D1-D5 certification, the E2E suites, or OpenAPI tests.
+
+### Boundary
+
+No Prisma schema, migration, runtime feature, frontend, infrastructure,
+production access, deployment, backfill, merge readiness, or POST-GO-LIVE.3
+work is included.
+
 ## ADR-POST-GO-LIVE.2.1D5: Tenant Platform Certification
 
 ### Status

@@ -2,10 +2,13 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "module": "commonjs",
-    "moduleResolution": "node"
+    "moduleResolution": "node",
+    "resolvePackageJsonExports": false,
+    "incremental": false
   },
   "include": [
     "prisma/seed.ts",
+    "prisma/seed-certification.ts",
     "prisma/backfill/**/*.ts",
     "src/prisma/legacy-backfill/**/*.ts"
   ]

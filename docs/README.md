@@ -39,12 +39,12 @@ Describes the backend architecture.
 
 Includes:
 
-* Technology stack
-* System architecture
-* Request flow
-* Authorization flow
-* Upload flow
-* Design decisions
+- Technology stack
+- System architecture
+- Request flow
+- Authorization flow
+- Upload flow
+- Design decisions
 
 ---
 
@@ -54,11 +54,11 @@ Documents the database model.
 
 Includes:
 
-* Entities
-* Relationships
-* Ownership
-* Clinical rules
-* Business constraints
+- Entities
+- Relationships
+- Ownership
+- Clinical rules
+- Business constraints
 
 ---
 
@@ -68,11 +68,11 @@ Defines the REST API contract.
 
 Includes:
 
-* Authentication
-* Ownership rules
-* Endpoints
-* Request and response contracts
-* Future API improvements
+- Authentication
+- Ownership rules
+- Endpoints
+- Request and response contracts
+- Future API improvements
 
 ---
 
@@ -82,12 +82,23 @@ Documents the development and deployment environment.
 
 Includes:
 
-* Docker Compose
-* Containers
-* Volumes
-* Environment variables
-* Common commands
-* Deployment notes
+- Docker Compose
+- Containers
+- Volumes
+- Environment variables
+- Common commands
+- Deployment notes
+
+## DEVELOPMENT_SEED_AND_POSTMAN.md
+
+Documents the tenant-aware local development seed and the local Postman
+collection artifacts introduced by POST-GO-LIVE.2.2 as tooling after tenant
+platform certification.
+
+## DECISION_LOG.md
+
+Records local development and release-gate decisions that affect how auxiliary
+tooling is certified or deferred.
 
 ## PRISMA_MIGRATION_ARTIFACT.md
 
@@ -100,13 +111,13 @@ digest-based publication.
 `AUTHORIZATION_CONTRACT.md` is the primary source of truth for the phased SaaS
 authorization model. Its companion documents are:
 
-* `AUTHORIZATION_CAPABILITY_MATRIX.md`
-* `TENANT_ENDPOINT_SCOPE_MATRIX.md`
-* `TENANT_SECURITY_TEST_CONTRACT.md`
-* `POST_GO_LIVE_2_1D0_TENANT_CONVERSION_CONTRACT.md`
-* `POST_GO_LIVE_2_1_TENANT_PLATFORM_CERTIFICATION.md`
-* `adr/ADR-TENANT-CONTEXT.md`
-* `adr/ADR-TENANT-DATA-ISOLATION.md`
+- `AUTHORIZATION_CAPABILITY_MATRIX.md`
+- `TENANT_ENDPOINT_SCOPE_MATRIX.md`
+- `TENANT_SECURITY_TEST_CONTRACT.md`
+- `POST_GO_LIVE_2_1D0_TENANT_CONVERSION_CONTRACT.md`
+- `POST_GO_LIVE_2_1_TENANT_PLATFORM_CERTIFICATION.md`
+- `adr/ADR-TENANT-CONTEXT.md`
+- `adr/ADR-TENANT-DATA-ISOLATION.md`
 
 They specify the approved target design and distinguish it from current runtime
 enforcement. They do not themselves change database, API, or runtime behavior.
@@ -124,11 +135,11 @@ Documents the project evolution.
 
 Includes:
 
-* Current MVP status
-* Completed features
-* Current sprint
-* Planned features
-* Long-term vision
+- Current MVP status
+- Completed features
+- Current sprint
+- Planned features
+- Long-term vision
 
 ---
 
@@ -140,10 +151,10 @@ The repository root also contains two important documents.
 
 Defines:
 
-* Product vision
-* Clinical workflow
-* MVP scope
-* Long-term goals
+- Product vision
+- Clinical workflow
+- MVP scope
+- Long-term goals
 
 ---
 
@@ -151,10 +162,10 @@ Defines:
 
 Defines:
 
-* AI development rules
-* Coding expectations
-* Project conventions
-* Agent workflow
+- AI development rules
+- Coding expectations
+- Project conventions
+- Agent workflow
 
 ---
 
@@ -162,9 +173,9 @@ Defines:
 
 The current source of truth for the backend is:
 
-* `/docs`
-* `PROJECT.md`
-* `AGENTS.md`
+- `/docs`
+- `PROJECT.md`
+- `AGENTS.md`
 
 Avoid creating duplicate documentation outside these files.
 
@@ -176,10 +187,10 @@ When documentation becomes outdated, update the existing document instead of cre
 
 Documentation should remain:
 
-* Accurate
-* Concise
-* Up to date
-* Consistent
+- Accurate
+- Concise
+- Up to date
+- Consistent
 
 Each document has a single responsibility and should avoid duplicating information found elsewhere.
 
