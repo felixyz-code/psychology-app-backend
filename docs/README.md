@@ -106,6 +106,12 @@ Documents the dedicated immutable Prisma migration image used by the
 POST-GO-LIVE schema procedure, including local PostgreSQL 16 validation and
 digest-based publication.
 
+## POST_GO_LIVE_3_0_ORGANIZATION_MEMBERSHIP_ADMINISTRATION_CONTRACT.md
+
+Documents the POST-GO-LIVE.3.0 architectural audit, gap analysis, and
+normative contract for organization administration, membership lifecycle,
+ownership, invitations, and active organization selection.
+
 ## SaaS authorization contracts
 
 `AUTHORIZATION_CONTRACT.md` is the primary source of truth for the phased SaaS
@@ -126,6 +132,13 @@ documentation-only contract for the 2.1D clinical and financial module
 conversion sequence.
 `POST_GO_LIVE_2_1_TENANT_PLATFORM_CERTIFICATION.md` is the D5 readiness report
 for the converted tenant-aware clinical and financial platform.
+`POST_GO_LIVE_3_0_ORGANIZATION_MEMBERSHIP_ADMINISTRATION_CONTRACT.md` is the
+normative POST-GO-LIVE.3.0 contract for the organization domain after the D0
+through D5 tenant platform baseline and POST-GO-LIVE.2.2 tooling baseline.
+
+Additional ADRs for the organization domain include:
+
+- `adr/ADR-ORGANIZATION-ACTIVE-SELECTION.md`
 
 ---
 
