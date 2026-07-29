@@ -48,8 +48,8 @@ baseline and defines future behavior without weakening D0 through D5 tenant
 boundaries. The contract allows multiple active owners, keeps organization
 selection stateless and request-validated, forbids generic OWNER grants through
 role change or invitation, preserves removal as historical state, and treats
-re-entry after removal as a future new membership history row rather than a
-silent reactivation.
+re-entry after removal as a schema-gated historical-lifecycle decision rather
+than a silent reactivation.
 
 ### Boundary
 

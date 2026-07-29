@@ -630,9 +630,15 @@ Normative posture:
 Historical posture:
 
 - a removed membership is historical and should not be silently reactivated
-- a future re-entry should create a new membership history row
-- this implies a future migration away from the current absolute unique
-  `(organizationId, userId)` constraint
+- the preferred long-term posture is to preserve each membership period with
+  independent historical identity
+- the current schema does not yet allow that posture because the absolute unique
+  `(organizationId, userId)` constraint permits only one membership row per
+  user and organization pair
+- therefore the concrete schema strategy for re-entry remains provisional and
+  gated for POST-GO-LIVE.3.2
+- POST-GO-LIVE.3.1 must not assume multiple historical membership rows and must
+  not depend on this schema decision being resolved
 
 ### Membership lifecycle
 
@@ -700,6 +706,10 @@ Normative posture:
 - `OWNER` grant belongs to a dedicated ownership flow
 - `ADMIN` cannot mutate an `OWNER`
 - `ADMIN` cannot self-elevate or grant above ADMIN
+- an `OWNER` may self-degrade only if another active `OWNER` remains after the
+  same transactional decision
+- the owner-preservation check must be concurrency-safe; a simple pre-read count
+  is not sufficient by itself
 - invalid no-op role changes return `409`
 
 ### Membership suspension and reactivation
@@ -712,6 +722,10 @@ Normative posture:
   membership
 - suspended membership data remains historical
 - reactivation is allowed only from `SUSPENDED`
+- an `OWNER` may self-suspend only if another active `OWNER` remains after the
+  same transactional decision
+- the future runtime must validate this invariant inside a transaction that is
+  safe against concurrent owner mutations
 
 ### Membership removal
 
@@ -721,8 +735,12 @@ Normative posture:
 - removal must not delete or detach tenant-owned clinical or financial data
 - patient assignments linked to the removed membership remain historical and
   later implementation may end active assignments explicitly
-- re-entry occurs through a new invitation or explicit create flow, not by
-  mutating the removed row back to active
+- owner removal, including self-removal, is allowed only if another active
+  `OWNER` remains after the same transactional decision
+- re-entry should be modeled through a future invitation or explicit create
+  flow, not by mutating the removed row back to active; whether that re-entry
+  creates a new membership row or reuses another stable structure remains gated
+  for POST-GO-LIVE.3.2 schema review
 
 ### Voluntary leave
 
@@ -733,6 +751,46 @@ Normative posture:
 - self-leave ends tenant eligibility immediately on the next request
 - after leave, a client may continue using another valid membership by sending
   another valid `X-Organization-Id`
+- an `OWNER` may leave only if another active `OWNER` remains after the same
+  transactional decision
+
+### Historical re-entry gate
+
+Current schema reality:
+
+- `@@unique([organizationId, userId])` allows only one membership row per
+  user/organization pair today
+- a removed membership already preserves historical state by remaining
+  persisted and ineligible for access
+
+Current contractual posture:
+
+- the preferred long-term posture is that each membership period can preserve
+  independent historical identity
+- that preference is not yet an approved schema decision because it conflicts
+  with the current absolute unique key
+- the re-entry strategy is therefore provisional and gated for
+  POST-GO-LIVE.3.2
+- POST-GO-LIVE.3.1 cannot modify schema for this question
+- POST-GO-LIVE.3.1 cannot assume multiple historical rows
+- any eventual schema change requires a separate migration review and must not
+  edit historical migrations
+
+Alternatives POST-GO-LIVE.3.2 must compare explicitly:
+
+- Alternative A - reactivate the existing row:
+  preserves schema compatibility and avoids migration, but weakens historical
+  separation across membership periods
+- Alternative B - allow multiple historical rows:
+  best supports distinct history periods, but likely requires changing or
+  removing the current unique key, defining a single-current-membership rule,
+  updating queries, and planning migration/backfill/rollback
+- Alternative C - keep one stable membership plus separate history:
+  preserves a single active row while moving period history elsewhere, but adds
+  model complexity and extra migration work
+- Alternative D - accept a new invitation that reuses the stable membership:
+  reduces schema churn, but mixes re-entry semantics with row reactivation and
+  may obscure independent period history
 
 ### Ownership
 
@@ -745,12 +803,52 @@ Normative posture:
 - multiple active owners are allowed
 - they are recommended for resilience and transfer safety
 
+#### Active owner counting rule
+
+Only memberships that are both:
+
+- `role = OWNER`
+- `status = ACTIVE`
+
+count as active owners for invariant protection.
+
+The following do not count as active owners:
+
+- suspended memberships
+- revoked or removed memberships
+- pending invitations
+- expired invitations
+- revoked invitations
+- rejected invitations
+- any future user-level deactivation state, if the product later models it
+
 #### Owner-protection rules
 
 - no actor may leave the organization with zero active owners
 - no actor may suspend the last active owner
 - no actor may remove the last active owner
 - no generic role-change flow may downgrade the last active owner
+- pending `OWNER` invitations never satisfy the active-owner invariant
+- `ADMIN` never executes suspension, removal, downgrade, or transfer operations
+  against `OWNER`
+- the protection depends on validated capability, persisted membership state,
+  and ownership invariants, not on any role value supplied by the client
+
+#### Owner self-operations
+
+- self-suspension is allowed only if another active `OWNER` remains after the
+  same transactional decision
+- self-degradation is allowed only if another active `OWNER` remains after the
+  same transactional decision and the target role is otherwise valid
+- self-removal and voluntary leave are allowed only if another active `OWNER`
+  remains after the same transactional decision
+- self-operations never delete tenant-owned data and invalidate tenant
+  eligibility on the next request when they succeed
+- future runtime enforcement must be transaction-safe and concurrency-safe; a
+  simple count performed before the write is not sufficient by itself
+- implementation may use locking, conditional updates, serializable retries, or
+  another PostgreSQL-compatible strategy, but this contract does not choose a
+  single technique yet
 
 #### Ownership transfer
 
@@ -1074,7 +1172,7 @@ Compatibility guarantees to preserve:
 5. Suspending an organization invalidates access immediately on the next request.
 6. Suspending a membership invalidates access immediately on the next request.
 7. Membership removal is a terminal historical state, not deletion.
-8. A removed membership should not be reactivated; future re-entry should create a new history row.
+8. A removed membership should not be reactivated; the preferred long-term posture is independent history periods, but the concrete schema strategy for re-entry remains gated for POST-GO-LIVE.3.2.
 9. The system must block any transition that would leave an active organization without at least one active owner.
 10. `ADMIN` cannot administer `OWNER`.
 11. An invitation creates a membership on acceptance, not on issuance.
