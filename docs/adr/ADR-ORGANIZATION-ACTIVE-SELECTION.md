@@ -2,9 +2,10 @@
 
 ## Status
 
-Accepted as the proposed POST-GO-LIVE.3.0 contract posture in PR Draft #35.
-This ADR does not change runtime behavior by itself and is not integrated into
-`development` until the draft PR is reviewed and merged.
+Accepted as the merged POST-GO-LIVE.3.0 contract posture after PR `#35`
+integrated into `development` at merge commit
+`7d897ec8db2c5d372fce0b4dc0eaf3bd3b1d4b13`.
+This ADR does not change runtime behavior by itself.
 
 ## Context
 

@@ -9,6 +9,16 @@ POST-GO-LIVE.3.0 is a documentation-only phase for:
 - normative contract design;
 - future rollout planning.
 
+This contract is now merged on `development` through PR `#35` at merge commit
+`7d897ec8db2c5d372fce0b4dc0eaf3bd3b1d4b13`.
+
+It is closed as a specification baseline only. It does not mean that
+organization administration runtime, membership history schema changes,
+invitation resend, or organization switching UX are already implemented.
+
+The next eligible phase is `POST-GO-LIVE.3.1 - Organization Administration
+Runtime`, which remains not started at the time of this closeout.
+
 It does not implement runtime behavior, Prisma schema changes, migrations,
 frontend behavior, infrastructure work, production access, deployment, or
 backfill.

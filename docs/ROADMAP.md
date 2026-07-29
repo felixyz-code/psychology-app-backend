@@ -37,8 +37,9 @@ Postman functional runner certification deferred
 Organization administration checkpoint:
 
 ```text
-POST-GO-LIVE.3.0 Organization & Membership Administration Contract documented
-Implementation remains deferred pending review and later execution phases
+POST-GO-LIVE.3.0 Organization & Membership Administration Contract merged in PR #35
+Merged baseline: 7d897ec8db2c5d372fce0b4dc0eaf3bd3b1d4b13
+Implementation remains deferred; POST-GO-LIVE.3.1 is next and not started
 ```
 
 Current priorities:
@@ -70,7 +71,8 @@ POST-GO-LIVE.2
       └── 2.2B Postman Collection        STATIC VALIDATION; RUNNER DEFERRED
 
 POST-GO-LIVE.3
- └── 3.0 Organization & Membership Contract DOCUMENTED; REVIEW PENDING
+ ├── 3.0 Organization & Membership Contract CLOSED
+ └── 3.1 Organization Administration Runtime NOT STARTED
 POST-GO-LIVE.4                           ⏳
 POST-GO-LIVE.5                           ⏳
 POST-GO-LIVE.6                           ⏳
@@ -480,7 +482,8 @@ contract tests.
 ## POST-GO-LIVE.3.0
 
 Organization & Membership Administration Contract is the documentation-only
-entry phase for POST-GO-LIVE.3.
+entry phase for POST-GO-LIVE.3. It is now merged and baseline-certified on
+`development`.
 
 It:
 
@@ -493,7 +496,19 @@ It:
 - introduces no runtime code, schema change, migration, frontend change,
   infrastructure change, production access, deployment, or backfill.
 
-The next implementation sequence after review is:
+Integration evidence:
+
+- merged by PR `#35`
+- merge commit baseline: `7d897ec8db2c5d372fce0b4dc0eaf3bd3b1d4b13`
+- merged on `2026-07-29T00:40:25Z`
+- post-merge `Backend CI / backend` succeeded on the merge commit
+- nature of closure: documentation / contract / architecture only
+
+POST-GO-LIVE.3.0 is therefore closed as a merged specification baseline. It
+does not mean that organization administration runtime, membership history
+schema work, invitations expansion, or switching UX are already implemented.
+
+The next implementation sequence after closeout is:
 
 1. organization creation and identity administration;
 2. membership lifecycle hardening and historical re-entry;
@@ -501,5 +516,50 @@ The next implementation sequence after review is:
 4. optional active-organization preference UX;
 5. organization-domain certification and later frontend work.
 
-POST-GO-LIVE.3 remains implementation-deferred until the contract review is
-accepted.
+POST-GO-LIVE.3.1 remains not started at the end of this closeout.
+
+## POST-GO-LIVE.3.1
+
+Organization Administration Runtime is the next planned phase after the merged
+3.0 contract baseline.
+
+Status:
+
+- NOT STARTED
+- not implemented
+- not authorized for production
+
+Preliminary objective:
+
+- implement the administrative organization lifecycle already defined in 3.0
+
+Preliminary in scope:
+
+- administrative organization reads
+- controlled editable organization identity fields
+- organization suspension
+- organization reactivation
+- organization capabilities and tenant validation
+- HTTP semantics, audit hooks, tests, and documentation
+- migration only if organization runtime proves one is strictly necessary
+
+Preliminary out of scope:
+
+- membership re-entry schema
+- new historical membership rows
+- invitation resend and advanced invitation lifecycle
+- frontend switching UX
+- freelancer public signup
+- branding, plans, billing, and custom settings
+- production rollout or production backfill
+
+Pre-implementation gates:
+
+- exact endpoint inventory
+- capability mapping
+- DTO ownership and server-owned fields
+- lifecycle transition rules
+- HTTP contract and audit strategy
+- migration-needed decision
+- test strategy
+- D0 through D5 compatibility review

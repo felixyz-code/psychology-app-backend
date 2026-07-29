@@ -134,7 +134,10 @@ conversion sequence.
 for the converted tenant-aware clinical and financial platform.
 `POST_GO_LIVE_3_0_ORGANIZATION_MEMBERSHIP_ADMINISTRATION_CONTRACT.md` is the
 normative POST-GO-LIVE.3.0 contract for the organization domain after the D0
-through D5 tenant platform baseline and POST-GO-LIVE.2.2 tooling baseline.
+through D5 tenant platform baseline and POST-GO-LIVE.2.2 tooling baseline. It
+is now merged and closed as a specification baseline on commit
+`7d897ec8db2c5d372fce0b4dc0eaf3bd3b1d4b13`; POST-GO-LIVE.3.1 is the next phase
+and remains not started.
 
 Additional ADRs for the organization domain include:
 
