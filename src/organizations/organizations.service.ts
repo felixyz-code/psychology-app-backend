@@ -113,7 +113,9 @@ export class OrganizationsService {
         tenant,
         'SUCCESS',
         'ORGANIZATION_UPDATED',
-        refreshed.id,
+        {
+          targetId: refreshed.id,
+        },
       );
       return refreshed;
     } catch (error) {
@@ -171,7 +173,14 @@ export class OrganizationsService {
       dto.status === OrganizationStatus.SUSPENDED
         ? 'ORGANIZATION_SUSPENDED'
         : 'ORGANIZATION_REACTIVATED',
-      refreshed.id,
+      {
+        targetId: refreshed.id,
+        previousStatus:
+          refreshed.status === OrganizationStatus.SUSPENDED
+            ? OrganizationStatus.ACTIVE
+            : OrganizationStatus.SUSPENDED,
+        newStatus: refreshed.status,
+      },
     );
     return refreshed;
   }

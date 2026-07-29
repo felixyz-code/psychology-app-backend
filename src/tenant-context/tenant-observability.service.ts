@@ -29,6 +29,15 @@ export type OrganizationDomainEvent =
   | 'membership_leave_denied'
   | 'owner_invariant_denied';
 
+type OrganizationDomainMetadata = {
+  targetId?: string;
+  targetUserId?: string;
+  previousRole?: string;
+  newRole?: string;
+  previousStatus?: string;
+  newStatus?: string;
+};
+
 @Injectable()
 export class TenantObservabilityService {
   private readonly logger = new Logger(TenantObservabilityService.name);
@@ -98,7 +107,7 @@ export class TenantObservabilityService {
     tenant: Pick<TenantContext, 'userId' | 'membershipId' | 'organizationId'>,
     outcome: 'SUCCESS' | 'DENY' | 'CONFLICT',
     reasonCode: string,
-    targetId?: string,
+    metadata: OrganizationDomainMetadata = {},
   ) {
     this.logger.log(
       JSON.stringify({
@@ -108,8 +117,8 @@ export class TenantObservabilityService {
         userId: tenant.userId,
         membershipId: tenant.membershipId,
         organizationId: tenant.organizationId,
-        ...(targetId && { targetId }),
         reasonCode,
+        ...metadata,
       }),
     );
   }

@@ -19,17 +19,17 @@
 | GET | `/organizations/:organizationId` | Organizations | Yes | `organization.read` | Path must match resolved tenant; route allows `ACTIVE` or `SUSPENDED` organization state | 404 | Implemented | 3.1 runtime |
 | PATCH | `/organizations/:organizationId` | Organizations | Yes | `organization.manage` | Path must match resolved tenant; editable identity fields only; route allows `ACTIVE` or `SUSPENDED` organization state | 404 / 400 / 409 | Implemented | 3.1 runtime |
 | PATCH | `/organizations/:organizationId/status` | Organizations | Yes | `organization.manage` | OWNER-only lifecycle mutation; `ACTIVE <-> SUSPENDED` only; other tenant-aware modules remain blocked while suspended | 404 / 409 | Implemented | 3.1 runtime |
-| GET | `/organizations/:organizationId/memberships` | Memberships | Yes | `membership.read` | Selected tenant only; AUDITOR gets sanitized metadata and no complete emails | 404 | Implemented | 2.1C2 integrated |
+| GET | `/organizations/:organizationId/memberships` | Memberships | Yes | `membership.read` | Selected tenant only; returns current non-terminal rows only; AUDITOR gets sanitized metadata and no complete emails | 404 | Implemented | 3.2 runtime |
 | POST | `/organizations/:organizationId/invitations` | Invitations | Yes | `invitation.create` | Selected tenant; OWNER/ADMIN; no OWNER grant | 404 | Implemented | 2.1C2 integrated |
 | GET | `/organizations/:organizationId/invitations` | Invitations | Yes | `invitation.read` | Selected tenant; no digest/token projection | 404 | Implemented | 2.1C2 integrated |
 | POST | `/organizations/:organizationId/invitations/:invitationId/revoke` | Invitations | Yes | `invitation.revoke` | Selected tenant and PENDING state | 404 | Implemented | 2.1C2 integrated |
-| POST | `/organization-invitations/:token/accept` | Invitations | No tenant selection | Authenticated recipient binding | Redacted 404 | Implemented | 2.1C2 integrated |
+| POST | `/organization-invitations/:token/accept` | Invitations | No tenant selection | Authenticated recipient binding; revoked history may re-enter with a new row; concurrent non-terminal duplicate remains blocked by PostgreSQL | Redacted 404 / 409 | Implemented | 3.2 runtime |
 | POST | `/organization-invitations/:token/reject` | Invitations | No tenant selection | Authenticated recipient binding | Redacted 404 | Implemented | 2.1C2 integrated |
-| PATCH | `/organizations/:organizationId/memberships/:membershipId/role` | Memberships | Yes | `membership.manage_role` | Selected tenant only; generic role patch never grants `OWNER`; `ADMIN` cannot mutate self, `OWNER`, or grant above `ADMIN` | 404 | Implemented | 2.1C2 integrated |
-| PATCH | `/organizations/:organizationId/memberships/:membershipId/status` | Memberships | Yes | `membership.suspend` | Selected tenant only; suspend path applies only to `ACTIVE -> SUSPENDED`; preserves owner invariant | 404 | Implemented | 2.1C2 integrated |
-| PATCH | `/organizations/:organizationId/memberships/:membershipId/status` | Memberships | Yes | `membership.reactivate` | Selected tenant only; reactivate path applies only to `SUSPENDED -> ACTIVE` | 404 | Implemented | 2.1C2 integrated |
-| DELETE | `/organizations/:organizationId/memberships/:membershipId` | Memberships | Yes | `membership.remove` | Administrative removal only; leaves historical `REVOKED` membership and preserves owner invariant | 404 | Implemented | 2.1C2 integrated |
-| POST | `/organizations/:organizationId/memberships/leave` | Memberships | Yes | `membership.leave` | Self-service leave only; invalid for last active `OWNER`; path is distinct from administrative remove | 404 | Implemented | 2.1C2 integrated |
+| PATCH | `/organizations/:organizationId/memberships/:membershipId/role` | Memberships | Yes | `membership.manage_role` | Selected tenant only; generic role patch never grants `OWNER`; rejects `REVOKED`; `ADMIN` cannot mutate self, `OWNER`, or grant above `ADMIN` | 404 / 409 | Implemented | 3.2 runtime |
+| PATCH | `/organizations/:organizationId/memberships/:membershipId/status` | Memberships | Yes | `membership.suspend` | Selected tenant only; public DTO allows only `ACTIVE` and `SUSPENDED`; suspend path applies only to `ACTIVE -> SUSPENDED`; preserves owner invariant | 404 / 400 / 409 | Implemented | 3.2 runtime |
+| PATCH | `/organizations/:organizationId/memberships/:membershipId/status` | Memberships | Yes | `membership.reactivate` | Selected tenant only; public DTO allows only `ACTIVE` and `SUSPENDED`; reactivate path applies only to `SUSPENDED -> ACTIVE` | 404 / 400 / 409 | Implemented | 3.2 runtime |
+| DELETE | `/organizations/:organizationId/memberships/:membershipId` | Memberships | Yes | `membership.remove` | Administrative removal only; leaves historical `REVOKED` membership and preserves owner invariant | 404 / 409 | Implemented | 3.2 runtime |
+| POST | `/organizations/:organizationId/memberships/leave` | Memberships | Yes | `membership.leave` | Self-service leave only; invalid for last active `OWNER`; leaves historical `REVOKED` membership | 404 / 409 | Implemented | 3.2 runtime |
 | POST | `/case-files` | Case files | Yes | `case_file.create` | Patient tenant + active assignment + temporary legacy psychologist restriction | 404 | D2 aligned | Complete in 2.1D2 |
 | GET | `/case-files` | Case files | Yes | `case_file.read` | Tenant + active assignment + temporary legacy psychologist restriction | Empty list | D2 aligned | Complete in 2.1D2 |
 | GET | `/case-files/patient/:patientId` | Case files | Yes | `case_file.read` | Patient tenant + active assignment + temporary legacy psychologist restriction | 404 | D2 aligned | Complete in 2.1D2 |
@@ -106,6 +106,27 @@ This does not broaden suspended-organization access to Patients, Clinical
 Core, Documents, Appointments, Financial Transactions, Financial Summary,
 Membership administration, or Invitations. Those routes still fail closed until
 the organization returns to `ACTIVE`.
+
+## POST-GO-LIVE.3.2 implementation status
+
+Membership administration runtime now extends the pre-existing membership and
+invitation surfaces with:
+
+- historical membership re-entry implemented as one new row per re-entry
+  period;
+- a PostgreSQL partial unique index that allows multiple `REVOKED` rows but
+  forbids concurrent non-terminal duplicates for the same organization and
+  user;
+- deterministic tenant-resolution and auth-context membership selection that
+  ignores revoked history and never authorizes through `INVITED` or
+  `SUSPENDED` memberships;
+- a narrowed public status DTO that accepts only `ACTIVE` and `SUSPENDED`;
+- current-state membership listing that keeps revoked history in the database
+  without silently broadening the administrative API.
+
+This does not add a public `POST /memberships`, does not allow suspended
+organizations on membership routes, and does not permit reactivating a revoked
+membership row in place.
 
 ## POST-GO-LIVE.2.1D4 integrated certification status
 

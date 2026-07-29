@@ -157,7 +157,8 @@ model OrganizationMembership {
   createdAt               DateTime            @default(now()) @db.Timestamptz(3)
   updatedAt               DateTime            @updatedAt @db.Timestamptz(3)
 
-  @@unique([organizationId, userId])
+  @@index([organizationId, userId])
+  @@index([organizationId, userId, createdAt])
   @@index([organizationId, status, role])
   @@index([userId, status])
   @@map("organization_memberships")

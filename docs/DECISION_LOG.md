@@ -1,5 +1,42 @@
 # Decision Log
 
+## STATUS-POST-GO-LIVE.3.2: Membership Administration Runtime Implemented
+
+### Status
+
+Accepted as a local runtime status update on branch
+`codex/post-go-live-3-2-membership-administration-runtime` from baseline
+`2373ff046d56f455ecb9b5c4cc075f36f9ab778f`, pending draft PR review and CI.
+
+### Decision
+
+POST-GO-LIVE.3.2 is no longer schema-gated only. The backend now implements:
+
+- historical membership re-entry through a new membership row per re-entry
+  period;
+- a PostgreSQL partial unique index that preserves at most one non-terminal
+  membership (`INVITED`, `ACTIVE`, `SUSPENDED`) per
+  `organizationId + userId` while allowing multiple `REVOKED` rows;
+- deterministic tenant-resolution and auth-context membership selection that
+  ignores revoked history and never authorizes through suspended memberships;
+- invitation acceptance that permits re-entry only when no non-terminal
+  membership already exists for the same organization and user;
+- a narrowed public membership-status DTO that accepts only `ACTIVE` and
+  `SUSPENDED`;
+- retained last-active-owner protection and structured organization-domain
+  observability across membership role, status, remove, leave, and invitation
+  flows.
+
+### Consequences
+
+Membership history is now preserved across remove, leave, revoke, and later
+re-entry without reopening the same row. Administrative APIs still list only
+current non-terminal memberships, suspended organizations remain fail-closed on
+membership routes, and role/status changes continue to take effect on the next
+request without requiring a new JWT. Ownership transfer, invitation resend,
+frontend switching UX, branding, plans, billing, and production rollout remain
+deferred.
+
 ## STATUS-POST-GO-LIVE.3.1: Organization Administration Runtime Implemented
 
 ### Status

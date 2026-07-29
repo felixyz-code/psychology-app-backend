@@ -1469,7 +1469,9 @@ metadata, and recipient invitation accept/reject routes, which bind to the
 authenticated recipient instead of a tenant selection. `X-Organization-Id`
 remains a validated selector only. POST-GO-LIVE.3.1 adds dedicated
 organization identity and lifecycle administration on top of the pre-existing
-read, membership, and invitation surfaces.
+read, membership, and invitation surfaces. POST-GO-LIVE.3.2 hardens the
+membership runtime and historical lifecycle without adding direct
+`POST /memberships`.
 
 | Method | Route | Capability / policy |
 | --- | --- | --- |
@@ -1491,6 +1493,34 @@ read, membership, and invitation surfaces.
 Invitation tokens are SHA-256 digested before persistence and are returned only
 once from creation outside production. API responses and logs never expose a
 digest; invitation list responses omit recipient email and token data.
+
+POST-GO-LIVE.3.2 membership runtime rules:
+
+- `OrganizationMembership` historical re-entry now uses one new row per
+  re-entry period. A `REVOKED` row is never reactivated in place.
+- PostgreSQL now enforces at most one non-terminal membership
+  (`INVITED`, `ACTIVE`, `SUSPENDED`) per `organizationId + userId` through a
+  partial unique index; any number of `REVOKED` historical rows are allowed.
+- `GET /organizations/:organizationId/memberships` keeps the current
+  administrative behavior and lists only non-terminal rows. Historical
+  `REVOKED` rows remain preserved in the database but are not projected by the
+  current API.
+- `PATCH /organizations/:organizationId/memberships/:membershipId/role` never
+  grants `OWNER`, never degrades `OWNER`, rejects `REVOKED` targets, and keeps
+  `ADMIN` blocked from mutating themself or any `OWNER`.
+- `PATCH /organizations/:organizationId/memberships/:membershipId/status`
+  accepts only `ACTIVE` and `SUSPENDED` in the public DTO and therefore only
+  supports `ACTIVE -> SUSPENDED` and `SUSPENDED -> ACTIVE` through that route.
+- `DELETE /organizations/:organizationId/memberships/:membershipId` and
+  `POST /organizations/:organizationId/memberships/leave` both end in
+  historical `REVOKED` rows; neither route deletes the membership record.
+- Invitation acceptance now permits re-entry when the recipient has only
+  `REVOKED` history in that organization. If an `INVITED`, `ACTIVE`, or
+  `SUSPENDED` membership already exists for that `organizationId + userId`,
+  acceptance fails with conflict.
+- Tenant resolution and `GET /auth/context` ignore `REVOKED` history and never
+  authorize from `INVITED` or `SUSPENDED` memberships. Role and status changes
+  take effect on the next request without minting a new JWT.
 
 POST-GO-LIVE.3.1 organization-update DTOs allow only:
 

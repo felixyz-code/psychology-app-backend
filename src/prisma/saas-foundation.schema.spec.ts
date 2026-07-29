@@ -18,7 +18,7 @@ describe('SaaS foundation schema contract', () => {
     expect(schema).toContain('model PsychologistProfile {');
     expect(schema).toContain('model PatientAssignment {');
     expect(schema).toContain('organizationId        String?');
-    expect(schema).toContain('@@unique([organizationId, userId])');
+    expect(schema).toContain('@@index([organizationId, userId])');
     expect(schema).toContain(
       'userId           String                    @unique',
     );
@@ -31,6 +31,9 @@ describe('SaaS foundation schema contract', () => {
     );
     expect(migration).toContain(
       'ALTER TABLE "financial_transactions" ADD COLUMN "organizationId" UUID;',
+    );
+    expect(migration).toContain(
+      'CREATE UNIQUE INDEX "organization_memberships_organizationId_userId_key"',
     );
     expect(migration).not.toMatch(/DROP\s+(TABLE|COLUMN|TYPE)/i);
     expect(migration).not.toMatch(/ALTER\s+COLUMN.+SET\s+NOT\s+NULL/i);
