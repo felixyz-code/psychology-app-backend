@@ -40,7 +40,9 @@ Organization administration checkpoint:
 POST-GO-LIVE.3.0 Organization & Membership Administration Contract merged in PR #35
 Merged baseline: 7d897ec8db2c5d372fce0b4dc0eaf3bd3b1d4b13
 POST-GO-LIVE.3.1 Organization Administration Runtime implemented locally and in review
-Runtime baseline: 6c8ecbbfb566a1cb8c6b113f5493e04adbf80b12
+POST-GO-LIVE.3.2 Membership Administration Runtime implemented locally and review pending
+Runtime baseline: 2373ff046d56f455ecb9b5c4cc075f36f9ab778f
+POST-GO-LIVE.3.3 Invitations Expansion not started
 ```
 
 Current priorities:
@@ -73,7 +75,9 @@ POST-GO-LIVE.2
 
 POST-GO-LIVE.3
  |- 3.0 Organization & Membership Contract CLOSED
- `- 3.1 Organization Administration Runtime IMPLEMENTED / IN REVIEW
+ |- 3.1 Organization Administration Runtime IMPLEMENTED / IN REVIEW
+ |- 3.2 Membership Administration Runtime IMPLEMENTED / REVIEW PENDING
+ `- 3.3 Invitations Expansion NOT STARTED
 POST-GO-LIVE.4                           PENDING
 POST-GO-LIVE.5                           PENDING
 POST-GO-LIVE.6                           PENDING
@@ -517,9 +521,9 @@ The next implementation sequence after closeout is:
 4. optional active-organization preference UX;
 5. organization-domain certification and later frontend work.
 
-POST-GO-LIVE.3.1 is now implemented locally and in review. It is not
-authorized for production until the draft PR, CI, and later review controls
-are complete.
+POST-GO-LIVE.3.1 is now implemented locally and in review. POST-GO-LIVE.3.2 is
+implemented locally and review-pending. Neither phase is authorized for
+production until the draft PR, CI, and later review controls are complete.
 
 ## POST-GO-LIVE.3.1
 
@@ -560,7 +564,51 @@ Compatibility notes:
 
 - suspended organizations remain blocked from Patients, Clinical Core,
   Documents, Appointments, and Finance until reactivated
-- membership historical re-entry remains deferred to POST-GO-LIVE.3.2
+- membership historical re-entry is implemented in POST-GO-LIVE.3.2 and
+  remains review-pending
 - invitations expansion remains deferred to POST-GO-LIVE.3.3
 - no branding, billing, plans, settings, frontend switching UX, or production
   rollout work is included
+
+## POST-GO-LIVE.3.2
+
+Membership Administration Runtime is the historical-lifecycle hardening phase
+that follows the 3.1 organization administration runtime.
+
+Status:
+
+- IMPLEMENTED / REVIEW PENDING
+- Prisma migration required and created
+- not authorized for production
+
+Implemented scope:
+
+- replaced absolute membership uniqueness with a partial unique active-window
+  index in PostgreSQL
+- preserved `REVOKED` history and created one new row per membership re-entry
+- kept tenant resolution and auth-context deterministic in the presence of
+  historical rows
+- restricted public membership-status mutations to `ACTIVE` and `SUSPENDED`
+- preserved last-active-owner protection under real PostgreSQL concurrency
+- updated invitations so revoked history does not block re-entry
+- added migration, persistence, unit, and PostgreSQL E2E certification for the
+  membership administration runtime
+
+Out of scope:
+
+- direct `POST /memberships`
+- invitation resend and broader invitation expansion
+- ownership transfer
+- frontend switching UX
+- branding, plans, billing, and custom settings
+- production rollout or production backfill
+
+Compatibility notes:
+
+- suspended organizations remain blocked from membership routes
+- suspended memberships do not resolve tenant context
+- administrative membership listing remains current-state only and does not
+  project revoked history
+- role and status mutations affect access on the next request without a new
+  JWT
+- POST-GO-LIVE.3.3 remains not started

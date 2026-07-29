@@ -36,7 +36,16 @@ export class MembershipsService {
   findAll(organizationId: string, tenant: TenantContext) {
     this.assertTenantPath(organizationId, tenant);
     return this.prisma.organizationMembership.findMany({
-      where: { organizationId: tenant.organizationId },
+      where: {
+        organizationId: tenant.organizationId,
+        status: {
+          in: [
+            MembershipStatus.INVITED,
+            MembershipStatus.ACTIVE,
+            MembershipStatus.SUSPENDED,
+          ],
+        },
+      },
       select: {
         id: true,
         userId: true,
@@ -72,6 +81,9 @@ export class MembershipsService {
       if (target.role === MembershipRole.OWNER) {
         throw new ConflictException('Ownership transfer is not supported');
       }
+      if (target.status === MembershipStatus.REVOKED) {
+        throw new ConflictException('Invalid membership transition');
+      }
       if (target.role === role) {
         throw new ConflictException('Membership role is already set');
       }
@@ -92,7 +104,14 @@ export class MembershipsService {
         tenant,
         'SUCCESS',
         'ROLE_CHANGED',
-        target.id,
+        {
+          targetId: target.id,
+          targetUserId: target.userId,
+          previousRole: target.role,
+          newRole: role,
+          previousStatus: target.status,
+          newStatus: target.status,
+        },
       );
       return this.findTarget(tx, membershipId, tenant);
     });
@@ -147,7 +166,14 @@ export class MembershipsService {
         tenant,
         'SUCCESS',
         'STATUS_CHANGED',
-        target.id,
+        {
+          targetId: target.id,
+          targetUserId: target.userId,
+          previousRole: target.role,
+          newRole: target.role,
+          previousStatus: target.status,
+          newStatus: status,
+        },
       );
       return this.findTarget(tx, membershipId, tenant);
     });
@@ -189,7 +215,14 @@ export class MembershipsService {
         tenant,
         'SUCCESS',
         'MEMBERSHIP_REMOVED',
-        target.id,
+        {
+          targetId: target.id,
+          targetUserId: target.userId,
+          previousRole: target.role,
+          newRole: target.role,
+          previousStatus: target.status,
+          newStatus: MembershipStatus.REVOKED,
+        },
       );
       return { id: target.id, status: MembershipStatus.REVOKED };
     });
@@ -231,7 +264,14 @@ export class MembershipsService {
         tenant,
         'SUCCESS',
         'MEMBERSHIP_LEFT',
-        target.id,
+        {
+          targetId: target.id,
+          targetUserId: target.userId,
+          previousRole: target.role,
+          newRole: target.role,
+          previousStatus: target.status,
+          newStatus: MembershipStatus.REVOKED,
+        },
       );
       return { id: target.id, status: MembershipStatus.REVOKED };
     });
@@ -280,7 +320,12 @@ export class MembershipsService {
 
   private async protectOwner(
     tx: Prisma.TransactionClient,
-    target: { id: string; role: MembershipRole; status: MembershipStatus },
+    target: {
+      id: string;
+      userId: string;
+      role: MembershipRole;
+      status: MembershipStatus;
+    },
     tenant: TenantContext,
     event:
       | 'owner_invariant_denied'
@@ -305,7 +350,14 @@ export class MembershipsService {
         tenant,
         'DENY',
         'LAST_ACTIVE_OWNER',
-        target.id,
+        {
+          targetId: target.id,
+          targetUserId: target.userId,
+          previousRole: target.role,
+          newRole: target.role,
+          previousStatus: target.status,
+          newStatus: target.status,
+        },
       );
       throw new ConflictException('Organization must retain an active owner');
     }

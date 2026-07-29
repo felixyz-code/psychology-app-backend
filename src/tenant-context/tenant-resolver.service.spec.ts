@@ -82,7 +82,16 @@ describe('TenantResolverService', () => {
     });
     expect(findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { userId: user.id },
+        where: {
+          userId: user.id,
+          status: {
+            in: [
+              MembershipStatus.INVITED,
+              MembershipStatus.ACTIVE,
+              MembershipStatus.SUSPENDED,
+            ],
+          },
+        },
       }),
     );
   });
@@ -198,6 +207,40 @@ describe('TenantResolverService', () => {
         message: 'Organization access denied',
       });
     }
+  });
+
+  it('resolves the only active membership when other organizations only have historical revoked rows', async () => {
+    memberships = [
+      { ...membership(organizationA), id: 'membership-active-a' },
+      {
+        ...membership(organizationB),
+        id: 'membership-revoked-b',
+        status: MembershipStatus.REVOKED,
+      },
+    ];
+
+    const resolution = await resolve({ 'x-organization-id': organizationA });
+    expect(resolution.tenantContext).toMatchObject({
+      membershipId: 'membership-active-a',
+      organizationId: organizationA,
+    });
+  });
+
+  it('denies access when only revoked history remains for a tenant', async () => {
+    memberships = [
+      {
+        ...membership(organizationA),
+        id: 'membership-revoked-a',
+        status: MembershipStatus.REVOKED,
+      },
+    ];
+
+    await expect(resolve()).resolves.toEqual({
+      failure: TenantResolutionFailure.INELIGIBLE_ORGANIZATION,
+    });
+    await expect(
+      resolve({ 'x-organization-id': organizationA }),
+    ).rejects.toBeInstanceOf(ForbiddenException);
   });
 
   function resolve(

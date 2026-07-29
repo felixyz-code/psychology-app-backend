@@ -123,6 +123,16 @@ describe('AuthService', () => {
   it('returns only the current user selectable memberships when tenant resolution is ambiguous', async () => {
     prisma.organizationMembership.findMany.mockResolvedValue([
       {
+        id: 'membership-a-revoked',
+        role: 'OWNER',
+        status: 'REVOKED',
+        organization: {
+          id: 'organization-a',
+          displayName: 'Organization A',
+          status: 'ACTIVE',
+        },
+      },
+      {
         id: 'membership-a',
         role: 'OWNER',
         status: 'ACTIVE',
@@ -162,7 +172,12 @@ describe('AuthService', () => {
       ],
     });
     expect(prisma.organizationMembership.findMany).toHaveBeenCalledWith({
-      where: { userId: user.id },
+      where: {
+        userId: user.id,
+        status: {
+          in: ['INVITED', 'ACTIVE', 'SUSPENDED'],
+        },
+      },
       select: {
         id: true,
         role: true,
@@ -171,6 +186,11 @@ describe('AuthService', () => {
           select: { id: true, displayName: true, status: true },
         },
       },
+      orderBy: [
+        { organizationId: 'asc' },
+        { createdAt: 'desc' },
+        { id: 'asc' },
+      ],
     });
   });
 

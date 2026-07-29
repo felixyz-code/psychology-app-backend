@@ -59,7 +59,16 @@ export class AuthService {
     }
 
     const memberships = await this.prisma.organizationMembership.findMany({
-      where: { userId: user.id },
+      where: {
+        userId: user.id,
+        status: {
+          in: [
+            MembershipStatus.INVITED,
+            MembershipStatus.ACTIVE,
+            MembershipStatus.SUSPENDED,
+          ],
+        },
+      },
       select: {
         id: true,
         role: true,
@@ -68,6 +77,11 @@ export class AuthService {
           select: { id: true, displayName: true, status: true },
         },
       },
+      orderBy: [
+        { organizationId: 'asc' },
+        { createdAt: 'desc' },
+        { id: 'asc' },
+      ],
     });
     const selectableMemberships = memberships
       .filter(

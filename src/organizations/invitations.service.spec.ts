@@ -113,9 +113,111 @@ describe('InvitationsService', () => {
       expect.objectContaining({ organizationId: tenant.organizationId }),
       'SUCCESS',
       'INVITATION_EXPIRED',
-      invitation.id,
+      expect.objectContaining({ targetId: invitation.id }),
     );
   });
+
+  it('creates a new active membership when only revoked history exists for the recipient', async () => {
+    const recipientId = '00000000-0000-4000-8000-000000000004';
+    const invitationId = '00000000-0000-4000-8000-000000000005';
+    const acceptedAt = new Date('2026-07-29T03:00:00.000Z');
+    jest.useFakeTimers().setSystemTime(acceptedAt);
+    const prisma = {
+      $transaction: jest.fn((work: (tx: unknown) => unknown) =>
+        work({
+          organizationInvitation: {
+            findFirst: jest.fn().mockResolvedValue({
+              id: invitationId,
+              organizationId: tenant.organizationId,
+              normalizedEmail: 'recipient@example.test',
+              invitedUserId: recipientId,
+              role: MembershipRole.PSYCHOLOGIST,
+              expiresAt: new Date('2026-08-05T03:00:00.000Z'),
+              acceptedAt: null,
+              rejectedAt: null,
+              revokedAt: null,
+              expiredAt: null,
+            }),
+            updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+          },
+          user: {
+            findFirst: jest.fn().mockResolvedValue({
+              id: recipientId,
+              email: 'recipient@example.test',
+            }),
+          },
+          organizationMembership: {
+            findFirst: jest.fn().mockResolvedValue(null),
+            create: jest.fn().mockResolvedValue({
+              id: '00000000-0000-4000-8000-000000000006',
+              organizationId: tenant.organizationId,
+              role: MembershipRole.PSYCHOLOGIST,
+              status: 'ACTIVE',
+              joinedAt: acceptedAt,
+            }),
+          },
+        }),
+      ),
+    } as never;
+
+    const service = new InvitationsService(prisma, observability as never);
+
+    await expect(
+      service.accept('A'.repeat(43), { id: recipientId } as never),
+    ).resolves.toMatchObject({
+      organizationId: tenant.organizationId,
+      role: MembershipRole.PSYCHOLOGIST,
+      status: 'ACTIVE',
+      joinedAt: acceptedAt,
+    });
+
+    jest.useRealTimers();
+  });
+
+  it.each(['INVITED', 'ACTIVE', 'SUSPENDED'])(
+    'rejects invitation acceptance when a %s membership already exists',
+    async (status) => {
+      const recipientId = '00000000-0000-4000-8000-000000000004';
+      const prisma = {
+        $transaction: jest.fn((work: (tx: unknown) => unknown) =>
+          work({
+            organizationInvitation: {
+              findFirst: jest.fn().mockResolvedValue({
+                id: '00000000-0000-4000-8000-000000000005',
+                organizationId: tenant.organizationId,
+                normalizedEmail: 'recipient@example.test',
+                invitedUserId: recipientId,
+                role: MembershipRole.PSYCHOLOGIST,
+                expiresAt: new Date('2026-08-05T03:00:00.000Z'),
+                acceptedAt: null,
+                rejectedAt: null,
+                revokedAt: null,
+                expiredAt: null,
+              }),
+              updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+            },
+            user: {
+              findFirst: jest.fn().mockResolvedValue({
+                id: recipientId,
+                email: 'recipient@example.test',
+              }),
+            },
+            organizationMembership: {
+              findFirst: jest
+                .fn()
+                .mockResolvedValue({ id: 'existing-membership', status }),
+            },
+          }),
+        ),
+      } as never;
+
+      const service = new InvitationsService(prisma, observability as never);
+
+      await expect(
+        service.accept('A'.repeat(43), { id: recipientId } as never),
+      ).rejects.toBeInstanceOf(ConflictException);
+    },
+  );
 });
 
 function hasMaterializedExpiration(

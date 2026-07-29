@@ -235,6 +235,115 @@ runPersistenceTests('PostgreSQL persistence integration', () => {
     }
   });
 
+  it('permits historical revoked memberships while rejecting concurrent non-terminal duplicates', async () => {
+    const suffix = randomUUID();
+    const organizationId = randomUUID();
+    const userId = randomUUID();
+    const firstMembershipId = randomUUID();
+    const secondMembershipId = randomUUID();
+    const thirdMembershipId = randomUUID();
+
+    try {
+      await prisma.user.create({
+        data: {
+          id: userId,
+          name: 'Historical Reentry User',
+          email: `historical-reentry-${suffix}@example.test`,
+          passwordHash: 'not-a-real-password',
+          role: 'PSYCHOLOGIST',
+        },
+      });
+      await prisma.organization.create({
+        data: {
+          id: organizationId,
+          slug: `historical-reentry-${suffix}`,
+          legalName: 'Historical Reentry Org',
+          displayName: 'Historical Reentry',
+          status: 'ACTIVE',
+        },
+      });
+
+      await prisma.organizationMembership.create({
+        data: {
+          id: firstMembershipId,
+          organizationId,
+          userId,
+          role: 'PSYCHOLOGIST',
+          status: 'REVOKED',
+          joinedAt: new Date('2026-01-01T00:00:00.000Z'),
+          revokedAt: new Date('2026-02-01T00:00:00.000Z'),
+        },
+      });
+
+      await prisma.organizationMembership.create({
+        data: {
+          id: secondMembershipId,
+          organizationId,
+          userId,
+          role: 'PSYCHOLOGIST',
+          status: 'ACTIVE',
+          joinedAt: new Date('2026-03-01T00:00:00.000Z'),
+        },
+      });
+
+      await expect(
+        prisma.organizationMembership.create({
+          data: {
+            id: randomUUID(),
+            organizationId,
+            userId,
+            role: 'PSYCHOLOGIST',
+            status: 'SUSPENDED',
+            suspendedAt: new Date('2026-04-01T00:00:00.000Z'),
+          },
+        }),
+      ).rejects.toMatchObject({ code: 'P2002' });
+
+      await prisma.organizationMembership.update({
+        where: { id: secondMembershipId },
+        data: {
+          status: 'REVOKED',
+          revokedAt: new Date('2026-05-01T00:00:00.000Z'),
+        },
+      });
+
+      await prisma.organizationMembership.create({
+        data: {
+          id: thirdMembershipId,
+          organizationId,
+          userId,
+          role: 'PSYCHOLOGIST',
+          status: 'ACTIVE',
+          joinedAt: new Date('2026-06-01T00:00:00.000Z'),
+        },
+      });
+
+      const memberships = await prisma.organizationMembership.findMany({
+        where: { organizationId, userId },
+        orderBy: { createdAt: 'asc' },
+        select: { id: true, status: true, revokedAt: true },
+      });
+
+      expect(memberships).toHaveLength(3);
+      expect(
+        memberships.filter((membership) => membership.status === 'REVOKED'),
+      ).toHaveLength(2);
+      expect(
+        memberships.filter((membership) => membership.status === 'ACTIVE'),
+      ).toHaveLength(1);
+      expect(memberships.at(-1)).toMatchObject({
+        id: thirdMembershipId,
+        status: 'ACTIVE',
+      });
+    } finally {
+      await prisma.organizationMembership.deleteMany({
+        where: { organizationId, userId },
+      });
+      await prisma.organization.deleteMany({ where: { id: organizationId } });
+      await prisma.user.deleteMany({ where: { id: userId } });
+    }
+  });
+
   it('does not treat the tenant-aware seed as a legacy backfill target', async () => {
     const owner = await prisma.user.findFirst({
       where: { role: 'ADMIN' },

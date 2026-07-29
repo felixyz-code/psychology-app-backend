@@ -55,7 +55,16 @@ export class TenantResolverService {
     const memberships = await this.prisma.organizationMembership.findMany({
       // Read only this authenticated user's memberships. Status and organization
       // are selected together so eligibility is validated from one DB snapshot.
-      where: { userId: user.id },
+      where: {
+        userId: user.id,
+        status: {
+          in: [
+            MembershipStatus.INVITED,
+            MembershipStatus.ACTIVE,
+            MembershipStatus.SUSPENDED,
+          ],
+        },
+      },
       select: {
         id: true,
         userId: true,
@@ -64,6 +73,11 @@ export class TenantResolverService {
         status: true,
         organization: { select: { id: true, status: true } },
       },
+      orderBy: [
+        { organizationId: 'asc' },
+        { createdAt: 'desc' },
+        { id: 'asc' },
+      ],
     });
 
     if (

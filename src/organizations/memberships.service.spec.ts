@@ -55,4 +55,64 @@ describe('MembershipsService policy boundary', () => {
       service.leave('00000000-0000-4000-8000-000000000099', tenant),
     ).rejects.toBeInstanceOf(NotFoundException);
   });
+
+  it('rejects role changes on revoked memberships', async () => {
+    const tx = {
+      organizationMembership: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: '00000000-0000-4000-8000-000000000004',
+          userId: '00000000-0000-4000-8000-000000000005',
+          role: MembershipRole.PSYCHOLOGIST,
+          status: MembershipStatus.REVOKED,
+        }),
+      },
+    };
+    const prisma = {
+      $transaction: jest.fn((work: (client: typeof tx) => unknown) => work(tx)),
+    } as never;
+    const service = new MembershipsService(
+      prisma,
+      { decisionFor: jest.fn().mockReturnValue('ALLOW') } as never,
+      { organizationDomainEvent: jest.fn() } as never,
+    );
+
+    await expect(
+      service.changeRole(
+        tenant.organizationId,
+        '00000000-0000-4000-8000-000000000004',
+        MembershipRole.BILLING,
+        { ...tenant, organizationRole: MembershipRole.OWNER },
+      ),
+    ).rejects.toThrow('Invalid membership transition');
+  });
+
+  it('rejects self-mutation for admin role changes', async () => {
+    const tx = {
+      organizationMembership: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: tenant.membershipId,
+          userId: tenant.userId,
+          role: MembershipRole.ADMIN,
+          status: MembershipStatus.ACTIVE,
+        }),
+      },
+    };
+    const prisma = {
+      $transaction: jest.fn((work: (client: typeof tx) => unknown) => work(tx)),
+    } as never;
+    const service = new MembershipsService(
+      prisma,
+      { decisionFor: jest.fn().mockReturnValue('CONDITIONAL') } as never,
+      { organizationDomainEvent: jest.fn() } as never,
+    );
+
+    await expect(
+      service.changeRole(
+        tenant.organizationId,
+        tenant.membershipId,
+        MembershipRole.BILLING,
+        tenant,
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+  });
 });

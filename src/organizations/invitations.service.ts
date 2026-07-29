@@ -88,7 +88,10 @@ export class InvitationsService {
         tenant,
         'SUCCESS',
         'INVITATION_CREATED',
-        invitation.id,
+        {
+          targetId: invitation.id,
+          newRole: invitation.role,
+        },
       );
       return {
         ...invitation,
@@ -135,7 +138,9 @@ export class InvitationsService {
         tenant,
         'SUCCESS',
         'INVITATION_REVOKED',
-        invitation.id,
+        {
+          targetId: invitation.id,
+        },
       );
       return {
         expired: false as const,
@@ -210,7 +215,11 @@ export class InvitationsService {
           tenant,
           'SUCCESS',
           'INVITATION_REJECTED',
-          invitation.id,
+          {
+            targetId: invitation.id,
+            targetUserId: recipient.id,
+            newRole: invitation.role,
+          },
         );
         return {
           expired: false as const,
@@ -221,6 +230,13 @@ export class InvitationsService {
         where: {
           organizationId: invitation.organizationId,
           userId: recipient.id,
+          status: {
+            in: [
+              MembershipStatus.INVITED,
+              MembershipStatus.ACTIVE,
+              MembershipStatus.SUSPENDED,
+            ],
+          },
         },
         select: { id: true },
       });
@@ -255,7 +271,12 @@ export class InvitationsService {
           tenant,
           'SUCCESS',
           'INVITATION_ACCEPTED',
-          invitation.id,
+          {
+            targetId: invitation.id,
+            targetUserId: recipient.id,
+            newRole: invitation.role,
+            newStatus: MembershipStatus.ACTIVE,
+          },
         );
         return { expired: false as const, value: membership };
       } catch (error) {
@@ -311,7 +332,9 @@ export class InvitationsService {
         tenant,
         'SUCCESS',
         'INVITATION_EXPIRED',
-        invitation.id,
+        {
+          targetId: invitation.id,
+        },
       );
       return true;
     }

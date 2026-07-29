@@ -2,6 +2,45 @@
 
 ---
 
+# POST-GO-LIVE.3.2 Membership Administration Runtime
+
+## Status
+
+Implemented locally and pending technical review, draft PR publication, and CI.
+
+## Highlights
+
+* Replaced the absolute `OrganizationMembership` uniqueness on
+  `organizationId + userId` with a PostgreSQL partial unique index that allows
+  multiple historical `REVOKED` rows while preserving at most one non-terminal
+  row (`INVITED`, `ACTIVE`, `SUSPENDED`).
+* Added a dedicated Prisma migration
+  `20260729030000_membership_historical_reentry` with an explicit preflight
+  guard for unsafe legacy duplicate non-terminal rows.
+* Hardened tenant resolution and `GET /auth/context` so historical `REVOKED`
+  rows are ignored deterministically and suspended memberships never authorize
+  tenant context.
+* Restricted the public membership-status DTO and Swagger contract to
+  `ACTIVE` and `SUSPENDED` only.
+* Kept membership administration listing behavior focused on current
+  non-terminal rows while preserving full historical membership periods in the
+  database.
+* Updated invitation acceptance so revoked history no longer blocks re-entry;
+  the accepted invitation creates a new `ACTIVE` membership row instead of
+  reactivating the revoked record.
+* Extended unit, persistence, migration, and PostgreSQL E2E coverage for
+  historical re-entry, partial-index conflicts, target-policy hardening, and
+  last-owner concurrency.
+
+## Compatibility
+
+* No new public `POST /memberships` route.
+* No frontend changes.
+* No infrastructure changes.
+* No production access.
+* No deployment or backfill activity.
+* POST-GO-LIVE.3.3 remains not started.
+
 # POST-GO-LIVE.3.1 Organization Administration Runtime
 
 ## Status
