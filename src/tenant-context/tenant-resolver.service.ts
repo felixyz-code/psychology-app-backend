@@ -22,6 +22,10 @@ type HeaderRequest = {
   rawHeaders?: string[];
 };
 
+type TenantResolutionOptions = {
+  allowedOrganizationStatuses?: readonly OrganizationStatus[];
+};
+
 const uuidPattern =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -35,7 +39,11 @@ export class TenantResolverService {
   async resolve(
     user: AuthenticatedUser,
     request: HeaderRequest,
+    options: TenantResolutionOptions = {},
   ): Promise<TenantResolution> {
+    const allowedOrganizationStatuses = new Set(
+      options.allowedOrganizationStatuses ?? [OrganizationStatus.ACTIVE],
+    );
     let requestedOrganizationId: string | undefined;
     try {
       requestedOrganizationId = getRequestedOrganizationId(request);
@@ -85,7 +93,7 @@ export class TenantResolverService {
         throw new ForbiddenException('Organization access denied');
       }
 
-      if (membership.organization.status !== OrganizationStatus.ACTIVE) {
+      if (!allowedOrganizationStatuses.has(membership.organization.status)) {
         this.observability.selectionDenied(user.id, 'INACTIVE_ORGANIZATION', {
           membershipId: membership.id,
           organizationId: membership.organizationId,
@@ -105,7 +113,7 @@ export class TenantResolverService {
     const eligibleMemberships = memberships.filter(
       (membership) =>
         membership.status === MembershipStatus.ACTIVE &&
-        membership.organization.status === OrganizationStatus.ACTIVE,
+        allowedOrganizationStatuses.has(membership.organization.status),
     );
 
     if (eligibleMemberships.length === 1) {

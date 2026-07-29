@@ -1464,15 +1464,20 @@ DOCKER.md
 ## POST-GO-LIVE.2.1C2 Organization APIs
 
 Authenticated organization routes are tenant-required except `GET /organizations`,
-which lists only the caller's active memberships, and recipient invitation
-accept/reject routes, which bind to the authenticated recipient instead of a
-tenant selection. `X-Organization-Id` remains a validated selector only.
+which lists the caller's active memberships and administrative organization
+metadata, and recipient invitation accept/reject routes, which bind to the
+authenticated recipient instead of a tenant selection. `X-Organization-Id`
+remains a validated selector only. POST-GO-LIVE.3.1 adds dedicated
+organization identity and lifecycle administration on top of the pre-existing
+read, membership, and invitation surfaces.
 
 | Method | Route | Capability / policy |
 | --- | --- | --- |
-| GET | `/organizations` | caller active memberships |
-| GET | `/organizations/current` | `organization.read` |
-| GET | `/organizations/:organizationId` | `organization.read` |
+| GET | `/organizations` | caller active memberships; list may include `ACTIVE` and `SUSPENDED` organizations for administrative discoverability |
+| GET | `/organizations/current` | `organization.read`; route allows `ACTIVE` or `SUSPENDED` selected organization state |
+| GET | `/organizations/:organizationId` | `organization.read`; path must match selected tenant and route allows `ACTIVE` or `SUSPENDED` organization state |
+| PATCH | `/organizations/:organizationId` | `organization.manage` (OWNER); editable identity fields only |
+| PATCH | `/organizations/:organizationId/status` | `organization.manage` (OWNER); `ACTIVE <-> SUSPENDED` only |
 | GET | `/organizations/:organizationId/memberships` | `membership.read`; sanitized metadata |
 | PATCH | `/organizations/:organizationId/memberships/:membershipId/role` | owner/admin conditional; never OWNER grant |
 | PATCH | `/organizations/:organizationId/memberships/:membershipId/status` | owner/admin conditional |
@@ -1486,3 +1491,20 @@ tenant selection. `X-Organization-Id` remains a validated selector only.
 Invitation tokens are SHA-256 digested before persistence and are returned only
 once from creation outside production. API responses and logs never expose a
 digest; invitation list responses omit recipient email and token data.
+
+POST-GO-LIVE.3.1 organization-update DTOs allow only:
+
+- `legalName`
+- `displayName`
+- `slug`
+- `timezone`
+- `locale`
+- `currency`
+
+`status` remains server-owned and requires the dedicated
+`PATCH /organizations/:organizationId/status` operation. A suspended
+organization remains unreadable to ordinary tenant-aware business routes such
+as Patients, Case Files, Documents, Appointments, and Finance; only the
+organization administrative read/update/status routes opt into suspended-state
+resolution so an authorized `OWNER` can inspect and reactivate the tenant
+without minting a new JWT.

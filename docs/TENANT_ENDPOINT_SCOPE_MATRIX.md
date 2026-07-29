@@ -15,8 +15,10 @@
 | GET | `/patients/:id` | Patients | Yes | `patient.read` | Tenant + active assignment + temporary legacy psychologist restriction | 404 | D1 aligned | Complete in 2.1D1 |
 | PATCH | `/patients/:id` | Patients | Yes | `patient.update` | Tenant + active assignment + temporary legacy psychologist restriction | 404 | D1 aligned | Complete in 2.1D1 |
 | DELETE | `/patients/:id` | Patients | Yes | `patient.delete` | Tenant + active assignment + temporary legacy psychologist restriction; patient assignments removed before physical delete | 404 | D1 aligned | Complete in 2.1D1 |
-| GET | `/organizations` | Organizations | Optional bootstrap | `organization.read` when resolved | Caller eligible memberships only | N/A | Implemented | 2.1C2 integrated |
-| GET | `/organizations/:organizationId` | Organizations | Yes | `organization.read` | Path must match resolved tenant | 404 | Implemented | 2.1C2 integrated |
+| GET | `/organizations` | Organizations | Optional bootstrap | `organization.read` when resolved | Caller active memberships; list includes `ACTIVE` and `SUSPENDED` organization admin metadata | N/A | Implemented | 3.1 runtime |
+| GET | `/organizations/:organizationId` | Organizations | Yes | `organization.read` | Path must match resolved tenant; route allows `ACTIVE` or `SUSPENDED` organization state | 404 | Implemented | 3.1 runtime |
+| PATCH | `/organizations/:organizationId` | Organizations | Yes | `organization.manage` | Path must match resolved tenant; editable identity fields only; route allows `ACTIVE` or `SUSPENDED` organization state | 404 / 400 / 409 | Implemented | 3.1 runtime |
+| PATCH | `/organizations/:organizationId/status` | Organizations | Yes | `organization.manage` | OWNER-only lifecycle mutation; `ACTIVE <-> SUSPENDED` only; other tenant-aware modules remain blocked while suspended | 404 / 409 | Implemented | 3.1 runtime |
 | GET | `/organizations/:organizationId/memberships` | Memberships | Yes | `membership.read` | Selected tenant only; AUDITOR gets sanitized metadata and no complete emails | 404 | Implemented | 2.1C2 integrated |
 | POST | `/organizations/:organizationId/invitations` | Invitations | Yes | `invitation.create` | Selected tenant; OWNER/ADMIN; no OWNER grant | 404 | Implemented | 2.1C2 integrated |
 | GET | `/organizations/:organizationId/invitations` | Invitations | Yes | `invitation.read` | Selected tenant; no digest/token projection | 404 | Implemented | 2.1C2 integrated |
@@ -87,6 +89,23 @@ The Organization, Membership, and Invitation rows above are now implemented.
 required resolved tenant context. Recipient accept/reject explicitly skip
 tenant resolution so a pending invitation cannot establish tenant authority.
 All organization-path mismatches are redacted as `404`.
+
+## POST-GO-LIVE.3.1 implementation status
+
+Organization administration runtime now extends the pre-existing organization
+read surface with:
+
+- `PATCH /organizations/:organizationId` for editable identity fields only;
+- `PATCH /organizations/:organizationId/status` for `ACTIVE` and `SUSPENDED`
+  transitions only;
+- route-scoped tenant resolution that still requires an active membership but
+  allows a suspended organization state on organization read/update/status
+  routes only.
+
+This does not broaden suspended-organization access to Patients, Clinical
+Core, Documents, Appointments, Financial Transactions, Financial Summary,
+Membership administration, or Invitations. Those routes still fail closed until
+the organization returns to `ACTIVE`.
 
 ## POST-GO-LIVE.2.1D4 integrated certification status
 

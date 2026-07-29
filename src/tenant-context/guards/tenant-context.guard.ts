@@ -6,6 +6,7 @@ import {
   Injectable,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
+import { OrganizationStatus } from '@prisma/client';
 import { IS_PUBLIC_KEY } from '../../auth/decorators/public.decorator';
 import { AuthenticatedUser } from '../../auth/types/authenticated-user.type';
 import {
@@ -13,6 +14,7 @@ import {
   TenantContextAlreadySetError,
 } from '../../common/request-context/request-context.service';
 import {
+  ALLOWED_ORGANIZATION_STATUSES_KEY,
   SKIP_TENANT_CONTEXT_KEY,
   TENANT_REQUIRED_KEY,
 } from '../tenant-context.constants';
@@ -62,7 +64,15 @@ export class TenantContextGuard implements CanActivate {
       TENANT_REQUIRED_KEY,
       [context.getHandler(), context.getClass()],
     );
-    const resolution = await this.resolver.resolve(request.user, request);
+    const allowedOrganizationStatuses = this.reflector.getAllAndOverride<
+      OrganizationStatus[]
+    >(ALLOWED_ORGANIZATION_STATUSES_KEY, [
+      context.getHandler(),
+      context.getClass(),
+    ]) ?? [OrganizationStatus.ACTIVE];
+    const resolution = await this.resolver.resolve(request.user, request, {
+      allowedOrganizationStatuses,
+    });
 
     if (resolution.tenantContext) {
       if (request.tenantContext) {

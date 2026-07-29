@@ -1,5 +1,5 @@
 import { ConflictException, ForbiddenException } from '@nestjs/common';
-import { MembershipRole, UserRole } from '@prisma/client';
+import { MembershipRole, OrganizationStatus, UserRole } from '@prisma/client';
 import { Reflector } from '@nestjs/core';
 import {
   RequestContextService,
@@ -26,7 +26,7 @@ describe('TenantContextGuard', () => {
     ambiguousContext: jest.Mock;
     missingRequiredContext: jest.Mock;
   };
-  let metadata: Record<string, boolean | undefined>;
+  let metadata: Record<string, boolean | OrganizationStatus[] | undefined>;
   let guard: TenantContextGuard;
 
   beforeEach(() => {
@@ -58,7 +58,9 @@ describe('TenantContextGuard', () => {
     );
 
     expect(request.tenantContext).toBe(tenantContext);
-    expect(resolver.resolve).toHaveBeenCalledWith(request.user, request);
+    expect(resolver.resolve).toHaveBeenCalledWith(request.user, request, {
+      allowedOrganizationStatuses: [OrganizationStatus.ACTIVE],
+    });
     expect(observability.resolutionSucceeded).toHaveBeenCalledWith(
       tenantContext,
     );
@@ -115,6 +117,26 @@ describe('TenantContextGuard', () => {
       guard.canActivate(contextFor(requestWithUser())),
     ).resolves.toBe(true);
     expect(resolver.resolve).not.toHaveBeenCalled();
+  });
+
+  it('passes route-scoped organization statuses to the resolver', async () => {
+    resolver.resolve.mockResolvedValue({ tenantContext });
+    metadata.allowedOrganizationStatuses = [
+      OrganizationStatus.ACTIVE,
+      OrganizationStatus.SUSPENDED,
+    ];
+    const request = requestWithUser();
+
+    await requestContext.run('suspended-admin', () =>
+      guard.canActivate(contextFor(request)),
+    );
+
+    expect(resolver.resolve).toHaveBeenCalledWith(request.user, request, {
+      allowedOrganizationStatuses: [
+        OrganizationStatus.ACTIVE,
+        OrganizationStatus.SUSPENDED,
+      ],
+    });
   });
 
   it('does not silently overwrite a context already attached to the request', async () => {

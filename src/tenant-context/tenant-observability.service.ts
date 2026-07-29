@@ -14,6 +14,9 @@ type TenantEvent =
   | 'tenant_capability_denied';
 
 export type OrganizationDomainEvent =
+  | 'organization_updated'
+  | 'organization_suspended'
+  | 'organization_reactivated'
   | 'invitation_created'
   | 'invitation_revoked'
   | 'invitation_accepted'

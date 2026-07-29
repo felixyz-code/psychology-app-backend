@@ -146,6 +146,32 @@ describe('TenantResolverService', () => {
     ).rejects.toBeInstanceOf(ForbiddenException);
   });
 
+  it('allows suspended organizations only when a route explicitly opts in', async () => {
+    memberships = [
+      membership(
+        organizationA,
+        MembershipRole.OWNER,
+        OrganizationStatus.SUSPENDED,
+      ),
+    ];
+
+    await expect(resolve()).resolves.toEqual({
+      failure: TenantResolutionFailure.INELIGIBLE_ORGANIZATION,
+    });
+
+    await expect(
+      resolve({ 'x-organization-id': organizationA }, undefined, [
+        OrganizationStatus.ACTIVE,
+        OrganizationStatus.SUSPENDED,
+      ]),
+    ).resolves.toMatchObject({
+      tenantContext: {
+        organizationId: organizationA,
+        organizationRole: MembershipRole.OWNER,
+      },
+    });
+  });
+
   it('rejects comma-separated, array, and whitespace-normalized values', async () => {
     await expect(
       resolve({ 'x-organization-id': `${organizationA},${organizationB}` }),
@@ -177,8 +203,13 @@ describe('TenantResolverService', () => {
   function resolve(
     headers: Record<string, string | string[] | undefined> = {},
     rawHeaders?: string[],
+    allowedOrganizationStatuses?: readonly OrganizationStatus[],
   ) {
-    return service.resolve(user, { headers, rawHeaders });
+    return service.resolve(
+      user,
+      { headers, rawHeaders },
+      { allowedOrganizationStatuses },
+    );
   }
 });
 
