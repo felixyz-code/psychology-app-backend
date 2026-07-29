@@ -1,5 +1,35 @@
 # Decision Log
 
+## STATUS-POST-GO-LIVE.3.0: Contract Merged and Baseline Certified
+
+### Status
+
+Accepted as a closeout status update after PR `#35` merged into `development`
+at merge commit `7d897ec8db2c5d372fce0b4dc0eaf3bd3b1d4b13`.
+
+### Decision
+
+POST-GO-LIVE.3.0 is closed as a documentation-only, contract-only, and
+architecture-only phase. The merged baseline is now
+`7d897ec8db2c5d372fce0b4dc0eaf3bd3b1d4b13`.
+
+POST-GO-LIVE.3.0 closure preserves these already-merged decisions without
+reopening them:
+
+- active organization remains per-request validated selection;
+- JWT remains identity-only and does not carry tenant authority;
+- multiple active owners are allowed, but every active organization must retain
+  at least one active owner;
+- historical membership re-entry remains schema-gated for POST-GO-LIVE.3.2.
+
+### Consequences
+
+POST-GO-LIVE.3.1 becomes the next planned runtime phase, but it remains not
+started and not implemented at this closeout point. No runtime route, DTO,
+service, controller, Prisma schema, migration, seed, frontend behavior,
+infrastructure behavior, production access, deployment, or backfill is approved
+by this closeout entry.
+
 ## ADR-POST-GO-LIVE.3.0: Organization Administration Starts from a Partial Runtime
 
 ### Status

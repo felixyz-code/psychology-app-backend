@@ -2,6 +2,36 @@
 
 ---
 
+# POST-GO-LIVE.3.0 Closeout
+
+## Status
+
+Closed as a merged documentation-only contract baseline after PR `#35`.
+
+## Highlights
+
+* Certified merge commit `7d897ec8db2c5d372fce0b4dc0eaf3bd3b1d4b13` as the new
+  official POST-GO-LIVE.3.0 baseline on `development`.
+* Confirmed post-merge `Backend CI / backend` succeeded on workflow run
+  `30411839106`, job `90449491216`.
+* Recorded POST-GO-LIVE.3.0 as closed at the documentation/contract/architecture
+  level only.
+* Preserved the merged decisions for active organization selection,
+  owner-protection rules, corrected membership endpoint matrix, and schema-gated
+  historical membership re-entry.
+* Registered POST-GO-LIVE.3.1 Organization Administration Runtime as the next
+  phase, still not started and not implemented.
+
+## Compatibility
+
+* No runtime code changes.
+* No Prisma schema changes.
+* No new migrations.
+* No frontend changes.
+* No infrastructure changes.
+* No production access.
+* No deployment or backfill activity.
+
 # POST-GO-LIVE.3.0 Organization & Membership Administration Contract
 
 ## Status
