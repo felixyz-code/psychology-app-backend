@@ -44,7 +44,7 @@ describe('OpenAPI document', () => {
   it('documents every certified route and the Bearer security scheme', () => {
     const document = createDocument(app);
 
-    expect(Object.keys(document.paths)).toHaveLength(39);
+    expect(Object.keys(document.paths)).toHaveLength(40);
     expect(document.components?.securitySchemes?.bearer).toEqual({
       type: 'http',
       scheme: 'bearer',
@@ -64,6 +64,9 @@ describe('OpenAPI document', () => {
     expect(document.paths['/organizations'].get?.security).toEqual([
       { bearer: [] },
     ]);
+    expect(
+      document.paths['/organizations/{organizationId}/status'].patch,
+    ).toBeDefined();
     expect(
       document.paths['/organizations/{organizationId}/invitations'].post
         ?.responses,

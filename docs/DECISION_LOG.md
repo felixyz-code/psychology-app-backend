@@ -1,5 +1,40 @@
 # Decision Log
 
+## STATUS-POST-GO-LIVE.3.1: Organization Administration Runtime Implemented
+
+### Status
+
+Accepted as a local runtime status update on `development` baseline
+`6c8ecbbfb566a1cb8c6b113f5493e04adbf80b12` pending draft PR review.
+
+### Decision
+
+POST-GO-LIVE.3.1 is no longer a future placeholder. The backend now
+implements:
+
+- owner-only `PATCH /organizations/:organizationId` for editable identity
+  fields;
+- owner-only `PATCH /organizations/:organizationId/status` for
+  `ACTIVE <-> SUSPENDED`;
+- organization read routes that can resolve `ACTIVE` or `SUSPENDED`
+  organization state only on the organization administration surface;
+- structured organization-domain logging events for update, suspension, and
+  reactivation.
+
+The runtime reuses the existing `organization.manage` capability rather than
+introducing a new capability enum in 3.1, and it requires no Prisma schema
+change or migration.
+
+### Consequences
+
+Suspending an organization still invalidates ordinary tenant-aware business
+routes on the next request, but it does not create an irreversible lockout:
+an authorized `OWNER` can still read and reactivate the suspended organization
+through the narrow administrative routes using the validated
+`X-Organization-Id` selector. Membership history re-entry, invitations
+expansion, frontend switching UX, branding, plans, billing, and production
+rollout remain deferred.
+
 ## STATUS-POST-GO-LIVE.3.0: Contract Merged and Baseline Certified
 
 ### Status

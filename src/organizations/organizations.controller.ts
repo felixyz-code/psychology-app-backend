@@ -12,6 +12,7 @@ import {
   ValidationPipe,
 } from '@nestjs/common';
 import {
+  ApiBadRequestResponse,
   ApiBearerAuth,
   ApiConflictResponse,
   ApiForbiddenResponse,
@@ -22,17 +23,21 @@ import {
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
+import { OrganizationStatus } from '@prisma/client';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { AuthenticatedUser } from '../auth/types/authenticated-user.type';
+import { AllowedOrganizationStatuses } from '../tenant-context/decorators/allowed-organization-statuses.decorator';
 import { RequireCapabilities } from '../tenant-context/authorization/require-capabilities.decorator';
 import { CapabilitiesGuard } from '../tenant-context/authorization/capabilities.guard';
 import { OrganizationCapability } from '../tenant-context/authorization/organization-capability';
 import { CurrentTenant } from '../tenant-context/decorators/current-tenant.decorator';
 import { TenantRequired } from '../tenant-context/decorators/tenant-required.decorator';
 import type { TenantContext } from '../tenant-context/tenant-context.types';
+import { ChangeOrganizationStatusDto } from './dto/change-organization-status.dto';
 import { ChangeMembershipRoleDto } from './dto/change-membership-role.dto';
 import { ChangeMembershipStatusDto } from './dto/change-membership-status.dto';
 import { CreateInvitationDto } from './dto/create-invitation.dto';
+import { UpdateOrganizationDto } from './dto/update-organization.dto';
 import { InvitationsService } from './invitations.service';
 import { MembershipsService } from './memberships.service';
 import { OrganizationsService } from './organizations.service';
@@ -65,6 +70,10 @@ export class OrganizationsController {
 
   @Get('current')
   @TenantRequired()
+  @AllowedOrganizationStatuses(
+    OrganizationStatus.ACTIVE,
+    OrganizationStatus.SUSPENDED,
+  )
   @UseGuards(CapabilitiesGuard)
   @RequireCapabilities(OrganizationCapability.ORGANIZATION_READ)
   @ApiOperation({ summary: 'Get the currently resolved organization' })
@@ -74,6 +83,10 @@ export class OrganizationsController {
 
   @Get(':organizationId')
   @TenantRequired()
+  @AllowedOrganizationStatuses(
+    OrganizationStatus.ACTIVE,
+    OrganizationStatus.SUSPENDED,
+  )
   @UseGuards(CapabilitiesGuard)
   @RequireCapabilities(OrganizationCapability.ORGANIZATION_READ)
   @ApiOperation({ summary: 'Get an accessible organization' })
@@ -88,6 +101,49 @@ export class OrganizationsController {
     @CurrentTenant(true) tenant: TenantContext,
   ) {
     return this.organizations.findOne(organizationId, tenant);
+  }
+
+  @Patch(':organizationId')
+  @TenantRequired()
+  @AllowedOrganizationStatuses(
+    OrganizationStatus.ACTIVE,
+    OrganizationStatus.SUSPENDED,
+  )
+  @UseGuards(CapabilitiesGuard)
+  @RequireCapabilities(OrganizationCapability.ORGANIZATION_MANAGE)
+  @ApiOperation({ summary: 'Update editable organization identity fields' })
+  @ApiBadRequestResponse({
+    description: 'Invalid payload or no editable organization fields provided',
+  })
+  @ApiConflictResponse({
+    description: 'Unique conflict or concurrent organization change',
+  })
+  update(
+    @Param('organizationId', ParseUUIDPipe) organizationId: string,
+    @Body() dto: UpdateOrganizationDto,
+    @CurrentTenant(true) tenant: TenantContext,
+  ) {
+    return this.organizations.update(organizationId, dto, tenant);
+  }
+
+  @Patch(':organizationId/status')
+  @TenantRequired()
+  @AllowedOrganizationStatuses(
+    OrganizationStatus.ACTIVE,
+    OrganizationStatus.SUSPENDED,
+  )
+  @UseGuards(CapabilitiesGuard)
+  @RequireCapabilities(OrganizationCapability.ORGANIZATION_MANAGE)
+  @ApiOperation({ summary: 'Suspend or reactivate an organization' })
+  @ApiConflictResponse({
+    description: 'Invalid organization transition or concurrent change',
+  })
+  changeOrganizationStatus(
+    @Param('organizationId', ParseUUIDPipe) organizationId: string,
+    @Body() dto: ChangeOrganizationStatusDto,
+    @CurrentTenant(true) tenant: TenantContext,
+  ) {
+    return this.organizations.changeStatus(organizationId, dto, tenant);
   }
 
   @Get(':organizationId/memberships')

@@ -39,7 +39,8 @@ Organization administration checkpoint:
 ```text
 POST-GO-LIVE.3.0 Organization & Membership Administration Contract merged in PR #35
 Merged baseline: 7d897ec8db2c5d372fce0b4dc0eaf3bd3b1d4b13
-Implementation remains deferred; POST-GO-LIVE.3.1 is next and not started
+POST-GO-LIVE.3.1 Organization Administration Runtime implemented locally and in review
+Runtime baseline: 6c8ecbbfb566a1cb8c6b113f5493e04adbf80b12
 ```
 
 Current priorities:
@@ -56,27 +57,27 @@ Current priorities:
 # Phase Status
 
 ```text
-GO-LIVE.0                                ✅ COMPLETADO
-POST-GO-LIVE.1                           ✅ COMPLETADO
+GO-LIVE.0                                âœ… COMPLETADO
+POST-GO-LIVE.1                           âœ… COMPLETADO
 
 POST-GO-LIVE.2
- ├── 2.0 Preparación                     ✅ COMPLETADO
- ├── 2.1D1 Patients                      ✅ COMPLETADO
- ├── 2.1D2 Clinical Core                 ✅ COMPLETADO
- ├── 2.1D3 Scheduling & Financial        COMPLETADO
- ├── 2.1D4 Cross Validation              COMPLETADO
- ├── 2.1D5 Tenant Certification          D5-R REVIEW
- └── 2.2 Seed & Postman Tooling
-      ├── 2.2A Tenant Development Seed   CERTIFIED
-      └── 2.2B Postman Collection        STATIC VALIDATION; RUNNER DEFERRED
+ â”œâ”€â”€ 2.0 PreparaciÃ³n                     âœ… COMPLETADO
+ â”œâ”€â”€ 2.1D1 Patients                      âœ… COMPLETADO
+ â”œâ”€â”€ 2.1D2 Clinical Core                 âœ… COMPLETADO
+ â”œâ”€â”€ 2.1D3 Scheduling & Financial        COMPLETADO
+ â”œâ”€â”€ 2.1D4 Cross Validation              COMPLETADO
+ â”œâ”€â”€ 2.1D5 Tenant Certification          D5-R REVIEW
+ â””â”€â”€ 2.2 Seed & Postman Tooling
+      â”œâ”€â”€ 2.2A Tenant Development Seed   CERTIFIED
+      â””â”€â”€ 2.2B Postman Collection        STATIC VALIDATION; RUNNER DEFERRED
 
 POST-GO-LIVE.3
- ├── 3.0 Organization & Membership Contract CLOSED
- └── 3.1 Organization Administration Runtime NOT STARTED
-POST-GO-LIVE.4                           ⏳
-POST-GO-LIVE.5                           ⏳
-POST-GO-LIVE.6                           ⏳
-POST-GO-LIVE.7                           ⏳
+ â”œâ”€â”€ 3.0 Organization & Membership Contract CLOSED
+ â””â”€â”€ 3.1 Organization Administration Runtime IMPLEMENTED / IN REVIEW
+POST-GO-LIVE.4                           â³
+POST-GO-LIVE.5                           â³
+POST-GO-LIVE.6                           â³
+POST-GO-LIVE.7                           â³
 ```
 
 ---
@@ -281,8 +282,8 @@ controlled merge, post-merge verification, and an explicit closure decision.
 
 Completed:
 
-- ✓ Patients
-- ✓ Clinical Core
+- âœ“ Patients
+- âœ“ Clinical Core
 - Scheduling
 - Financial
 - Cross Validation
@@ -302,11 +303,11 @@ pending D5-R review, controlled merge, and post-merge verification.
 
 | Module                 | Tenant-Aware | Status             |
 | ---------------------- | ------------ | ------------------ |
-| Patients               | Yes          | ✅                 |
-| Case Files             | Yes          | ✅                 |
-| Workspace              | Yes          | ✅                 |
-| Session Notes          | Yes          | ✅                 |
-| Documents              | Yes          | ✅                 |
+| Patients               | Yes          | âœ…                 |
+| Case Files             | Yes          | âœ…                 |
+| Workspace              | Yes          | âœ…                 |
+| Session Notes          | Yes          | âœ…                 |
+| Documents              | Yes          | âœ…                 |
 | Appointments           | Yes          | Completed in 2.1D3 |
 | Financial Transactions | Yes          | Completed in 2.1D3 |
 | Financial Summary      | Yes          | Completed in 2.1D3 |
@@ -315,8 +316,8 @@ pending D5-R review, controlled merge, and post-merge verification.
 
 | Stage            | Status                    |
 | ---------------- | ------------------------- |
-| Patients         | ✅                        |
-| Clinical Core    | ✅                        |
+| Patients         | âœ…                        |
+| Clinical Core    | âœ…                        |
 | Scheduling       | Completed in 2.1D3        |
 | Financial        | Completed in 2.1D3        |
 | Cross Validation | Completed                 |
@@ -330,8 +331,8 @@ post-merge verification.
 
 | Stage | Status                    |
 | ----- | ------------------------- |
-| D1    | ✅                        |
-| D2    | ✅                        |
+| D1    | âœ…                        |
+| D2    | âœ…                        |
 | D3    | Completed                 |
 | D4    | Completed                 |
 | D5    | Published for D5-R review |
@@ -516,7 +517,9 @@ The next implementation sequence after closeout is:
 4. optional active-organization preference UX;
 5. organization-domain certification and later frontend work.
 
-POST-GO-LIVE.3.1 remains not started at the end of this closeout.
+POST-GO-LIVE.3.1 is now implemented locally and in review. It is not
+authorized for production until the draft PR, CI, and later review controls
+are complete.
 
 ## POST-GO-LIVE.3.1
 
@@ -525,23 +528,23 @@ Organization Administration Runtime is the next planned phase after the merged
 
 Status:
 
-- NOT STARTED
-- not implemented
+- IMPLEMENTED / IN REVIEW
+- no Prisma migration required
 - not authorized for production
 
-Preliminary objective:
+Implemented scope:
 
-- implement the administrative organization lifecycle already defined in 3.0
-
-Preliminary in scope:
-
-- administrative organization reads
-- controlled editable organization identity fields
-- organization suspension
-- organization reactivation
-- organization capabilities and tenant validation
-- HTTP semantics, audit hooks, tests, and documentation
-- migration only if organization runtime proves one is strictly necessary
+- administrative organization reads now support `ACTIVE` and `SUSPENDED`
+  organization state on organization-specific routes only
+- controlled editable organization identity fields:
+  `legalName`, `displayName`, `slug`, `timezone`, `locale`, `currency`
+- dedicated organization suspension endpoint
+- dedicated organization reactivation endpoint
+- existing `organization.manage` reused as the owner-only management capability
+- structured logging audit hooks for organization update, suspension, and
+  reactivation
+- unit, OpenAPI, and opt-in E2E coverage for the organization administration
+  runtime
 
 Preliminary out of scope:
 
@@ -553,13 +556,11 @@ Preliminary out of scope:
 - branding, plans, billing, and custom settings
 - production rollout or production backfill
 
-Pre-implementation gates:
+Compatibility notes:
 
-- exact endpoint inventory
-- capability mapping
-- DTO ownership and server-owned fields
-- lifecycle transition rules
-- HTTP contract and audit strategy
-- migration-needed decision
-- test strategy
-- D0 through D5 compatibility review
+- suspended organizations remain blocked from Patients, Clinical Core,
+  Documents, Appointments, and Finance until reactivated
+- membership historical re-entry remains deferred to POST-GO-LIVE.3.2
+- invitations expansion remains deferred to POST-GO-LIVE.3.3
+- no branding, billing, plans, settings, frontend switching UX, or production
+  rollout work is included

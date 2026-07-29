@@ -2,6 +2,40 @@
 
 ---
 
+# POST-GO-LIVE.3.1 Organization Administration Runtime
+
+## Status
+
+Implemented locally and in review as the first runtime phase after the merged
+POST-GO-LIVE.3.0 contract baseline.
+
+## Highlights
+
+* Added owner-only `PATCH /organizations/:organizationId` for editable
+  organization identity fields: `legalName`, `displayName`, `slug`,
+  `timezone`, `locale`, and `currency`.
+* Added owner-only `PATCH /organizations/:organizationId/status` for
+  `ACTIVE <-> SUSPENDED` lifecycle transitions.
+* Extended organization admin reads so `GET /organizations`,
+  `GET /organizations/current`, and `GET /organizations/:organizationId`
+  can surface suspended organizations for safe administrative recovery.
+* Preserved identity-first JWT and per-request tenant validation by adding a
+  route-scoped suspended-organization allowance only on organization
+  read/update/status routes.
+* Added structured organization-domain log events for organization update,
+  suspension, and reactivation.
+* Added unit, OpenAPI, and opt-in E2E coverage for the organization
+  administration runtime.
+
+## Compatibility
+
+* No Prisma schema changes.
+* No new migrations.
+* No frontend changes.
+* No infrastructure changes.
+* No production access.
+* No deployment or backfill activity.
+
 # POST-GO-LIVE.3.0 Closeout
 
 ## Status
