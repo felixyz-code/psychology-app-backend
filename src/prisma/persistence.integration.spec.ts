@@ -10,9 +10,10 @@ const runPersistenceTests =
 
 runPersistenceTests('PostgreSQL persistence integration', () => {
   let prisma: PrismaClient;
-  const databaseUrl = process.env.DATABASE_URL;
+  let databaseUrl: string;
 
   beforeAll(async () => {
+    databaseUrl = process.env.DATABASE_URL ?? '';
     if (!databaseUrl) {
       throw new Error('DATABASE_URL is required for persistence tests');
     }

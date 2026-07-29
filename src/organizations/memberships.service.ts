@@ -70,7 +70,7 @@ export class MembershipsService {
     if (role === MembershipRole.OWNER) {
       throw new ConflictException('Ownership transfer is not supported');
     }
-    return serializableTransaction(this.prisma, async (tx) => {
+    const result = await serializableTransaction(this.prisma, async (tx) => {
       const target = await this.findTarget(tx, membershipId, tenant);
       this.requireManage(
         tenant,
@@ -99,12 +99,9 @@ export class MembershipsService {
       if (updated.count !== 1) {
         throw new ConflictException('Membership changed concurrently');
       }
-      this.observability.organizationDomainEvent(
-        'membership_role_changed',
-        tenant,
-        'SUCCESS',
-        'ROLE_CHANGED',
-        {
+      return {
+        membership: await this.findTarget(tx, membershipId, tenant),
+        eventMetadata: {
           targetId: target.id,
           targetUserId: target.userId,
           previousRole: target.role,
@@ -112,9 +109,16 @@ export class MembershipsService {
           previousStatus: target.status,
           newStatus: target.status,
         },
-      );
-      return this.findTarget(tx, membershipId, tenant);
+      };
     });
+    this.observability.organizationDomainEvent(
+      'membership_role_changed',
+      tenant,
+      'SUCCESS',
+      'ROLE_CHANGED',
+      result.eventMetadata,
+    );
+    return result.membership;
   }
 
   async changeStatus(
@@ -124,7 +128,7 @@ export class MembershipsService {
     tenant: TenantContext,
   ) {
     this.assertTenantPath(organizationId, tenant);
-    return serializableTransaction(this.prisma, async (tx) => {
+    const result = await serializableTransaction(this.prisma, async (tx) => {
       const target = await this.findTarget(tx, membershipId, tenant);
       this.requireManage(
         tenant,
@@ -159,14 +163,9 @@ export class MembershipsService {
       if (updated.count !== 1) {
         throw new ConflictException('Membership changed concurrently');
       }
-      this.observability.organizationDomainEvent(
-        status === MembershipStatus.SUSPENDED
-          ? 'membership_suspended'
-          : 'membership_reactivated',
-        tenant,
-        'SUCCESS',
-        'STATUS_CHANGED',
-        {
+      return {
+        membership: await this.findTarget(tx, membershipId, tenant),
+        eventMetadata: {
           targetId: target.id,
           targetUserId: target.userId,
           previousRole: target.role,
@@ -174,9 +173,18 @@ export class MembershipsService {
           previousStatus: target.status,
           newStatus: status,
         },
-      );
-      return this.findTarget(tx, membershipId, tenant);
+      };
     });
+    this.observability.organizationDomainEvent(
+      status === MembershipStatus.SUSPENDED
+        ? 'membership_suspended'
+        : 'membership_reactivated',
+      tenant,
+      'SUCCESS',
+      'STATUS_CHANGED',
+      result.eventMetadata,
+    );
+    return result.membership;
   }
 
   async remove(
@@ -185,7 +193,7 @@ export class MembershipsService {
     tenant: TenantContext,
   ) {
     this.assertTenantPath(organizationId, tenant);
-    return serializableTransaction(this.prisma, async (tx) => {
+    const result = await serializableTransaction(this.prisma, async (tx) => {
       const target = await this.findTarget(tx, membershipId, tenant);
       this.requireManage(
         tenant,
@@ -210,12 +218,9 @@ export class MembershipsService {
       if (updated.count !== 1) {
         throw new ConflictException('Membership changed concurrently');
       }
-      this.observability.organizationDomainEvent(
-        'membership_removed',
-        tenant,
-        'SUCCESS',
-        'MEMBERSHIP_REMOVED',
-        {
+      return {
+        membership: { id: target.id, status: MembershipStatus.REVOKED },
+        eventMetadata: {
           targetId: target.id,
           targetUserId: target.userId,
           previousRole: target.role,
@@ -223,9 +228,16 @@ export class MembershipsService {
           previousStatus: target.status,
           newStatus: MembershipStatus.REVOKED,
         },
-      );
-      return { id: target.id, status: MembershipStatus.REVOKED };
+      };
     });
+    this.observability.organizationDomainEvent(
+      'membership_removed',
+      tenant,
+      'SUCCESS',
+      'MEMBERSHIP_REMOVED',
+      result.eventMetadata,
+    );
+    return result.membership;
   }
 
   async leave(organizationId: string, tenant: TenantContext) {
@@ -238,7 +250,7 @@ export class MembershipsService {
     ) {
       throw new ForbiddenException('Organization capability is required');
     }
-    return serializableTransaction(this.prisma, async (tx) => {
+    const result = await serializableTransaction(this.prisma, async (tx) => {
       const target = await this.findTarget(tx, tenant.membershipId, tenant);
       if (
         target.userId !== tenant.userId ||
@@ -259,12 +271,9 @@ export class MembershipsService {
       if (updated.count !== 1) {
         throw new ConflictException('Membership changed concurrently');
       }
-      this.observability.organizationDomainEvent(
-        'membership_removed',
-        tenant,
-        'SUCCESS',
-        'MEMBERSHIP_LEFT',
-        {
+      return {
+        membership: { id: target.id, status: MembershipStatus.REVOKED },
+        eventMetadata: {
           targetId: target.id,
           targetUserId: target.userId,
           previousRole: target.role,
@@ -272,9 +281,16 @@ export class MembershipsService {
           previousStatus: target.status,
           newStatus: MembershipStatus.REVOKED,
         },
-      );
-      return { id: target.id, status: MembershipStatus.REVOKED };
+      };
     });
+    this.observability.organizationDomainEvent(
+      'membership_removed',
+      tenant,
+      'SUCCESS',
+      'MEMBERSHIP_LEFT',
+      result.eventMetadata,
+    );
+    return result.membership;
   }
 
   private assertTenantPath(organizationId: string, tenant: TenantContext) {

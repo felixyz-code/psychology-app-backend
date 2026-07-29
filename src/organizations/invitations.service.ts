@@ -125,30 +125,42 @@ export class InvitationsService {
         },
       });
       if (!invitation) throw new NotFoundException('Invitation not found');
-      if (await this.materializeInvitationIfExpired(tx, invitation, tenant))
-        return { expired: true as const };
+      const expiredEvent = await this.materializeInvitationIfExpired(
+        tx,
+        invitation,
+      );
+      if (expiredEvent) return { expired: true as const, expiredEvent };
       const updated = await tx.organizationInvitation.updateMany({
         where: pendingInvitationWhere(invitation.id),
         data: { revokedAt: new Date() },
       });
       if (updated.count !== 1)
         throw new ConflictException('Invitation is no longer pending');
-      this.observability.organizationDomainEvent(
-        'invitation_revoked',
-        tenant,
-        'SUCCESS',
-        'INVITATION_REVOKED',
-        {
-          targetId: invitation.id,
-        },
-      );
       return {
         expired: false as const,
         value: { id: invitation.id, revokedAt: new Date() },
+        eventMetadata: {
+          targetId: invitation.id,
+        },
       };
     });
-    if (result.expired)
+    if (result.expired) {
+      this.observability.organizationDomainEvent(
+        'invitation_expired',
+        tenant,
+        'SUCCESS',
+        'INVITATION_EXPIRED',
+        result.expiredEvent,
+      );
       throw new ConflictException('Invitation is no longer pending');
+    }
+    this.observability.organizationDomainEvent(
+      'invitation_revoked',
+      tenant,
+      'SUCCESS',
+      'INVITATION_REVOKED',
+      result.eventMetadata,
+    );
     return result.value;
   }
 
@@ -201,8 +213,17 @@ export class InvitationsService {
         membershipId: 'not-applicable',
         organizationId: invitation.organizationId,
       };
-      if (await this.materializeInvitationIfExpired(tx, invitation, tenant))
-        return { expired: true as const };
+      const expiredEvent = await this.materializeInvitationIfExpired(
+        tx,
+        invitation,
+      );
+      if (expiredEvent) {
+        return {
+          expired: true as const,
+          expiredTenant: tenant,
+          expiredEvent,
+        };
+      }
       if (action === 'reject') {
         const updated = await tx.organizationInvitation.updateMany({
           where: pendingInvitationWhere(invitation.id),
@@ -210,20 +231,17 @@ export class InvitationsService {
         });
         if (updated.count !== 1)
           throw new ConflictException('Invitation is no longer pending');
-        this.observability.organizationDomainEvent(
-          'invitation_rejected',
-          tenant,
-          'SUCCESS',
-          'INVITATION_REJECTED',
-          {
+        return {
+          expired: false as const,
+          value: { id: invitation.id, rejectedAt: new Date() },
+          event: 'invitation_rejected' as const,
+          eventTenant: tenant,
+          reasonCode: 'INVITATION_REJECTED' as const,
+          eventMetadata: {
             targetId: invitation.id,
             targetUserId: recipient.id,
             newRole: invitation.role,
           },
-        );
-        return {
-          expired: false as const,
-          value: { id: invitation.id, rejectedAt: new Date() },
         };
       }
       const existingMembership = await tx.organizationMembership.findFirst({
@@ -266,27 +284,42 @@ export class InvitationsService {
             joinedAt: true,
           },
         });
-        this.observability.organizationDomainEvent(
-          'invitation_accepted',
-          tenant,
-          'SUCCESS',
-          'INVITATION_ACCEPTED',
-          {
+        return {
+          expired: false as const,
+          value: membership,
+          event: 'invitation_accepted' as const,
+          eventTenant: tenant,
+          reasonCode: 'INVITATION_ACCEPTED' as const,
+          eventMetadata: {
             targetId: invitation.id,
             targetUserId: recipient.id,
             newRole: invitation.role,
             newStatus: MembershipStatus.ACTIVE,
           },
-        );
-        return { expired: false as const, value: membership };
+        };
       } catch (error) {
         if (isUniqueViolation(error))
           throw new ConflictException('Membership already exists');
         throw error;
       }
     });
-    if (result.expired)
+    if (result.expired) {
+      this.observability.organizationDomainEvent(
+        'invitation_expired',
+        result.expiredTenant,
+        'SUCCESS',
+        'INVITATION_EXPIRED',
+        result.expiredEvent,
+      );
       throw new ConflictException('Invitation is no longer pending');
+    }
+    this.observability.organizationDomainEvent(
+      result.event,
+      result.eventTenant,
+      'SUCCESS',
+      result.reasonCode,
+      result.eventMetadata,
+    );
     return result.value;
   }
 
@@ -318,27 +351,19 @@ export class InvitationsService {
       revokedAt: Date | null;
       expiredAt: Date | null;
     },
-    tenant: { userId: string; membershipId: string; organizationId: string },
   ) {
     if (invitation.expiresAt > new Date() || hasTerminalState(invitation))
-      return false;
+      return null;
     const updated = await tx.organizationInvitation.updateMany({
       where: pendingInvitationWhere(invitation.id),
       data: { expiredAt: new Date() },
     });
     if (updated.count === 1) {
-      this.observability.organizationDomainEvent(
-        'invitation_expired',
-        tenant,
-        'SUCCESS',
-        'INVITATION_EXPIRED',
-        {
-          targetId: invitation.id,
-        },
-      );
-      return true;
+      return {
+        targetId: invitation.id,
+      };
     }
-    return false;
+    return null;
   }
 
   private assertTenantPath(organizationId: string, tenant: TenantContext) {

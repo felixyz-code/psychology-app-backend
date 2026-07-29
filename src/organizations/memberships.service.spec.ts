@@ -1,5 +1,14 @@
-import { ForbiddenException, NotFoundException } from '@nestjs/common';
-import { MembershipRole, MembershipStatus, UserRole } from '@prisma/client';
+import {
+  ConflictException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
+import {
+  MembershipRole,
+  MembershipStatus,
+  Prisma,
+  UserRole,
+} from '@prisma/client';
 import {
   TenantResolutionMode,
   type TenantContext,
@@ -114,5 +123,58 @@ describe('MembershipsService policy boundary', () => {
         tenant,
       ),
     ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('does not emit success events when a membership transaction aborts after the write callback completes', async () => {
+    const targetId = '00000000-0000-4000-8000-000000000004';
+    const targetUserId = '00000000-0000-4000-8000-000000000005';
+    let findFirstCalls = 0;
+    const findFirst = jest.fn().mockImplementation(() => {
+      findFirstCalls += 1;
+      return Promise.resolve({
+        id: targetId,
+        userId: targetUserId,
+        role: MembershipRole.PSYCHOLOGIST,
+        status:
+          findFirstCalls % 2 === 1
+            ? MembershipStatus.ACTIVE
+            : MembershipStatus.SUSPENDED,
+      });
+    });
+    const tx = {
+      organizationMembership: {
+        findFirst,
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+    };
+    const observability = {
+      organizationDomainEvent: jest.fn(),
+    };
+    const prisma = {
+      $transaction: jest.fn(
+        async (work: (client: typeof tx) => Promise<unknown>) => {
+          await work(tx);
+          throw new Prisma.PrismaClientKnownRequestError('serialization', {
+            code: 'P2034',
+            clientVersion: 'test',
+          });
+        },
+      ),
+    } as never;
+    const service = new MembershipsService(
+      prisma,
+      { decisionFor: jest.fn().mockReturnValue('ALLOW') } as never,
+      observability as never,
+    );
+
+    await expect(
+      service.changeStatus(
+        tenant.organizationId,
+        targetId,
+        MembershipStatus.SUSPENDED,
+        { ...tenant, organizationRole: MembershipRole.OWNER },
+      ),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(observability.organizationDomainEvent).not.toHaveBeenCalled();
   });
 });

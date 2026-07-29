@@ -218,6 +218,61 @@ describe('InvitationsService', () => {
       ).rejects.toBeInstanceOf(ConflictException);
     },
   );
+
+  it('does not emit success events when invitation acceptance aborts after the write callback completes', async () => {
+    const recipientId = '00000000-0000-4000-8000-000000000004';
+    const observability = { organizationDomainEvent: jest.fn() };
+    const tx = {
+      organizationInvitation: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: '00000000-0000-4000-8000-000000000005',
+          organizationId: tenant.organizationId,
+          normalizedEmail: 'recipient@example.test',
+          invitedUserId: recipientId,
+          role: MembershipRole.PSYCHOLOGIST,
+          expiresAt: new Date('2026-08-05T03:00:00.000Z'),
+          acceptedAt: null,
+          rejectedAt: null,
+          revokedAt: null,
+          expiredAt: null,
+        }),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+      user: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: recipientId,
+          email: 'recipient@example.test',
+        }),
+      },
+      organizationMembership: {
+        findFirst: jest.fn().mockResolvedValue(null),
+        create: jest.fn().mockResolvedValue({
+          id: '00000000-0000-4000-8000-000000000006',
+          organizationId: tenant.organizationId,
+          role: MembershipRole.PSYCHOLOGIST,
+          status: 'ACTIVE',
+          joinedAt: new Date('2026-07-29T03:00:00.000Z'),
+        }),
+      },
+    };
+    const prisma = {
+      $transaction: jest.fn(
+        async (work: (client: typeof tx) => Promise<unknown>) => {
+          await work(tx);
+          throw new Prisma.PrismaClientKnownRequestError('serialization', {
+            code: 'P2034',
+            clientVersion: 'test',
+          });
+        },
+      ),
+    } as never;
+    const service = new InvitationsService(prisma, observability as never);
+
+    await expect(
+      service.accept('A'.repeat(43), { id: recipientId } as never),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(observability.organizationDomainEvent).not.toHaveBeenCalled();
+  });
 });
 
 function hasMaterializedExpiration(
