@@ -1,5 +1,62 @@
 # Decision Log
 
+## ADR-POST-GO-LIVE.3.0: Organization Administration Starts from a Partial Runtime
+
+### Status
+
+Accepted for POST-GO-LIVE.3.0 as a documentation-only audit and contract
+decision. No runtime implementation, schema change, migration, production
+access, deployment, or backfill is included.
+
+### Decision
+
+Treat the organization domain as partially implemented, not as a blank future
+surface.
+
+The current backend already contains:
+
+- organization read routes;
+- membership administration routes;
+- invitation lifecycle routes;
+- multi-membership tenant selection;
+- last-active-owner protection;
+- digest-only invitation token persistence;
+- acceptance-time membership creation.
+
+POST-GO-LIVE.3 therefore standardizes and extends that real baseline instead of
+re-describing it as hypothetical. The 3.0 contract also fixes the active
+organization posture: the source of truth remains per-request validated tenant
+selection, not a JWT organization claim or mutable server-side tenant session.
+
+### Reason
+
+The repository runtime and OpenAPI surface already exceed the older documents
+that still described 2.1C2 routes as unimplemented. Starting 3.0 from the real
+state reduces review ambiguity, prevents contract drift, and makes the next
+implementation phases focus on the actual gaps:
+
+- organization create/update/lifecycle;
+- ownership transfer;
+- historical membership re-entry;
+- invitation resend;
+- optional active-organization preference UX.
+
+### Consequences
+
+POST-GO-LIVE.3.0 records the current organization-domain runtime as an audited
+baseline and defines future behavior without weakening D0 through D5 tenant
+boundaries. The contract allows multiple active owners, keeps organization
+selection stateless and request-validated, forbids generic OWNER grants through
+role change or invitation, preserves removal as historical state, and treats
+re-entry after removal as a schema-gated historical-lifecycle decision rather
+than a silent reactivation.
+
+### Boundary
+
+No runtime route, DTO, service, controller, Prisma schema, migration, seed,
+frontend behavior, infrastructure behavior, deployment step, production
+operation, or tenant data mutation is approved by this decision.
+
 ## ADR-POST-GO-LIVE.2.2: Seed Certified and Postman Runner Deferred
 
 ### Status

@@ -34,6 +34,13 @@ POST-GO-LIVE.2.2B Postman Collection Refresh implemented and statically validate
 Postman functional runner certification deferred
 ```
 
+Organization administration checkpoint:
+
+```text
+POST-GO-LIVE.3.0 Organization & Membership Administration Contract documented
+Implementation remains deferred pending review and later execution phases
+```
+
 Current priorities:
 
 - Backend stabilization
@@ -62,7 +69,8 @@ POST-GO-LIVE.2
       ├── 2.2A Tenant Development Seed   CERTIFIED
       └── 2.2B Postman Collection        STATIC VALIDATION; RUNNER DEFERRED
 
-POST-GO-LIVE.3                           NEXT ELIGIBLE PHASE
+POST-GO-LIVE.3
+ └── 3.0 Organization & Membership Contract DOCUMENTED; REVIEW PENDING
 POST-GO-LIVE.4                           ⏳
 POST-GO-LIVE.5                           ⏳
 POST-GO-LIVE.6                           ⏳
@@ -469,5 +477,29 @@ published as a development artifact with that limitation explicit. It does not
 replace D1-D5 certification, PostgreSQL E2E, Jest regression, or OpenAPI
 contract tests.
 
-POST-GO-LIVE.3 remains the next eligible phase, subject to review acceptance of
-the deferred Postman runner risk.
+## POST-GO-LIVE.3.0
+
+Organization & Membership Administration Contract is the documentation-only
+entry phase for POST-GO-LIVE.3.
+
+It:
+
+- audits the real backend organization-domain baseline;
+- distinguishes current runtime behavior from missing lifecycle features;
+- defines the normative contract for organization identity and lifecycle,
+  membership lifecycle, ownership, invitations, and active organization
+  selection;
+- preserves the D0 through D5 tenant-aware platform invariants;
+- introduces no runtime code, schema change, migration, frontend change,
+  infrastructure change, production access, deployment, or backfill.
+
+The next implementation sequence after review is:
+
+1. organization creation and identity administration;
+2. membership lifecycle hardening and historical re-entry;
+3. invitation resend and ownership transfer;
+4. optional active-organization preference UX;
+5. organization-domain certification and later frontend work.
+
+POST-GO-LIVE.3 remains implementation-deferred until the contract review is
+accepted.

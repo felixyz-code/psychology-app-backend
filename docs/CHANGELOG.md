@@ -2,6 +2,38 @@
 
 ---
 
+# POST-GO-LIVE.3.0 Organization & Membership Administration Contract
+
+## Status
+
+Documented for review as a documentation-only organization-domain audit and
+contract phase.
+
+## Highlights
+
+* Audited the real backend baseline for `Organization`,
+  `OrganizationMembership`, `OrganizationInvitation`, `Auth`, `TenantContext`,
+  runtime capabilities, and tenant-aware tooling.
+* Recorded that the organization domain is already partially implemented in the
+  current backend through organization read routes, membership administration,
+  invitation lifecycle routes, and owner-protection invariants.
+* Published the normative POST-GO-LIVE.3.0 contract in
+  `POST_GO_LIVE_3_0_ORGANIZATION_MEMBERSHIP_ADMINISTRATION_CONTRACT.md`.
+* Published the active organization selection ADR in
+  `adr/ADR-ORGANIZATION-ACTIVE-SELECTION.md`.
+* Corrected source-of-truth documentation that still described the 2.1C2
+  organization routes as unimplemented.
+
+## Compatibility
+
+* No runtime code changes.
+* No Prisma schema changes.
+* No new migrations.
+* No frontend changes.
+* No infrastructure changes.
+* No production access.
+* No deployment or backfill activity.
+
 # POST-GO-LIVE.2.1D5 Tenant Platform Certification
 
 ## Status

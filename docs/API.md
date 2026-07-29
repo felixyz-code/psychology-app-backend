@@ -6,10 +6,12 @@
 
 This document defines the public REST API contract exposed by the backend.
 
-> POST-GO-LIVE.2.1C0 note: organization, membership, and invitation routes are
-> not implemented or publicly available. Their proposed routes are recorded in
-> `TENANT_ENDPOINT_SCOPE_MATRIX.md` pending human decisions and 2.1C1 schema
-> work; this document does not advertise them as current API.
+> POST-GO-LIVE.3.0 note: organization, membership, and invitation routes are
+> implemented in the current backend baseline. Their broader lifecycle,
+> ownership, and active-organization evolution is governed by
+> `POST_GO_LIVE_3_0_ORGANIZATION_MEMBERSHIP_ADMINISTRATION_CONTRACT.md`.
+> This document records the current API surface; it does not claim that every
+> future 3.x organization-domain operation is already implemented.
 
 Business rules are documented in PROJECT.md.
 
