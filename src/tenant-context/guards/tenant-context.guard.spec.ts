@@ -26,7 +26,7 @@ describe('TenantContextGuard', () => {
     ambiguousContext: jest.Mock;
     missingRequiredContext: jest.Mock;
   };
-  let metadata: Record<string, boolean | undefined>;
+  let metadata: Record<string, boolean | OrganizationStatus[] | undefined>;
   let guard: TenantContextGuard;
 
   beforeEach(() => {

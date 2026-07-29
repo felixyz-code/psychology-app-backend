@@ -57,27 +57,27 @@ Current priorities:
 # Phase Status
 
 ```text
-GO-LIVE.0                                âœ… COMPLETADO
-POST-GO-LIVE.1                           âœ… COMPLETADO
+GO-LIVE.0                                COMPLETADO
+POST-GO-LIVE.1                           COMPLETADO
 
 POST-GO-LIVE.2
- â”œâ”€â”€ 2.0 PreparaciÃ³n                     âœ… COMPLETADO
- â”œâ”€â”€ 2.1D1 Patients                      âœ… COMPLETADO
- â”œâ”€â”€ 2.1D2 Clinical Core                 âœ… COMPLETADO
- â”œâ”€â”€ 2.1D3 Scheduling & Financial        COMPLETADO
- â”œâ”€â”€ 2.1D4 Cross Validation              COMPLETADO
- â”œâ”€â”€ 2.1D5 Tenant Certification          D5-R REVIEW
- â””â”€â”€ 2.2 Seed & Postman Tooling
-      â”œâ”€â”€ 2.2A Tenant Development Seed   CERTIFIED
-      â””â”€â”€ 2.2B Postman Collection        STATIC VALIDATION; RUNNER DEFERRED
+ |- 2.0 Preparacion                      COMPLETADO
+ |- 2.1D1 Patients                       COMPLETADO
+ |- 2.1D2 Clinical Core                  COMPLETADO
+ |- 2.1D3 Scheduling & Financial         COMPLETADO
+ |- 2.1D4 Cross Validation               COMPLETADO
+ |- 2.1D5 Tenant Certification           D5-R REVIEW
+ `- 2.2 Seed & Postman Tooling
+    |- 2.2A Tenant Development Seed      CERTIFIED
+    `- 2.2B Postman Collection           STATIC VALIDATION; RUNNER DEFERRED
 
 POST-GO-LIVE.3
- â”œâ”€â”€ 3.0 Organization & Membership Contract CLOSED
- â””â”€â”€ 3.1 Organization Administration Runtime IMPLEMENTED / IN REVIEW
-POST-GO-LIVE.4                           â³
-POST-GO-LIVE.5                           â³
-POST-GO-LIVE.6                           â³
-POST-GO-LIVE.7                           â³
+ |- 3.0 Organization & Membership Contract CLOSED
+ `- 3.1 Organization Administration Runtime IMPLEMENTED / IN REVIEW
+POST-GO-LIVE.4                           PENDING
+POST-GO-LIVE.5                           PENDING
+POST-GO-LIVE.6                           PENDING
+POST-GO-LIVE.7                           PENDING
 ```
 
 ---
@@ -282,8 +282,8 @@ controlled merge, post-merge verification, and an explicit closure decision.
 
 Completed:
 
-- âœ“ Patients
-- âœ“ Clinical Core
+- Patients
+- Clinical Core
 - Scheduling
 - Financial
 - Cross Validation
@@ -303,11 +303,11 @@ pending D5-R review, controlled merge, and post-merge verification.
 
 | Module                 | Tenant-Aware | Status             |
 | ---------------------- | ------------ | ------------------ |
-| Patients               | Yes          | âœ…                 |
-| Case Files             | Yes          | âœ…                 |
-| Workspace              | Yes          | âœ…                 |
-| Session Notes          | Yes          | âœ…                 |
-| Documents              | Yes          | âœ…                 |
+| Patients               | Yes          | Completed          |
+| Case Files             | Yes          | Completed          |
+| Workspace              | Yes          | Completed          |
+| Session Notes          | Yes          | Completed          |
+| Documents              | Yes          | Completed          |
 | Appointments           | Yes          | Completed in 2.1D3 |
 | Financial Transactions | Yes          | Completed in 2.1D3 |
 | Financial Summary      | Yes          | Completed in 2.1D3 |
@@ -316,8 +316,8 @@ pending D5-R review, controlled merge, and post-merge verification.
 
 | Stage            | Status                    |
 | ---------------- | ------------------------- |
-| Patients         | âœ…                        |
-| Clinical Core    | âœ…                        |
+| Patients         | Completed                 |
+| Clinical Core    | Completed                 |
 | Scheduling       | Completed in 2.1D3        |
 | Financial        | Completed in 2.1D3        |
 | Cross Validation | Completed                 |
@@ -331,8 +331,8 @@ post-merge verification.
 
 | Stage | Status                    |
 | ----- | ------------------------- |
-| D1    | âœ…                        |
-| D2    | âœ…                        |
+| D1    | Completed                 |
+| D2    | Completed                 |
 | D3    | Completed                 |
 | D4    | Completed                 |
 | D5    | Published for D5-R review |

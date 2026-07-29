@@ -79,39 +79,43 @@ export class OrganizationsService {
     }
 
     try {
-      return await serializableTransaction(this.prisma, async (tx) => {
-        const organization = await this.findScopedOrThrowTx(
-          tx,
-          organizationId,
-          tenant,
-        );
-        const updated = await tx.organization.updateMany({
-          where: {
-            id: organization.id,
-            status: organization.status,
-            updatedAt: organization.updatedAt,
-          },
-          data,
-        });
-        if (updated.count !== 1) {
-          throw new ConflictException('Organization changed concurrently');
-        }
-        const refreshed = await tx.organization.findUnique({
-          where: { id: organization.id },
-          select: organizationAdminSelect,
-        });
-        if (!refreshed) {
-          throw new ConflictException('Organization changed concurrently');
-        }
-        this.observability.organizationDomainEvent(
-          'organization_updated',
-          tenant,
-          'SUCCESS',
-          'ORGANIZATION_UPDATED',
-          organization.id,
-        );
-        return refreshed;
-      });
+      const refreshed = await serializableTransaction(
+        this.prisma,
+        async (tx) => {
+          const organization = await this.findScopedOrThrowTx(
+            tx,
+            organizationId,
+            tenant,
+          );
+          const updated = await tx.organization.updateMany({
+            where: {
+              id: organization.id,
+              status: organization.status,
+              updatedAt: organization.updatedAt,
+            },
+            data,
+          });
+          if (updated.count !== 1) {
+            throw new ConflictException('Organization changed concurrently');
+          }
+          const refreshed = await tx.organization.findUnique({
+            where: { id: organization.id },
+            select: organizationAdminSelect,
+          });
+          if (!refreshed) {
+            throw new ConflictException('Organization changed concurrently');
+          }
+          return refreshed;
+        },
+      );
+      this.observability.organizationDomainEvent(
+        'organization_updated',
+        tenant,
+        'SUCCESS',
+        'ORGANIZATION_UPDATED',
+        refreshed.id,
+      );
+      return refreshed;
     } catch (error) {
       if (isUniqueViolation(error)) {
         throw new ConflictException('Organization slug is already in use');
@@ -129,7 +133,7 @@ export class OrganizationsService {
       throw new NotFoundException('Organization not found');
     }
 
-    return serializableTransaction(this.prisma, async (tx) => {
+    const refreshed = await serializableTransaction(this.prisma, async (tx) => {
       const organization = await this.findScopedOrThrowTx(
         tx,
         organizationId,
@@ -156,19 +160,20 @@ export class OrganizationsService {
       if (!refreshed) {
         throw new ConflictException('Organization changed concurrently');
       }
-      this.observability.organizationDomainEvent(
-        dto.status === OrganizationStatus.SUSPENDED
-          ? 'organization_suspended'
-          : 'organization_reactivated',
-        tenant,
-        'SUCCESS',
-        dto.status === OrganizationStatus.SUSPENDED
-          ? 'ORGANIZATION_SUSPENDED'
-          : 'ORGANIZATION_REACTIVATED',
-        organization.id,
-      );
       return refreshed;
     });
+    this.observability.organizationDomainEvent(
+      dto.status === OrganizationStatus.SUSPENDED
+        ? 'organization_suspended'
+        : 'organization_reactivated',
+      tenant,
+      'SUCCESS',
+      dto.status === OrganizationStatus.SUSPENDED
+        ? 'ORGANIZATION_SUSPENDED'
+        : 'ORGANIZATION_REACTIVATED',
+      refreshed.id,
+    );
+    return refreshed;
   }
 
   private async findScopedOrThrow(

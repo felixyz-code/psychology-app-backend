@@ -115,4 +115,53 @@ describe('OrganizationsService', () => {
       ),
     ).rejects.toBeInstanceOf(ConflictException);
   });
+
+  it('does not emit success events when the transaction aborts after the write callback completes', async () => {
+    const organization = {
+      id: tenant.organizationId,
+      slug: 'tenant-a',
+      legalName: 'Tenant A Legal',
+      displayName: 'Tenant A',
+      status: OrganizationStatus.ACTIVE,
+      timezone: 'UTC',
+      locale: 'es-MX',
+      currency: 'MXN',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    const tx = {
+      organization: {
+        findFirst: jest.fn().mockResolvedValue(organization),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+        findUnique: jest.fn().mockResolvedValue({
+          ...organization,
+          status: OrganizationStatus.SUSPENDED,
+        }),
+      },
+    };
+    const observability = {
+      organizationDomainEvent: jest.fn(),
+    };
+    const prisma = {
+      $transaction: jest.fn(
+        async (work: (client: typeof tx) => Promise<unknown>) => {
+          await work(tx);
+          throw new Prisma.PrismaClientKnownRequestError('serialization', {
+            code: 'P2034',
+            clientVersion: 'test',
+          });
+        },
+      ),
+    } as never;
+    const service = new OrganizationsService(prisma, observability as never);
+
+    await expect(
+      service.changeStatus(
+        tenant.organizationId,
+        { status: OrganizationStatus.SUSPENDED },
+        tenant,
+      ),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(observability.organizationDomainEvent).not.toHaveBeenCalled();
+  });
 });

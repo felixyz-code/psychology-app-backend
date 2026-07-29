@@ -1,11 +1,16 @@
 import { OrganizationStatus } from '@prisma/client';
 import { ApiProperty } from '@nestjs/swagger';
-import { IsEnum } from 'class-validator';
+import { IsIn } from 'class-validator';
+
+const ADMINISTRABLE_ORGANIZATION_STATUSES = [
+  OrganizationStatus.ACTIVE,
+  OrganizationStatus.SUSPENDED,
+] as const;
 
 export class ChangeOrganizationStatusDto {
   @ApiProperty({
-    enum: [OrganizationStatus.ACTIVE, OrganizationStatus.SUSPENDED],
+    enum: ADMINISTRABLE_ORGANIZATION_STATUSES,
   })
-  @IsEnum(OrganizationStatus)
+  @IsIn(ADMINISTRABLE_ORGANIZATION_STATUSES)
   status: 'ACTIVE' | 'SUSPENDED';
 }

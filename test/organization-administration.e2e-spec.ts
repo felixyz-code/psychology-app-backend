@@ -213,6 +213,13 @@ describeCertification('Organization administration runtime', () => {
       .expect(400);
 
     await request(app.getHttpServer())
+      .patch(`/organizations/${organizationAlphaId}/status`)
+      .set('Authorization', ownerToken)
+      .set('X-Organization-Id', organizationAlphaId)
+      .send({ status: 'ARCHIVED' })
+      .expect(400);
+
+    await request(app.getHttpServer())
       .get(`/organizations/${organizationBetaId}`)
       .set('Authorization', ownerToken)
       .set('X-Organization-Id', organizationAlphaId)
