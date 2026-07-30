@@ -19,6 +19,7 @@ export type OrganizationDomainEvent =
   | 'organization_reactivated'
   | 'invitation_created'
   | 'invitation_revoked'
+  | 'invitation_resent'
   | 'invitation_accepted'
   | 'invitation_rejected'
   | 'invitation_expired'
@@ -32,6 +33,8 @@ export type OrganizationDomainEvent =
 type OrganizationDomainMetadata = {
   targetId?: string;
   targetUserId?: string;
+  previousInvitationId?: string;
+  newInvitationId?: string;
   previousRole?: string;
   newRole?: string;
   previousStatus?: string;

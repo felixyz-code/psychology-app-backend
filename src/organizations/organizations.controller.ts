@@ -3,6 +3,7 @@ import {
   Controller,
   Delete,
   Get,
+  HttpCode,
   Param,
   ParseUUIDPipe,
   Patch,
@@ -15,8 +16,10 @@ import {
   ApiBadRequestResponse,
   ApiBearerAuth,
   ApiConflictResponse,
+  ApiCreatedResponse,
   ApiForbiddenResponse,
   ApiHeader,
+  ApiOkResponse,
   ApiNotFoundResponse,
   ApiOperation,
   ApiParam,
@@ -37,6 +40,11 @@ import { ChangeOrganizationStatusDto } from './dto/change-organization-status.dt
 import { ChangeMembershipRoleDto } from './dto/change-membership-role.dto';
 import { ChangeMembershipStatusDto } from './dto/change-membership-status.dto';
 import { CreateInvitationDto } from './dto/create-invitation.dto';
+import {
+  InvitationIssueResponseDto,
+  InvitationListItemDto,
+  InvitationRevokeResponseDto,
+} from './dto/invitation-response.dto';
 import { UpdateOrganizationDto } from './dto/update-organization.dto';
 import { InvitationsService } from './invitations.service';
 import { MembershipsService } from './memberships.service';
@@ -225,6 +233,7 @@ export class OrganizationsController {
     summary:
       'List invitation lifecycle metadata without recipient or token data',
   })
+  @ApiOkResponse({ type: InvitationListItemDto, isArray: true })
   invitationsList(
     @Param('organizationId', ParseUUIDPipe) organizationId: string,
     @CurrentTenant(true) tenant: TenantContext,
@@ -237,6 +246,12 @@ export class OrganizationsController {
   @UseGuards(CapabilitiesGuard)
   @RequireCapabilities(OrganizationCapability.INVITATION_CREATE)
   @ApiOperation({ summary: 'Create a seven-day organization invitation' })
+  @ApiCreatedResponse({ type: InvitationIssueResponseDto })
+  @ApiBadRequestResponse({ description: 'Invalid payload or invite role' })
+  @ApiConflictResponse({
+    description:
+      'Pending invitation exists or the known recipient already has a non-terminal membership',
+  })
   createInvitation(
     @Param('organizationId', ParseUUIDPipe) organizationId: string,
     @Body() dto: CreateInvitationDto,
@@ -250,11 +265,36 @@ export class OrganizationsController {
   @UseGuards(CapabilitiesGuard)
   @RequireCapabilities(OrganizationCapability.INVITATION_REVOKE)
   @ApiOperation({ summary: 'Revoke a pending invitation' })
+  @HttpCode(200)
+  @ApiOkResponse({ type: InvitationRevokeResponseDto })
+  @ApiConflictResponse({
+    description: 'Invitation is no longer pending',
+  })
   revokeInvitation(
     @Param('organizationId', ParseUUIDPipe) organizationId: string,
     @Param('invitationId', ParseUUIDPipe) invitationId: string,
     @CurrentTenant(true) tenant: TenantContext,
   ) {
     return this.invitations.revoke(organizationId, invitationId, tenant);
+  }
+
+  @Post(':organizationId/invitations/:invitationId/resend')
+  @TenantRequired()
+  @UseGuards(CapabilitiesGuard)
+  @RequireCapabilities(OrganizationCapability.INVITATION_RESEND)
+  @ApiOperation({
+    summary: 'Replace a pending or expired invitation with a new token',
+  })
+  @ApiCreatedResponse({ type: InvitationIssueResponseDto })
+  @ApiConflictResponse({
+    description:
+      'Invitation is not eligible for resend or a non-terminal membership already exists',
+  })
+  resendInvitation(
+    @Param('organizationId', ParseUUIDPipe) organizationId: string,
+    @Param('invitationId', ParseUUIDPipe) invitationId: string,
+    @CurrentTenant(true) tenant: TenantContext,
+  ) {
+    return this.invitations.resend(organizationId, invitationId, tenant);
   }
 }

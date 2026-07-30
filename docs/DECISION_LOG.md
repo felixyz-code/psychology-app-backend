@@ -1,5 +1,37 @@
 # Decision Log
 
+## STATUS-POST-GO-LIVE.3.3: Invitation Administration Runtime Implemented
+
+### Status
+
+Accepted as a local runtime status update on branch
+`codex/post-go-live-3-3-invitation-administration-runtime` from integrated
+baseline `206371972ee10958f62f01434c9ac2f5631d4ec6`, pending draft PR review
+and CI on Wednesday, July 29, 2026.
+
+### Decision
+
+POST-GO-LIVE.3.3 is no longer deferred. The backend now implements:
+
+- derived invitation `logicalStatus` without a persisted enum or migration;
+- hardened administrative invitation listing with sanitized metadata only;
+- hardened creation with canonicalized email, no `OWNER` grant, and known
+  non-terminal membership rejection;
+- owner-only administrative revoke and owner-only resend through replacement
+  semantics and fresh token generation;
+- canonicalized accept/reject recipient binding with serializable
+  exactly-once terminal transitions;
+- post-commit structured organization-domain observability including
+  `invitation_resent`.
+
+### Consequences
+
+Invitation administration still preserves the original persistence model:
+`OrganizationInvitation` remains timestamp-derived, token persistence stays
+digest-only, and resend creates a new invitation row rather than mutating the
+old token in place. Ownership transfer, public token validation, real email
+delivery, audit-log persistence, and production rollout remain deferred.
+
 ## STATUS-POST-GO-LIVE.3.2: Membership Administration Runtime Implemented
 
 ### Status

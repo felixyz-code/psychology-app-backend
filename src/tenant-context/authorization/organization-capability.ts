@@ -16,6 +16,7 @@ export enum OrganizationCapability {
   INVITATION_READ = 'invitation.read',
   INVITATION_CREATE = 'invitation.create',
   INVITATION_REVOKE = 'invitation.revoke',
+  INVITATION_RESEND = 'invitation.resend',
   PATIENT_READ = 'patient.read',
   PATIENT_CREATE = 'patient.create',
   PATIENT_UPDATE = 'patient.update',

@@ -128,6 +128,7 @@ invariant. Unlisted or ambiguous capabilities remain DENY.
 | `invitation.read` | ALLOW | ALLOW | DENY | DENY | DENY | DENY | DENY |
 | `invitation.create` | ALLOW | ALLOW | DENY | DENY | DENY | DENY | DENY |
 | `invitation.revoke` | ALLOW | DENY | DENY | DENY | DENY | DENY | DENY |
+| `invitation.resend` | ALLOW | DENY | DENY | DENY | DENY | DENY | DENY |
 | `membership.read` | ALLOW | ALLOW | DENY | DENY | DENY | ALLOW | DENY |
 | `membership.change_role` | ALLOW | CONDITIONAL | DENY | DENY | DENY | DENY | DENY |
 | `membership.suspend` | ALLOW | CONDITIONAL | DENY | DENY | DENY | DENY | DENY |
@@ -138,19 +139,20 @@ invariant. Unlisted or ambiguous capabilities remain DENY.
 
 ADMIN may create invitations and administer a non-OWNER membership, but may not
 promote, degrade, suspend, remove, or otherwise mutate an OWNER; ADMIN may not
-self-elevate or grant a privilege above its own. Invitation revocation remains
-OWNER-only because it was not granted to ADMIN. AUDITOR may read memberships
-only through a sanitized projection with no complete email or clinical data. A
-rejected invitation is terminal and not reusable, but a new invitation to the
-same normalized email is allowed after rejection. No invite may grant OWNER and
-ownership transfer is outside the MVP. These entries do not change the existing
-typed catalog or its 2.1B resolver until 2.1C2 follows the required schema
-phase.
+self-elevate or grant a privilege above its own. Invitation revocation and
+invitation resend remain OWNER-only because they were not granted to ADMIN.
+AUDITOR may read memberships only through a sanitized projection with no
+complete email or clinical data. A rejected invitation is terminal and not
+reusable, but a new invitation to the same normalized email is allowed after
+rejection. No invite may grant OWNER and ownership transfer is outside the MVP.
+These entries do not change the existing typed catalog or its 2.1B resolver
+until 2.1C2 follows the required schema phase.
 
 ## POST-GO-LIVE.2.1C2 runtime mapping
 
-2.1C2 implements the invitation entries above as `invitation.read`,
-`invitation.create`, and `invitation.revoke`, and the membership entries as
+3.3 invitation administration runtime now implements the invitation entries
+above as `invitation.read`, `invitation.create`, `invitation.revoke`, and
+`invitation.resend`, while the membership entries remain
 `membership.manage_role`, `membership.suspend`, `membership.reactivate`, and
 `membership.remove`. Conditional ADMIN operations are enforced by the
 organization service after central resolution: the target must be non-OWNER,

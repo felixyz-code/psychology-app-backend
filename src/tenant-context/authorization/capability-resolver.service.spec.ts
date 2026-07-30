@@ -117,6 +117,45 @@ describe('CapabilityResolverService', () => {
     ).toBe(CapabilityDecision.DENY);
   });
 
+  it('keeps invitation revoke and resend owner-only while allowing admin list/create', () => {
+    expect(
+      resolver.resolve(
+        MembershipRole.OWNER,
+        OrganizationCapability.INVITATION_REVOKE,
+      ),
+    ).toBe(CapabilityDecision.ALLOW);
+    expect(
+      resolver.resolve(
+        MembershipRole.OWNER,
+        OrganizationCapability.INVITATION_RESEND,
+      ),
+    ).toBe(CapabilityDecision.ALLOW);
+    expect(
+      resolver.resolve(
+        MembershipRole.ADMIN,
+        OrganizationCapability.INVITATION_READ,
+      ),
+    ).toBe(CapabilityDecision.ALLOW);
+    expect(
+      resolver.resolve(
+        MembershipRole.ADMIN,
+        OrganizationCapability.INVITATION_CREATE,
+      ),
+    ).toBe(CapabilityDecision.ALLOW);
+    expect(
+      resolver.resolve(
+        MembershipRole.ADMIN,
+        OrganizationCapability.INVITATION_REVOKE,
+      ),
+    ).toBe(CapabilityDecision.DENY);
+    expect(
+      resolver.resolve(
+        MembershipRole.ADMIN,
+        OrganizationCapability.INVITATION_RESEND,
+      ),
+    ).toBe(CapabilityDecision.DENY);
+  });
+
   it('does not infer organizational capabilities from a legacy user role', () => {
     const observability = { capabilityDenied: jest.fn() };
     const policy = new OrganizationPolicyService(

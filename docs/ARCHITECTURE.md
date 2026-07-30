@@ -529,6 +529,20 @@ data-preparation operation without claiming to provide a business audit trail.
 Operational use, dry-run, apply confirmation and non-production rollback are
 documented in `SAAS_LEGACY_BACKFILL.md`.
 
+## Invitation Administration Runtime (POST-GO-LIVE.3.3)
+
+Invitation administration now stays entirely on the existing
+`OrganizationInvitation` persistence model. The runtime derives
+`logicalStatus` from timestamps plus wall-clock expiry, keeps token persistence
+hash-only through SHA-256 digests, and executes create/revoke/resend/accept/
+reject mutations inside serializable PostgreSQL transactions with conditional
+updates. Administrative resend is implemented as replacement semantics: the
+previous invitation becomes terminal and a new row with a new token digest is
+created atomically. Structured organization-domain observability emits
+`invitation_created`, `invitation_revoked`, `invitation_resent`,
+`invitation_accepted`, `invitation_rejected`, and `invitation_expired` only
+after commit and never logs tokens or digests.
+
 ## Tenant Context Foundation (POST-GO-LIVE.1.6)
 
 Authenticated requests now pass through `TenantContextGuard` after JWT

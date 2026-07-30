@@ -1487,12 +1487,43 @@ membership runtime and historical lifecycle without adding direct
 | POST | `/organizations/:organizationId/memberships/leave` | self only; last active OWNER denied |
 | GET/POST | `/organizations/:organizationId/invitations` | `invitation.read` / `invitation.create` |
 | POST | `/organizations/:organizationId/invitations/:invitationId/revoke` | `invitation.revoke` (OWNER) |
+| POST | `/organizations/:organizationId/invitations/:invitationId/resend` | `invitation.resend` (OWNER) |
 | POST | `/organization-invitations/:token/accept` | authenticated bound recipient |
 | POST | `/organization-invitations/:token/reject` | authenticated bound recipient |
 
 Invitation tokens are SHA-256 digested before persistence and are returned only
-once from creation outside production. API responses and logs never expose a
-digest; invitation list responses omit recipient email and token data.
+once from creation or resend outside production. API responses and logs never
+expose a digest; invitation list responses expose sanitized invitation metadata
+including recipient email, role, timestamps, and derived `logicalStatus`, but
+never the token or `tokenDigest`.
+
+POST-GO-LIVE.3.3 invitation administration runtime rules:
+
+- `GET /organizations/:organizationId/invitations` returns administrative
+  metadata only, ordered by `createdAt DESC, id DESC`, with
+  `logicalStatus = PENDING | ACCEPTED | REJECTED | REVOKED | EXPIRED` derived
+  from terminal timestamps and `expiresAt`.
+- `POST /organizations/:organizationId/invitations` rejects `OWNER`, reuses the
+  canonical invitation email normalization (`trim().toLocaleLowerCase('en-US')`)
+  across create/lookup/accept/reject/resend, materializes logically expired
+  duplicates before insert, and blocks known recipients that already have an
+  `INVITED`, `ACTIVE`, or `SUSPENDED` membership in that organization.
+- `POST /organizations/:organizationId/invitations/:invitationId/revoke`
+  performs administrative cancelation as `PENDING -> REVOKED` only; a logically
+  expired target materializes `EXPIRED` and returns conflict instead of
+  revoking.
+- `POST /organizations/:organizationId/invitations/:invitationId/resend`
+  performs replacement semantics: it revokes a pending invitation or
+  materializes an expired one, creates a new row with a new token digest and a
+  fresh seven-day TTL, and leaves the previous row in history.
+- `POST /organization-invitations/:token/accept` and
+  `POST /organization-invitations/:token/reject` both require JWT, skip tenant
+  selection, validate canonicalized recipient identity, and execute in
+  serializable transactions with conditional updates so concurrent terminal
+  replays fail safely.
+- Invitation resend invalidates the old token immediately because the original
+  row becomes terminal (`REVOKED` or `EXPIRED`) before the replacement row is
+  committed.
 
 POST-GO-LIVE.3.2 membership runtime rules:
 

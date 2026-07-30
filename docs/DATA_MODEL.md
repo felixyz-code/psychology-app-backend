@@ -656,6 +656,13 @@ timestamps null. Thus a future create flow must first materialize equivalent
 expired rows and then insert; rejection, revocation, acceptance, and
 materialized expiry each release the key.
 
+POST-GO-LIVE.3.3 uses that persisted shape without any schema change. Runtime
+responses derive `logicalStatus` with deterministic precedence
+`ACCEPTED > REJECTED > REVOKED > EXPIRED > PENDING`, administrative resend
+creates a replacement row instead of mutating the token in place, and
+acceptance after historical revocation still creates a brand new
+`OrganizationMembership` row rather than reopening history.
+
 The migration is safe for legacy rows: it derives `normalizedEmail` from the
 existing required `email`, then sets it `NOT NULL`. It aborts without exposing
 the value if a legacy email is blank, exceeds the canonical column limit, or

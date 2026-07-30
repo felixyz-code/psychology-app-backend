@@ -137,9 +137,10 @@ normative POST-GO-LIVE.3.0 contract for the organization domain after the D0
 through D5 tenant platform baseline and POST-GO-LIVE.2.2 tooling baseline. It
 is now merged and closed as a specification baseline on commit
 `7d897ec8db2c5d372fce0b4dc0eaf3bd3b1d4b13`; POST-GO-LIVE.3.1 and
-POST-GO-LIVE.3.2 are now implemented locally and remain in review as the
-current organization and membership administration runtime phases. The next
-planned organization-domain phase remains POST-GO-LIVE.3.3 and is not started.
+POST-GO-LIVE.3.2 are now closed and integrated as the organization and
+membership administration runtime baseline. POST-GO-LIVE.3.3 invitation
+administration runtime is now implemented locally and review pending on
+Wednesday, July 29, 2026.
 
 Additional ADRs for the organization domain include:
 
