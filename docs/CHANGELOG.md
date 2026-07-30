@@ -2,6 +2,35 @@
 
 ---
 
+# POST-GO-LIVE.3.4 Organization Ownership Transfer Runtime
+
+## Status
+
+Implemented locally and pending technical review, draft PR publication, and
+CI on Thursday, July 30, 2026.
+
+## Highlights
+
+* Added dedicated `POST /organizations/:organizationId/ownership-transfer`
+  instead of reusing generic role mutation.
+* Added the closed capability `ownership.transfer`, granted only to `OWNER`.
+* Implemented serializable compare-and-set ownership handoff that promotes the
+  target to `OWNER`, demotes the actor to `ADMIN`, and verifies the active
+  owner invariant before commit.
+* Added post-commit `organization_ownership_transferred` observability with
+  actor/source/target role metadata only.
+* Extended unit, OpenAPI, PostgreSQL E2E, and PostgreSQL concurrency coverage
+  for owner handoff and stale-actor conflict paths.
+
+## Compatibility
+
+* No Prisma schema change.
+* No migration or backfill.
+* No new owner-designation table or primary-owner column.
+* Generic membership role mutation still never grants `OWNER`.
+* Suspended organizations remain fail-closed for the ownership-transfer
+  operation itself.
+
 # POST-GO-LIVE.3.2 Membership Administration Runtime
 
 ## Status

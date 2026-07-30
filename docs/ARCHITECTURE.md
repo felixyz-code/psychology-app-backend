@@ -529,6 +529,29 @@ data-preparation operation without claiming to provide a business audit trail.
 Operational use, dry-run, apply confirmation and non-production rollback are
 documented in `SAAS_LEGACY_BACKFILL.md`.
 
+## Ownership Transfer Runtime (POST-GO-LIVE.3.4)
+
+Organization ownership transfer stays inside the existing
+`MembershipsService`; no new controller helper, table, background job, or
+primary-owner persistence is introduced. The dedicated
+`POST /organizations/:organizationId/ownership-transfer` route requires the
+closed capability `ownership.transfer`, resolved tenant context, and the
+existing JWT and tenant guards.
+
+The runtime executes one serializable PostgreSQL transaction that:
+
+1. revalidates the actor membership from the selected tenant context;
+2. rejects suspended organizations at the business-operation boundary;
+3. revalidates the target membership inside the same organization;
+4. promotes the target with compare-and-set `updateMany()`;
+5. demotes the source owner with compare-and-set `updateMany()`;
+6. verifies at least one active `OWNER` still exists before commit.
+
+Post-commit structured observability emits
+`organization_ownership_transferred` only after the transaction succeeds. This
+keeps the existing architecture rule that business audit telemetry must not
+claim success before durable commit.
+
 ## Invitation Administration Runtime (POST-GO-LIVE.3.3)
 
 Invitation administration now stays entirely on the existing

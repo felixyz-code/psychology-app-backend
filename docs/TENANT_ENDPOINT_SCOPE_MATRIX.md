@@ -19,6 +19,7 @@
 | GET | `/organizations/:organizationId` | Organizations | Yes | `organization.read` | Path must match resolved tenant; route allows `ACTIVE` or `SUSPENDED` organization state | 404 | Implemented | 3.1 runtime |
 | PATCH | `/organizations/:organizationId` | Organizations | Yes | `organization.manage` | Path must match resolved tenant; editable identity fields only; route allows `ACTIVE` or `SUSPENDED` organization state | 404 / 400 / 409 | Implemented | 3.1 runtime |
 | PATCH | `/organizations/:organizationId/status` | Organizations | Yes | `organization.manage` | OWNER-only lifecycle mutation; `ACTIVE <-> SUSPENDED` only; other tenant-aware modules remain blocked while suspended | 404 / 409 | Implemented | 3.1 runtime |
+| POST | `/organizations/:organizationId/ownership-transfer` | Memberships | Yes | `ownership.transfer` | Selected tenant; OWNER-only; dedicated owner handoff; route allows suspended organization resolution only to fail closed with deterministic `409`; target must be another `ACTIVE` non-OWNER membership in the same organization | 404 / 400 / 409 | Implemented | 3.4 runtime |
 | GET | `/organizations/:organizationId/memberships` | Memberships | Yes | `membership.read` | Selected tenant only; returns current non-terminal rows only; AUDITOR gets sanitized metadata and no complete emails | 404 | Implemented | 3.2 runtime |
 | POST | `/organizations/:organizationId/invitations` | Invitations | Yes | `invitation.create` | Selected tenant; OWNER/ADMIN; no OWNER grant; materializes expired duplicates before insert; known non-terminal memberships fail closed | 404 / 409 | Implemented | 3.3 runtime |
 | GET | `/organizations/:organizationId/invitations` | Invitations | Yes | `invitation.read` | Selected tenant; sanitized metadata only; logical status is derived from timestamps and clock | 404 | Implemented | 3.3 runtime |
@@ -128,6 +129,21 @@ invitation surfaces with:
 This does not add a public `POST /memberships`, does not allow suspended
 organizations on membership routes, and does not permit reactivating a revoked
 membership row in place.
+
+## POST-GO-LIVE.3.4 implementation status
+
+Ownership transfer runtime now adds one dedicated owner handoff route:
+
+- `POST /organizations/:organizationId/ownership-transfer` with the new
+  `ownership.transfer` capability;
+- serializable compare-and-set promotion/demotion using the existing
+  `OrganizationMembership` rows only;
+- deterministic conflict handling for suspended organizations, stale actors,
+  self-targeting, inactive targets, owner targets, and lost concurrency.
+
+This does not broaden generic membership role mutation, does not allow ADMIN
+to grant `OWNER`, and does not introduce a schema change or primary-owner
+table.
 
 ## POST-GO-LIVE.2.1D4 integrated certification status
 

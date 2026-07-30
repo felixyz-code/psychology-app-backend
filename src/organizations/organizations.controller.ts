@@ -45,6 +45,10 @@ import {
   InvitationListItemDto,
   InvitationRevokeResponseDto,
 } from './dto/invitation-response.dto';
+import {
+  OwnershipTransferResponseDto,
+  TransferOwnershipDto,
+} from './dto/transfer-ownership.dto';
 import { UpdateOrganizationDto } from './dto/update-organization.dto';
 import { InvitationsService } from './invitations.service';
 import { MembershipsService } from './memberships.service';
@@ -152,6 +156,39 @@ export class OrganizationsController {
     @CurrentTenant(true) tenant: TenantContext,
   ) {
     return this.organizations.changeStatus(organizationId, dto, tenant);
+  }
+
+  @Post(':organizationId/ownership-transfer')
+  @TenantRequired()
+  @AllowedOrganizationStatuses(
+    OrganizationStatus.ACTIVE,
+    OrganizationStatus.SUSPENDED,
+  )
+  @UseGuards(CapabilitiesGuard)
+  @RequireCapabilities(OrganizationCapability.OWNERSHIP_TRANSFER)
+  @HttpCode(200)
+  @ApiOperation({
+    summary:
+      'Transfer organization ownership from the current owner to an active non-owner membership',
+  })
+  @ApiOkResponse({ type: OwnershipTransferResponseDto })
+  @ApiBadRequestResponse({ description: 'Invalid payload' })
+  @ApiForbiddenResponse({ description: 'Ownership transfer is not permitted' })
+  @ApiNotFoundResponse({ description: 'Organization or membership not found' })
+  @ApiConflictResponse({
+    description:
+      'Organization is suspended, target is ineligible, actor is no longer owner, or the transfer lost a concurrency race',
+  })
+  transferOwnership(
+    @Param('organizationId', ParseUUIDPipe) organizationId: string,
+    @Body() dto: TransferOwnershipDto,
+    @CurrentTenant(true) tenant: TenantContext,
+  ) {
+    return this.memberships.transferOwnership(
+      organizationId,
+      dto.targetMembershipId,
+      tenant,
+    );
   }
 
   @Get(':organizationId/memberships')

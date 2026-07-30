@@ -44,7 +44,7 @@ describe('OpenAPI document', () => {
   it('documents every certified route and the Bearer security scheme', () => {
     const document = createDocument(app);
 
-    expect(Object.keys(document.paths)).toHaveLength(41);
+    expect(Object.keys(document.paths)).toHaveLength(42);
     expect(document.components?.securitySchemes?.bearer).toEqual({
       type: 'http',
       scheme: 'bearer',
@@ -66,6 +66,9 @@ describe('OpenAPI document', () => {
     ]);
     expect(
       document.paths['/organizations/{organizationId}/status'].patch,
+    ).toBeDefined();
+    expect(
+      document.paths['/organizations/{organizationId}/ownership-transfer'].post,
     ).toBeDefined();
     expect(
       document.paths['/organizations/{organizationId}/invitations'].post
@@ -136,6 +139,23 @@ describe('OpenAPI document', () => {
           enum: ['PENDING', 'ACCEPTED', 'REJECTED', 'REVOKED', 'EXPIRED'],
         },
       },
+    });
+    expect(
+      getRequestContent(
+        document,
+        '/organizations/{organizationId}/ownership-transfer',
+        'post',
+      )['application/json']?.schema,
+    ).toEqual({ $ref: '#/components/schemas/TransferOwnershipDto' });
+    expect(
+      getResponseContent(
+        document,
+        '/organizations/{organizationId}/ownership-transfer',
+        'post',
+        '200',
+      )['application/json']?.schema,
+    ).toEqual({
+      $ref: '#/components/schemas/OwnershipTransferResponseDto',
     });
   });
 

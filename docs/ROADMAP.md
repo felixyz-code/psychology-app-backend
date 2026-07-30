@@ -522,8 +522,11 @@ The next implementation sequence after closeout is:
 5. organization-domain certification and later frontend work.
 
 POST-GO-LIVE.3.1 is now implemented locally and in review. POST-GO-LIVE.3.2 is
-implemented locally and review-pending. Neither phase is authorized for
-production until the draft PR, CI, and later review controls are complete.
+implemented locally and review-pending. POST-GO-LIVE.3.3 invitation
+administration runtime and POST-GO-LIVE.3.4 ownership transfer runtime are now
+implemented locally and review-pending as of Thursday, July 30, 2026. No phase
+in this sequence is authorized for production until the draft PR, CI, and
+later review controls are complete.
 
 ## POST-GO-LIVE.3.1
 
@@ -612,4 +615,45 @@ Compatibility notes:
   project revoked history
 - role and status mutations affect access on the next request without a new
   JWT
-- POST-GO-LIVE.3.3 is implemented locally and review pending
+- POST-GO-LIVE.3.3 and POST-GO-LIVE.3.4 are implemented locally and review
+  pending
+
+## POST-GO-LIVE.3.4
+
+Organization Ownership Transfer Runtime follows the 3.3 invitation runtime and
+keeps the 3.0 organization contract on the existing persistence model.
+
+Status:
+
+- IMPLEMENTED / IN REVIEW
+- no Prisma migration required
+- not authorized for production
+
+Implemented scope:
+
+- dedicated owner-only `POST /organizations/:organizationId/ownership-transfer`
+  with the new `ownership.transfer` capability
+- serializable compare-and-set promotion/demotion of target and source
+  memberships
+- deterministic `409` behavior for suspended organizations, self-targeting,
+  inactive targets, existing-owner targets, stale actors, and lost concurrency
+- post-commit structured observability through
+  `organization_ownership_transferred`
+- unit, OpenAPI, PostgreSQL E2E, and PostgreSQL concurrency coverage for the
+  runtime path
+
+Out of scope:
+
+- Prisma schema change, migration, or primary-owner persistence
+- ownership audit table persistence
+- broader membership route redesign
+- frontend switching UX
+- branding, plans, billing, and custom settings
+- production rollout or production backfill
+
+Compatibility notes:
+
+- generic membership role patch still never grants `OWNER`
+- ownership transfer remains the only public route that can assign `OWNER`
+- suspended organizations remain blocked from ordinary membership,
+  invitation, clinical, and financial routes

@@ -4,7 +4,12 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { MembershipRole, MembershipStatus, Prisma } from '@prisma/client';
+import {
+  MembershipRole,
+  MembershipStatus,
+  OrganizationStatus,
+  Prisma,
+} from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   CapabilityDecision,
@@ -119,6 +124,119 @@ export class MembershipsService {
       result.eventMetadata,
     );
     return result.membership;
+  }
+
+  async transferOwnership(
+    organizationId: string,
+    targetMembershipId: string,
+    tenant: TenantContext,
+  ) {
+    this.assertTenantPath(organizationId, tenant);
+    this.requireOwnershipTransfer(tenant);
+    const result = await serializableTransaction(this.prisma, async (tx) => {
+      const actor = await this.findTransferActor(tx, tenant);
+      if (actor.organization.status !== OrganizationStatus.ACTIVE) {
+        throw new ConflictException('Organization is not active');
+      }
+      if (
+        actor.status !== MembershipStatus.ACTIVE ||
+        actor.role !== MembershipRole.OWNER
+      ) {
+        throw new ConflictException(
+          'Ownership transfer is no longer available',
+        );
+      }
+
+      const target = await this.findTarget(tx, targetMembershipId, tenant);
+      if (target.id === actor.id || target.userId === actor.userId) {
+        throw new ConflictException(
+          'Ownership transfer target must be another membership',
+        );
+      }
+      if (target.status !== MembershipStatus.ACTIVE) {
+        throw new ConflictException('Ownership transfer target must be active');
+      }
+      if (target.role === MembershipRole.OWNER) {
+        throw new ConflictException(
+          'Ownership transfer target must not already be an owner',
+        );
+      }
+
+      const promoted = await tx.organizationMembership.updateMany({
+        where: {
+          id: target.id,
+          organizationId: tenant.organizationId,
+          role: target.role,
+          status: MembershipStatus.ACTIVE,
+        },
+        data: { role: MembershipRole.OWNER },
+      });
+      if (promoted.count !== 1) {
+        throw new ConflictException('Membership changed concurrently');
+      }
+
+      const demoted = await tx.organizationMembership.updateMany({
+        where: {
+          id: actor.id,
+          organizationId: tenant.organizationId,
+          userId: tenant.userId,
+          role: MembershipRole.OWNER,
+          status: MembershipStatus.ACTIVE,
+        },
+        data: { role: MembershipRole.ADMIN },
+      });
+      if (demoted.count !== 1) {
+        throw new ConflictException('Membership changed concurrently');
+      }
+
+      const activeOwners = await tx.organizationMembership.count({
+        where: {
+          organizationId: tenant.organizationId,
+          role: MembershipRole.OWNER,
+          status: MembershipStatus.ACTIVE,
+        },
+      });
+      if (activeOwners < 1) {
+        throw new ConflictException('Organization must retain an active owner');
+      }
+
+      const [sourceMembership, targetMembership] = await Promise.all([
+        this.findTarget(tx, actor.id, tenant),
+        this.findTarget(tx, target.id, tenant),
+      ]);
+      const transferredAt = new Date();
+
+      return {
+        organizationId: tenant.organizationId,
+        sourceMembership,
+        targetMembership,
+        transferredAt,
+        eventMetadata: {
+          actorUserId: actor.userId,
+          sourceMembershipId: actor.id,
+          targetMembershipId: target.id,
+          sourcePreviousRole: actor.role,
+          sourceNewRole: sourceMembership.role,
+          targetPreviousRole: target.role,
+          targetNewRole: targetMembership.role,
+        },
+      };
+    });
+
+    this.observability.organizationDomainEvent(
+      'organization_ownership_transferred',
+      tenant,
+      'SUCCESS',
+      'OWNERSHIP_TRANSFERRED',
+      result.eventMetadata,
+    );
+
+    return {
+      organizationId: result.organizationId,
+      sourceMembership: result.sourceMembership,
+      targetMembership: result.targetMembership,
+      transferredAt: result.transferredAt,
+    };
   }
 
   async changeStatus(
@@ -332,6 +450,47 @@ export class MembershipsService {
     ) {
       throw new ForbiddenException('Membership action is not permitted');
     }
+  }
+
+  private requireOwnershipTransfer(tenant: TenantContext) {
+    if (
+      this.policy.decisionFor(
+        tenant,
+        OrganizationCapability.OWNERSHIP_TRANSFER,
+      ) === CapabilityDecision.DENY
+    ) {
+      throw new ForbiddenException('Organization capability is required');
+    }
+  }
+
+  private async findTransferActor(
+    tx: Prisma.TransactionClient,
+    tenant: TenantContext,
+  ) {
+    const actor = await tx.organizationMembership.findFirst({
+      where: {
+        id: tenant.membershipId,
+        organizationId: tenant.organizationId,
+        userId: tenant.userId,
+      },
+      select: {
+        id: true,
+        userId: true,
+        role: true,
+        status: true,
+        organization: {
+          select: {
+            status: true,
+          },
+        },
+      },
+    });
+    if (!actor) {
+      throw new ConflictException(
+        'Organization context is no longer available',
+      );
+    }
+    return actor;
   }
 
   private async protectOwner(

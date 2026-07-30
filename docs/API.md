@@ -1480,6 +1480,7 @@ membership runtime and historical lifecycle without adding direct
 | GET | `/organizations/:organizationId` | `organization.read`; path must match selected tenant and route allows `ACTIVE` or `SUSPENDED` organization state |
 | PATCH | `/organizations/:organizationId` | `organization.manage` (OWNER); editable identity fields only |
 | PATCH | `/organizations/:organizationId/status` | `organization.manage` (OWNER); `ACTIVE <-> SUSPENDED` only |
+| POST | `/organizations/:organizationId/ownership-transfer` | `ownership.transfer` (OWNER); dedicated owner handoff only |
 | GET | `/organizations/:organizationId/memberships` | `membership.read`; sanitized metadata |
 | PATCH | `/organizations/:organizationId/memberships/:membershipId/role` | owner/admin conditional; never OWNER grant |
 | PATCH | `/organizations/:organizationId/memberships/:membershipId/status` | owner/admin conditional |
@@ -1496,6 +1497,29 @@ once from creation or resend outside production. API responses and logs never
 expose a digest; invitation list responses expose sanitized invitation metadata
 including recipient email, role, timestamps, and derived `logicalStatus`, but
 never the token or `tokenDigest`.
+
+POST-GO-LIVE.3.4 ownership-transfer runtime rules:
+
+- `POST /organizations/:organizationId/ownership-transfer` requires JWT,
+  resolved tenant context, `X-Organization-Id`, and the dedicated
+  `ownership.transfer` capability; `organization.manage` is not reused.
+- The actor must still be the current `ACTIVE` `OWNER` membership for the
+  selected organization when the serializable transaction executes; a stale
+  actor that is no longer owner fails with conflict rather than silently
+  downgrading someone else.
+- The target must be another `ACTIVE` membership in the same selected
+  organization and must not already be `OWNER`.
+- The transfer runs as one serializable PostgreSQL transaction using
+  compare-and-set `updateMany()` mutations: target promotion to `OWNER`, actor
+  demotion to `ADMIN`, and a final active-owner invariant verification.
+- Suspended organizations remain fail-closed for the operation itself even
+  though the route opts into suspended-state tenant resolution to return a
+  deterministic `409` instead of a generic capability denial.
+- The response returns the same organization ID, the demoted source
+  membership, the promoted target membership, and a `transferredAt` timestamp.
+- Post-commit structured observability emits
+  `organization_ownership_transferred` with actor/source/target role metadata
+  only after the transaction commits successfully.
 
 POST-GO-LIVE.3.3 invitation administration runtime rules:
 

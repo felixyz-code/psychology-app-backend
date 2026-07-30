@@ -13,6 +13,7 @@ export enum OrganizationCapability {
   MEMBERSHIP_REACTIVATE = 'membership.reactivate',
   MEMBERSHIP_REMOVE = 'membership.remove',
   MEMBERSHIP_LEAVE = 'membership.leave',
+  OWNERSHIP_TRANSFER = 'ownership.transfer',
   INVITATION_READ = 'invitation.read',
   INVITATION_CREATE = 'invitation.create',
   INVITATION_REVOKE = 'invitation.revoke',

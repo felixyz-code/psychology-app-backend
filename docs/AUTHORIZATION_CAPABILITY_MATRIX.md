@@ -1,6 +1,9 @@
 # Authorization Capability Matrix
 
-`Allow` is unconditional inside the selected active organization. `Conditional` requires the stated condition. `Deny` is explicit. This is target policy; current runtime has not implemented these capabilities.
+`Allow` is unconditional inside the selected active organization. `Conditional`
+requires the stated condition. `Deny` is explicit. This matrix is the approved
+capability catalog and current organization-domain runtime baseline unless a
+historical status note below states otherwise.
 
 | Capability | OWNER | ADMIN | PSYCHOLOGIST | RECEPTIONIST | BILLING | AUDITOR | READ_ONLY | Condition |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -10,6 +13,7 @@
 | `membership.invite` | Allow | Allow | Deny | Deny | Deny | Deny | Deny | Cannot grant OWNER |
 | `membership.manage_role` | Allow | Conditional | Deny | Deny | Deny | Deny | Deny | Admin cannot manage OWNER or grant above self |
 | `membership.suspend` | Allow | Conditional | Deny | Deny | Deny | Deny | Deny | Admin cannot suspend OWNER |
+| `ownership.transfer` | Allow | Deny | Deny | Deny | Deny | Deny | Deny | Current ACTIVE OWNER only; target must be another ACTIVE non-OWNER membership in the selected organization |
 | `patient.read` | Allow | Allow | Conditional | Deny | Deny | Conditional | Conditional | Psychologist assignment required; read roles need redaction policy |
 | `patient.create` | Allow | Allow | Allow | Deny | Deny | Deny | Deny | Assignment/owner created consistently |
 | `patient.update` | Allow | Allow | Conditional | Deny | Deny | Deny | Deny | Psychologist assignment required |
@@ -157,3 +161,8 @@ above as `invitation.read`, `invitation.create`, `invitation.revoke`, and
 `membership.remove`. Conditional ADMIN operations are enforced by the
 organization service after central resolution: the target must be non-OWNER,
 the actor cannot target themself, and a new role cannot outrank ADMIN.
+
+POST-GO-LIVE.3.4 adds the dedicated `ownership.transfer` runtime grant for
+`OWNER` only. It is intentionally separate from `organization.manage` and
+`membership.manage_role`; the generic role patch remains unable to grant
+`OWNER`.
