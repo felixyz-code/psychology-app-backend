@@ -40,9 +40,9 @@ Organization administration checkpoint:
 POST-GO-LIVE.3.0 Organization & Membership Administration Contract merged in PR #35
 Merged baseline: 7d897ec8db2c5d372fce0b4dc0eaf3bd3b1d4b13
 POST-GO-LIVE.3.1 Organization Administration Runtime implemented locally and in review
-POST-GO-LIVE.3.2 Membership Administration Runtime implemented locally and review pending
+POST-GO-LIVE.3.2 Membership Administration Runtime closed and integrated
 Runtime baseline: 2373ff046d56f455ecb9b5c4cc075f36f9ab778f
-POST-GO-LIVE.3.3 Invitations Expansion not started
+POST-GO-LIVE.3.3 Invitation Administration Runtime implemented locally and review pending
 ```
 
 Current priorities:
@@ -76,8 +76,8 @@ POST-GO-LIVE.2
 POST-GO-LIVE.3
  |- 3.0 Organization & Membership Contract CLOSED
  |- 3.1 Organization Administration Runtime IMPLEMENTED / IN REVIEW
- |- 3.2 Membership Administration Runtime IMPLEMENTED / REVIEW PENDING
- `- 3.3 Invitations Expansion NOT STARTED
+ |- 3.2 Membership Administration Runtime CLOSED / INTEGRATED
+ `- 3.3 Invitation Administration Runtime IMPLEMENTED / REVIEW PENDING
 POST-GO-LIVE.4                           PENDING
 POST-GO-LIVE.5                           PENDING
 POST-GO-LIVE.6                           PENDING
@@ -564,9 +564,10 @@ Compatibility notes:
 
 - suspended organizations remain blocked from Patients, Clinical Core,
   Documents, Appointments, and Finance until reactivated
-- membership historical re-entry is implemented in POST-GO-LIVE.3.2 and
+- membership historical re-entry is implemented in POST-GO-LIVE.3.2 and is
+  closed/integrated
+- invitation administration runtime is implemented in POST-GO-LIVE.3.3 and
   remains review-pending
-- invitations expansion remains deferred to POST-GO-LIVE.3.3
 - no branding, billing, plans, settings, frontend switching UX, or production
   rollout work is included
 
@@ -577,7 +578,7 @@ that follows the 3.1 organization administration runtime.
 
 Status:
 
-- IMPLEMENTED / REVIEW PENDING
+- CLOSED / INTEGRATED
 - Prisma migration required and created
 - not authorized for production
 
@@ -597,7 +598,7 @@ Implemented scope:
 Out of scope:
 
 - direct `POST /memberships`
-- invitation resend and broader invitation expansion
+- broader invitation expansion beyond administration runtime
 - ownership transfer
 - frontend switching UX
 - branding, plans, billing, and custom settings
@@ -611,4 +612,4 @@ Compatibility notes:
   project revoked history
 - role and status mutations affect access on the next request without a new
   JWT
-- POST-GO-LIVE.3.3 remains not started
+- POST-GO-LIVE.3.3 is implemented locally and review pending

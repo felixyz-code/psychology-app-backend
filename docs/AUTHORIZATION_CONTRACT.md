@@ -138,7 +138,7 @@ token, digest, or a foreign organization identifier.
 
 * ADMIN may create invitations and administer non-OWNER memberships; it may not
   self-elevate, grant a higher privilege, or mutate an OWNER. Invitation
-  revocation remains OWNER-only.
+  revocation and invitation resend remain OWNER-only.
 * AUDITOR may read memberships and sanitized organization metadata only. It
   receives neither clinical access nor complete email values.
 * Rejection persists in `rejectedAt`; expiry persists in `expiredAt`; they are

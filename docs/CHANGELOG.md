@@ -39,7 +39,40 @@ Implemented locally and pending technical review, draft PR publication, and CI.
 * No infrastructure changes.
 * No production access.
 * No deployment or backfill activity.
-* POST-GO-LIVE.3.3 remains not started.
+* POST-GO-LIVE.3.2 is closed and integrated as the organization-domain
+  baseline.
+* POST-GO-LIVE.3.3 invitation administration runtime is implemented locally and
+  review pending as of Wednesday, July 29, 2026.
+
+# POST-GO-LIVE.3.3 Invitation Administration Runtime
+
+## Status
+
+Implemented locally without a Prisma migration. Review pending.
+
+## Highlights
+
+* Added hardened administrative invitation listing with derived
+  `logicalStatus`, sanitized projections, and deterministic ordering.
+* Hardened invitation creation so `OWNER` is rejected in both DTO and service,
+  logically expired duplicates are materialized before insert, and known
+  recipients with `INVITED`, `ACTIVE`, or `SUSPENDED` memberships fail closed.
+* Added owner-only `POST /organizations/:organizationId/invitations/:invitationId/resend`
+  with replacement semantics, fresh token generation, and post-commit
+  `invitation_resent` observability.
+* Hardened accept/reject flows with canonicalized recipient email checks,
+  organization-active enforcement, exactly-once terminal transitions, and
+  historical membership re-entry via a new membership row.
+* Extended unit, persistence, and PostgreSQL E2E/concurrency coverage for
+  invitation administration runtime scenarios.
+
+## Compatibility
+
+* No Prisma schema change.
+* No new migration.
+* No real email delivery.
+* No frontend change.
+* No production access or deployment.
 
 # POST-GO-LIVE.3.1 Organization Administration Runtime
 

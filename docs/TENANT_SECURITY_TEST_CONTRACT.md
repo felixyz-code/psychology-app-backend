@@ -123,6 +123,9 @@ use synthetic identifiers and `example.test` email addresses only.
 Organization path scope uses a required resolved context and membership reads
 use sanitized projections. Invitation lifecycle mutations use serializable
 transactions, conditional updates and the 2.1C1 partial pending key. The
-implementation tests malformed tokens, cross-tenant paths, ADMIN-to-OWNER
-denial and last-owner protection; integration certification remains required
-against the local `_test` PostgreSQL database.
+implementation tests malformed tokens, cross-tenant paths, canonicalized
+recipient binding, ADMIN-to-OWNER denial, owner-only invitation
+revoke/resend, old-token invalidation after resend, and the required create/
+create, accept/accept, accept/reject, accept/revoke, accept/resend, and
+resend/resend PostgreSQL concurrency races. Integration certification remains
+required against the local `_test` PostgreSQL database.

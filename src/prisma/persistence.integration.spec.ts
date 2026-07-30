@@ -1,5 +1,9 @@
 import { PrismaPg } from '@prisma/adapter-pg';
-import { PrismaClient } from '@prisma/client';
+import {
+  MembershipRole,
+  OrganizationStatus,
+  PrismaClient,
+} from '@prisma/client';
 import { randomUUID } from 'node:crypto';
 
 import { parseLegacyBackfillManifest } from './legacy-backfill/manifest';
@@ -345,6 +349,132 @@ runPersistenceTests('PostgreSQL persistence integration', () => {
     }
   });
 
+  it('enforces one pending invitation per organization and preserves historical rows across replacement-like inserts', async () => {
+    const suffix = randomUUID();
+    const organizationAId = randomUUID();
+    const organizationBId = randomUUID();
+    const invitationA1Id = randomUUID();
+    const invitationA2Id = randomUUID();
+    const invitationB1Id = randomUUID();
+    const email = `invitation-${suffix}@example.test`;
+    const normalizedEmail = email.toLocaleLowerCase('en-US');
+    const sharedDigest = tokenDigestSeed();
+
+    try {
+      await prisma.organization.createMany({
+        data: [
+          organizationRecord(organizationAId, `invitation-a-${suffix}`),
+          organizationRecord(organizationBId, `invitation-b-${suffix}`),
+        ],
+      });
+
+      await prisma.organizationInvitation.create({
+        data: {
+          id: invitationA1Id,
+          organizationId: organizationAId,
+          email,
+          normalizedEmail,
+          role: MembershipRole.PSYCHOLOGIST,
+          tokenDigest: sharedDigest,
+          expiresAt: new Date('2026-08-20T00:00:00.000Z'),
+        },
+      });
+
+      await prisma.organizationInvitation.create({
+        data: {
+          id: invitationB1Id,
+          organizationId: organizationBId,
+          email,
+          normalizedEmail,
+          role: MembershipRole.PSYCHOLOGIST,
+          tokenDigest: tokenDigestSeed(),
+          expiresAt: new Date('2026-08-20T00:00:00.000Z'),
+        },
+      });
+
+      await expect(
+        prisma.organizationInvitation.create({
+          data: {
+            organizationId: organizationAId,
+            email,
+            normalizedEmail,
+            role: MembershipRole.PSYCHOLOGIST,
+            tokenDigest: tokenDigestSeed(),
+            expiresAt: new Date('2026-08-21T00:00:00.000Z'),
+          },
+        }),
+      ).rejects.toMatchObject({ code: 'P2002' });
+
+      await expect(
+        prisma.organizationInvitation.create({
+          data: {
+            organizationId: organizationBId,
+            email: `other-${suffix}@example.test`,
+            normalizedEmail: `other-${suffix}@example.test`,
+            role: MembershipRole.ADMIN,
+            tokenDigest: sharedDigest,
+            expiresAt: new Date('2026-08-21T00:00:00.000Z'),
+          },
+        }),
+      ).rejects.toMatchObject({ code: 'P2002' });
+
+      await prisma.organizationInvitation.update({
+        where: { id: invitationA1Id },
+        data: { revokedAt: new Date('2026-08-10T00:00:00.000Z') },
+      });
+
+      await prisma.organizationInvitation.create({
+        data: {
+          id: invitationA2Id,
+          organizationId: organizationAId,
+          email,
+          normalizedEmail,
+          role: MembershipRole.PSYCHOLOGIST,
+          tokenDigest: tokenDigestSeed(),
+          expiresAt: new Date('2026-08-27T00:00:00.000Z'),
+        },
+      });
+
+      const organizationAInvitations =
+        await prisma.organizationInvitation.findMany({
+          where: { organizationId: organizationAId, normalizedEmail },
+          orderBy: { createdAt: 'asc' },
+          select: {
+            id: true,
+            revokedAt: true,
+            acceptedAt: true,
+            rejectedAt: true,
+            expiredAt: true,
+          },
+        });
+
+      expect(organizationAInvitations).toHaveLength(2);
+      expect(
+        organizationAInvitations.map((invitation) => invitation.id),
+      ).toEqual([invitationA1Id, invitationA2Id]);
+      expect(
+        organizationAInvitations.filter(
+          (invitation) =>
+            !invitation.acceptedAt &&
+            !invitation.rejectedAt &&
+            !invitation.revokedAt &&
+            !invitation.expiredAt,
+        ),
+      ).toHaveLength(1);
+      expect(organizationAInvitations[0]?.revokedAt).toBeInstanceOf(Date);
+      expect(organizationAInvitations[1]?.revokedAt).toBeNull();
+    } finally {
+      await prisma.organizationInvitation.deleteMany({
+        where: {
+          organizationId: { in: [organizationAId, organizationBId] },
+        },
+      });
+      await prisma.organization.deleteMany({
+        where: { id: { in: [organizationAId, organizationBId] } },
+      });
+    }
+  });
+
   it('does not treat the tenant-aware seed as a legacy backfill target', async () => {
     const owner = await prisma.user.findFirst({
       where: { role: 'ADMIN' },
@@ -385,3 +515,17 @@ runPersistenceTests('PostgreSQL persistence integration', () => {
     ).toBe(0);
   });
 });
+
+function organizationRecord(id: string, slug: string) {
+  return {
+    id,
+    slug,
+    legalName: 'Invitation Persistence Organization',
+    displayName: 'Invitation Persistence',
+    status: OrganizationStatus.ACTIVE,
+  };
+}
+
+function tokenDigestSeed() {
+  return randomUUID().replace(/-/g, '').repeat(2).slice(0, 64);
+}

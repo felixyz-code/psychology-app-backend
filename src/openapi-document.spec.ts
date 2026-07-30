@@ -44,7 +44,7 @@ describe('OpenAPI document', () => {
   it('documents every certified route and the Bearer security scheme', () => {
     const document = createDocument(app);
 
-    expect(Object.keys(document.paths)).toHaveLength(40);
+    expect(Object.keys(document.paths)).toHaveLength(41);
     expect(document.components?.securitySchemes?.bearer).toEqual({
       type: 'http',
       scheme: 'bearer',
@@ -70,6 +70,11 @@ describe('OpenAPI document', () => {
     expect(
       document.paths['/organizations/{organizationId}/invitations'].post
         ?.responses,
+    ).toHaveProperty('201');
+    expect(
+      document.paths[
+        '/organizations/{organizationId}/invitations/{invitationId}/resend'
+      ].post?.responses,
     ).toHaveProperty('201');
     expect(
       document.paths['/organization-invitations/{token}/accept'].post?.security,
@@ -121,6 +126,15 @@ describe('OpenAPI document', () => {
     ).toMatchObject({
       properties: {
         amount: { type: 'string', example: '850.50' },
+      },
+    });
+    expect(
+      document.components?.schemas?.InvitationIssueResponseDto,
+    ).toMatchObject({
+      properties: {
+        logicalStatus: {
+          enum: ['PENDING', 'ACCEPTED', 'REJECTED', 'REVOKED', 'EXPIRED'],
+        },
       },
     });
   });
