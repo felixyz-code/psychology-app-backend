@@ -59,6 +59,10 @@ describe('InvitationsService', () => {
       $transaction: jest.fn((work: (tx: unknown) => unknown) =>
         work({
           organizationInvitation: {
+            findMany: jest
+              .fn()
+              .mockResolvedValueOnce([])
+              .mockResolvedValueOnce([]),
             updateMany: jest.fn().mockResolvedValue({ count: 0 }),
             create: jest.fn().mockRejectedValue(
               new Prisma.PrismaClientKnownRequestError('duplicate', {
@@ -85,11 +89,81 @@ describe('InvitationsService', () => {
     ).rejects.toBeInstanceOf(ConflictException);
   });
 
+  it('emits invitation_expired after create materializes an expired pending invitation', async () => {
+    const expiredInvitationId = '00000000-0000-4000-8000-000000000090';
+    const createdInvitationId = '00000000-0000-4000-8000-000000000091';
+    const prisma = {
+      $transaction: jest.fn((work: (tx: unknown) => unknown) =>
+        work({
+          organizationInvitation: {
+            findMany: jest
+              .fn()
+              .mockResolvedValueOnce([{ id: expiredInvitationId }])
+              .mockResolvedValueOnce([{ id: expiredInvitationId }]),
+            updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+            create: jest.fn().mockResolvedValue({
+              id: createdInvitationId,
+              email: 'recipient@example.test',
+              normalizedEmail: 'recipient@example.test',
+              role: MembershipRole.PSYCHOLOGIST,
+              expiresAt: new Date('2026-08-10T00:00:00.000Z'),
+              acceptedAt: null,
+              acceptedByUserId: null,
+              rejectedAt: null,
+              revokedAt: null,
+              expiredAt: null,
+              invitedUserId: null,
+              createdAt: new Date('2026-08-03T00:00:00.000Z'),
+              updatedAt: new Date('2026-08-03T00:00:00.000Z'),
+            }),
+          },
+          user: { findMany: jest.fn().mockResolvedValue([]) },
+          organizationMembership: {
+            findFirst: jest.fn().mockResolvedValue(null),
+          },
+        }),
+      ),
+    } as never;
+    const service = new InvitationsService(prisma, observability as never);
+
+    await expect(
+      service.create(
+        tenant.organizationId,
+        { email: 'recipient@example.test', role: MembershipRole.PSYCHOLOGIST },
+        tenant,
+      ),
+    ).resolves.toMatchObject({
+      id: createdInvitationId,
+      logicalStatus: InvitationLogicalStatus.PENDING,
+    });
+
+    expect(observability.organizationDomainEvent).toHaveBeenNthCalledWith(
+      1,
+      'invitation_expired',
+      tenant,
+      'SUCCESS',
+      'INVITATION_EXPIRED',
+      { targetId: expiredInvitationId },
+    );
+    expect(observability.organizationDomainEvent).toHaveBeenNthCalledWith(
+      2,
+      'invitation_created',
+      tenant,
+      'SUCCESS',
+      'INVITATION_CREATED',
+      expect.objectContaining({ targetId: createdInvitationId }),
+    );
+  });
+
   it('rejects creation when the known recipient already has a non-terminal membership', async () => {
     const prisma = {
       $transaction: jest.fn((work: (tx: unknown) => unknown) =>
         work({
           organizationInvitation: {
+            findMany: jest
+              .fn()
+              .mockResolvedValueOnce([])
+              .mockResolvedValueOnce([]),
             updateMany: jest.fn().mockResolvedValue({ count: 0 }),
             create: jest.fn(),
           },
@@ -415,6 +489,88 @@ describe('InvitationsService', () => {
       expect.objectContaining({
         previousInvitationId: targetInvitationId,
         newInvitationId: nextInvitationId,
+      }),
+    );
+  });
+
+  it('materializes a logically expired invitation before resend and emits expiration plus resend events', async () => {
+    const targetInvitationId = '00000000-0000-4000-8000-000000000105';
+    const nextInvitationId = '00000000-0000-4000-8000-000000000106';
+    const prisma = {
+      $transaction: jest.fn((work: (tx: unknown) => unknown) =>
+        work({
+          organizationInvitation: {
+            findFirst: jest.fn().mockResolvedValue({
+              id: targetInvitationId,
+              email: 'recipient@example.test',
+              role: MembershipRole.PSYCHOLOGIST,
+              expiresAt: new Date('2026-07-01T00:00:00.000Z'),
+              acceptedAt: null,
+              acceptedByUserId: null,
+              rejectedAt: null,
+              revokedAt: null,
+              expiredAt: null,
+              invitedUserId: null,
+              createdAt: new Date('2026-06-24T00:00:00.000Z'),
+              updatedAt: new Date('2026-06-24T00:00:00.000Z'),
+              normalizedEmail: 'recipient@example.test',
+            }),
+            updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+            create: jest.fn().mockResolvedValue({
+              id: nextInvitationId,
+              email: 'recipient@example.test',
+              normalizedEmail: 'recipient@example.test',
+              role: MembershipRole.PSYCHOLOGIST,
+              expiresAt: new Date('2026-08-10T00:00:00.000Z'),
+              acceptedAt: null,
+              acceptedByUserId: null,
+              rejectedAt: null,
+              revokedAt: null,
+              expiredAt: null,
+              invitedUserId: null,
+              createdAt: new Date('2026-08-03T00:00:00.000Z'),
+              updatedAt: new Date('2026-08-03T00:00:00.000Z'),
+            }),
+          },
+          user: {
+            findMany: jest.fn().mockResolvedValue([]),
+          },
+          organizationMembership: {
+            findFirst: jest.fn().mockResolvedValue(null),
+          },
+        }),
+      ),
+    } as never;
+    const service = new InvitationsService(prisma, observability as never);
+
+    const resent = await service.resend(
+      tenant.organizationId,
+      targetInvitationId,
+      tenant,
+    );
+
+    expect(resent).toMatchObject({
+      id: nextInvitationId,
+      logicalStatus: InvitationLogicalStatus.PENDING,
+    });
+    expect(observability.organizationDomainEvent).toHaveBeenNthCalledWith(
+      1,
+      'invitation_expired',
+      tenant,
+      'SUCCESS',
+      'INVITATION_EXPIRED',
+      { targetId: targetInvitationId },
+    );
+    expect(observability.organizationDomainEvent).toHaveBeenNthCalledWith(
+      2,
+      'invitation_resent',
+      tenant,
+      'SUCCESS',
+      'INVITATION_RESENT',
+      expect.objectContaining({
+        previousInvitationId: targetInvitationId,
+        newInvitationId: nextInvitationId,
+        previousStatus: InvitationLogicalStatus.EXPIRED,
       }),
     );
   });

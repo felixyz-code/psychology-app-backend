@@ -552,6 +552,60 @@ describeCertification('Invitation administration runtime', () => {
       });
   });
 
+  it('replaces logically expired invitations on resend and preserves the original as EXPIRED', async () => {
+    const invitation = await createInvitationThroughApi(
+      mixedCaseRecipientEmail.toLocaleLowerCase('en-US'),
+      MembershipRole.ADMIN,
+    );
+
+    await prisma.organizationInvitation.update({
+      where: { id: invitation.id },
+      data: { expiresAt: new Date('2026-01-01T00:00:00.000Z') },
+    });
+
+    const resent = await request(app.getHttpServer())
+      .post(
+        `/organizations/${organizationAlphaId}/invitations/${invitation.id}/resend`,
+      )
+      .set('Authorization', bearerToken(ownerAlphaUserId, UserRole.ADMIN))
+      .set('X-Organization-Id', organizationAlphaId)
+      .expect(201);
+    const resentBody = resent.body as InvitationIssueResponse;
+
+    expect(resentBody.id).not.toBe(invitation.id);
+    expect(resentBody.token).toEqual(expect.any(String));
+
+    const historical = await prisma.organizationInvitation.findUniqueOrThrow({
+      where: { id: invitation.id },
+      select: { revokedAt: true, expiredAt: true },
+    });
+    expect(historical.revokedAt).toBeNull();
+    expect(historical.expiredAt).toBeInstanceOf(Date);
+
+    await request(app.getHttpServer())
+      .post(`/organization-invitations/${invitation.token}/accept`)
+      .set(
+        'Authorization',
+        bearerToken(mixedCaseRecipientUserId, UserRole.ADMIN),
+      )
+      .expect(409);
+
+    await request(app.getHttpServer())
+      .post(`/organization-invitations/${resentBody.token}/accept`)
+      .set(
+        'Authorization',
+        bearerToken(mixedCaseRecipientUserId, UserRole.ADMIN),
+      )
+      .expect(201)
+      .expect((response) => {
+        expect(response.body).toMatchObject({
+          organizationId: organizationAlphaId,
+          role: MembershipRole.ADMIN,
+          status: MembershipStatus.ACTIVE,
+        });
+      });
+  });
+
   it('permits membership re-entry when the user only has revoked history', async () => {
     const invitation = await createInvitationThroughApi(
       reentryEmail,

@@ -78,52 +78,59 @@ export class InvitationsService {
     const token = generateInvitationToken();
     const tokenDigest = digestInvitationToken(token);
     try {
-      const invitation = await serializableTransaction(
-        this.prisma,
-        async (tx) => {
-          const now = new Date();
-          await this.materializeExpired(
+      const result = await serializableTransaction(this.prisma, async (tx) => {
+        const now = new Date();
+        const expiredEvents = await this.materializeExpired(
+          tx,
+          tenant.organizationId,
+          normalizedEmail,
+          now,
+        );
+        const invitedUser = await this.resolveInvitationRecipientUser(
+          tx,
+          dto.email,
+        );
+        if (invitedUser) {
+          await this.assertNoNonTerminalMembership(
             tx,
             tenant.organizationId,
+            invitedUser.id,
+          );
+        }
+        const invitation = await tx.organizationInvitation.create({
+          data: {
+            organizationId: tenant.organizationId,
+            email: dto.email.trim(),
             normalizedEmail,
-            now,
-          );
-          const invitedUser = await this.resolveInvitationRecipientUser(
-            tx,
-            dto.email,
-          );
-          if (invitedUser) {
-            await this.assertNoNonTerminalMembership(
-              tx,
-              tenant.organizationId,
-              invitedUser.id,
-            );
-          }
-          return tx.organizationInvitation.create({
-            data: {
-              organizationId: tenant.organizationId,
-              email: dto.email.trim(),
-              normalizedEmail,
-              invitedUserId: invitedUser?.id,
-              role: dto.role,
-              tokenDigest,
-              expiresAt: new Date(now.getTime() + INVITATION_TTL_MS),
-            },
-            select: invitationResponseSelect,
-          });
-        },
-      );
+            invitedUserId: invitedUser?.id,
+            role: dto.role,
+            tokenDigest,
+            expiresAt: new Date(now.getTime() + INVITATION_TTL_MS),
+          },
+          select: invitationResponseSelect,
+        });
+        return { invitation, expiredEvents };
+      });
+      for (const expiredEvent of result.expiredEvents) {
+        this.observability.organizationDomainEvent(
+          'invitation_expired',
+          tenant,
+          'SUCCESS',
+          'INVITATION_EXPIRED',
+          expiredEvent,
+        );
+      }
       this.observability.organizationDomainEvent(
         'invitation_created',
         tenant,
         'SUCCESS',
         'INVITATION_CREATED',
         {
-          targetId: invitation.id,
-          newRole: invitation.role,
+          targetId: result.invitation.id,
+          newRole: result.invitation.role,
         },
       );
-      return this.buildInvitationIssueResponse(invitation, token);
+      return this.buildInvitationIssueResponse(result.invitation, token);
     } catch (error) {
       if (isUniqueViolation(error)) {
         throw new ConflictException('A pending invitation already exists');
@@ -221,15 +228,17 @@ export class InvitationsService {
           throw new ConflictException('Invitation is not eligible for resend');
         }
 
+        let expiredEvent: { targetId: string } | null = null;
         if (
           logicalStatus === InvitationLogicalStatus.EXPIRED &&
           target.expiredAt === null
         ) {
-          const updated = await tx.organizationInvitation.updateMany({
-            where: pendingInvitationWhere(target.id),
-            data: { expiredAt: now },
-          });
-          if (updated.count !== 1)
+          expiredEvent = await this.materializeInvitationIfExpired(
+            tx,
+            target,
+            now,
+          );
+          if (!expiredEvent)
             throw new ConflictException('Invitation is no longer pending');
         }
 
@@ -287,6 +296,7 @@ export class InvitationsService {
         return {
           invitation: nextInvitation,
           token: nextToken,
+          expiredEvent,
           eventMetadata: {
             targetId: nextInvitation.id,
             previousInvitationId: target.id,
@@ -298,6 +308,15 @@ export class InvitationsService {
         };
       });
 
+      if (result.expiredEvent) {
+        this.observability.organizationDomainEvent(
+          'invitation_expired',
+          tenant,
+          'SUCCESS',
+          'INVITATION_EXPIRED',
+          result.expiredEvent,
+        );
+      }
       this.observability.organizationDomainEvent(
         'invitation_resent',
         tenant,
@@ -489,16 +508,44 @@ export class InvitationsService {
     normalizedEmail: string,
     now: Date,
   ) {
-    const expired = await tx.organizationInvitation.updateMany({
+    const pendingExpiredInvitations = await tx.organizationInvitation.findMany({
       where: {
         organizationId,
         normalizedEmail,
         expiresAt: { lte: now },
         ...pendingInvitationWhere(),
       },
+      select: { id: true },
+      orderBy: { id: 'asc' },
+    });
+    if (pendingExpiredInvitations.length === 0) {
+      return [];
+    }
+
+    await tx.organizationInvitation.updateMany({
+      where: {
+        id: {
+          in: pendingExpiredInvitations.map((invitation) => invitation.id),
+        },
+        ...pendingInvitationWhere(),
+      },
       data: { expiredAt: now },
     });
-    return expired.count;
+
+    const materializedInvitations = await tx.organizationInvitation.findMany({
+      where: {
+        id: {
+          in: pendingExpiredInvitations.map((invitation) => invitation.id),
+        },
+        expiredAt: { not: null },
+      },
+      select: { id: true },
+      orderBy: { id: 'asc' },
+    });
+
+    return materializedInvitations.map((invitation) => ({
+      targetId: invitation.id,
+    }));
   }
 
   private async materializeInvitationIfExpired(
@@ -511,12 +558,14 @@ export class InvitationsService {
       revokedAt: Date | null;
       expiredAt: Date | null;
     },
+    now: Date = new Date(),
   ) {
-    if (invitation.expiresAt > new Date() || hasTerminalState(invitation))
+    if (invitation.expiresAt > now || hasTerminalState(invitation)) {
       return null;
+    }
     const updated = await tx.organizationInvitation.updateMany({
       where: pendingInvitationWhere(invitation.id),
-      data: { expiredAt: new Date() },
+      data: { expiredAt: now },
     });
     if (updated.count === 1) {
       return {
