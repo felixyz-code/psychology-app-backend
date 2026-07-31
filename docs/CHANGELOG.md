@@ -70,14 +70,14 @@ Implemented locally and pending technical review, draft PR publication, and CI.
 * No deployment or backfill activity.
 * POST-GO-LIVE.3.2 is closed and integrated as the organization-domain
   baseline.
-* POST-GO-LIVE.3.3 invitation administration runtime is implemented locally and
-  review pending as of Wednesday, July 29, 2026.
+* POST-GO-LIVE.3.3 invitation administration runtime is closed and integrated
+  on merge commit `5bb75dc4ae8deed67543f745abb23bac88508066` via PR `#39`.
 
 # POST-GO-LIVE.3.3 Invitation Administration Runtime
 
 ## Status
 
-Implemented locally without a Prisma migration. Review pending.
+Closed and integrated on `development` without a Prisma migration.
 
 ## Highlights
 

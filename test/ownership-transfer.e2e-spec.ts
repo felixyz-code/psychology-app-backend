@@ -350,6 +350,13 @@ describeCertification('Organization ownership transfer runtime', () => {
       role: MembershipRole.OWNER,
       status: MembershipStatus.ACTIVE,
     });
+
+    await request(app.getHttpServer())
+      .post(`/organizations/${organizationSuccessId}/ownership-transfer`)
+      .set('Authorization', ownerToken)
+      .set('X-Organization-Id', organizationSuccessId)
+      .send({ targetMembershipId: successOwnerMembershipId })
+      .expect(403);
   });
 
   function bearerToken(userId: string, role: UserRole) {

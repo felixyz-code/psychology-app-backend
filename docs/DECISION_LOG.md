@@ -36,8 +36,9 @@ membership rows only.
 
 Accepted as a local runtime status update on branch
 `codex/post-go-live-3-3-invitation-administration-runtime` from integrated
-baseline `206371972ee10958f62f01434c9ac2f5631d4ec6`, pending draft PR review
-and CI on Wednesday, July 29, 2026.
+baseline `206371972ee10958f62f01434c9ac2f5631d4ec6`; later closed and
+integrated into `development` by PR `#39` at merge commit
+`5bb75dc4ae8deed67543f745abb23bac88508066` on Thursday, July 30, 2026.
 
 ### Decision
 

@@ -42,7 +42,8 @@ Merged baseline: 7d897ec8db2c5d372fce0b4dc0eaf3bd3b1d4b13
 POST-GO-LIVE.3.1 Organization Administration Runtime implemented locally and in review
 POST-GO-LIVE.3.2 Membership Administration Runtime closed and integrated
 Runtime baseline: 2373ff046d56f455ecb9b5c4cc075f36f9ab778f
-POST-GO-LIVE.3.3 Invitation Administration Runtime implemented locally and review pending
+POST-GO-LIVE.3.3 Invitation Administration Runtime closed and integrated
+Runtime baseline: 5bb75dc4ae8deed67543f745abb23bac88508066
 ```
 
 Current priorities:
@@ -77,7 +78,8 @@ POST-GO-LIVE.3
  |- 3.0 Organization & Membership Contract CLOSED
  |- 3.1 Organization Administration Runtime IMPLEMENTED / IN REVIEW
  |- 3.2 Membership Administration Runtime CLOSED / INTEGRATED
- `- 3.3 Invitation Administration Runtime IMPLEMENTED / REVIEW PENDING
+ |- 3.3 Invitation Administration Runtime CLOSED / INTEGRATED
+ `- 3.4 Organization Ownership Transfer Runtime IMPLEMENTED / REVIEW PENDING
 POST-GO-LIVE.4                           PENDING
 POST-GO-LIVE.5                           PENDING
 POST-GO-LIVE.6                           PENDING
@@ -521,12 +523,12 @@ The next implementation sequence after closeout is:
 4. optional active-organization preference UX;
 5. organization-domain certification and later frontend work.
 
-POST-GO-LIVE.3.1 is now implemented locally and in review. POST-GO-LIVE.3.2 is
-implemented locally and review-pending. POST-GO-LIVE.3.3 invitation
-administration runtime and POST-GO-LIVE.3.4 ownership transfer runtime are now
-implemented locally and review-pending as of Thursday, July 30, 2026. No phase
-in this sequence is authorized for production until the draft PR, CI, and
-later review controls are complete.
+POST-GO-LIVE.3.1 is now implemented locally and in review. POST-GO-LIVE.3.2
+and POST-GO-LIVE.3.3 are closed and integrated on `development`.
+POST-GO-LIVE.3.4 ownership transfer runtime is implemented locally and review
+pending as of Thursday, July 30, 2026. No phase in this sequence is
+authorized for production until the draft PR, CI, and later review controls
+are complete.
 
 ## POST-GO-LIVE.3.1
 
@@ -569,8 +571,8 @@ Compatibility notes:
   Documents, Appointments, and Finance until reactivated
 - membership historical re-entry is implemented in POST-GO-LIVE.3.2 and is
   closed/integrated
-- invitation administration runtime is implemented in POST-GO-LIVE.3.3 and
-  remains review-pending
+- invitation administration runtime is implemented in POST-GO-LIVE.3.3 and is
+  closed/integrated
 - no branding, billing, plans, settings, frontend switching UX, or production
   rollout work is included
 
@@ -615,8 +617,8 @@ Compatibility notes:
   project revoked history
 - role and status mutations affect access on the next request without a new
   JWT
-- POST-GO-LIVE.3.3 and POST-GO-LIVE.3.4 are implemented locally and review
-  pending
+- POST-GO-LIVE.3.3 is closed/integrated and POST-GO-LIVE.3.4 is implemented
+  locally and review pending
 
 ## POST-GO-LIVE.3.4
 
