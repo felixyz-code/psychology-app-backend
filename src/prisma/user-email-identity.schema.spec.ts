@@ -27,7 +27,10 @@ describe('user email identity persistence schema contract', () => {
   it('backfills the canonical key and protects it with a unique index', () => {
     expect(migration).toContain('ADD COLUMN "normalizedEmail" VARCHAR(255);');
     expect(migration).toContain(
-      'SET "normalizedEmail" = lower(btrim("email"));',
+      `regexp_replace("email", '^[[:space:]]+|[[:space:]]+$', '', 'g')`,
+    );
+    expect(migration).toContain(
+      'SET "normalizedEmail" = candidates.normalized_email',
     );
     expect(migration).toContain('ALTER COLUMN "normalizedEmail" SET NOT NULL;');
     expect(migration).toContain(
@@ -37,6 +40,7 @@ describe('user email identity persistence schema contract', () => {
 
   it('fails closed when legacy emails cannot be canonicalized safely', () => {
     expect(migration).toContain('blank legacy email exists');
+    expect(migration).toContain('unsupported non-ASCII legacy email exists');
     expect(migration).toContain('normalized legacy email exceeds 255 bytes');
     expect(migration).toContain('duplicate canonical users already exist');
   });

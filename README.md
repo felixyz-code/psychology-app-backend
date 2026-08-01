@@ -122,6 +122,9 @@ Use `POST /auth/login` to obtain a JWT and then use Swagger `Authorize` with Bea
 
 Swagger also documents the public self-bootstrap route
 `POST /auth/freelancer-bootstrap` for the independent freelancer baseline.
+The route is served only when
+`PUBLIC_FREELANCER_BOOTSTRAP_ENABLED=true`; it remains disabled by default
+until an environment enables it explicitly.
 
 ## Environment Variables
 
@@ -138,6 +141,7 @@ UPLOADS_PATH="uploads"
 CORS_ORIGIN="http://localhost:4200,http://localhost:4201"
 SWAGGER_ENABLED="true"
 TRUST_PROXY_HOPS=0
+PUBLIC_FREELANCER_BOOTSTRAP_ENABLED="false"
 ```
 
 Required variables:
@@ -154,6 +158,7 @@ Optional variables:
 - `CORS_ORIGIN`: comma-separated allowed origins. Default: `http://localhost:4200,http://localhost:4201`; production requires an explicit value.
 - `SWAGGER_ENABLED`: `true` or `false`. Defaults to `false` in production and `true` otherwise. Production exposure requires an explicit `true`.
 - `TRUST_PROXY_HOPS`: number of explicitly trusted reverse-proxy hops (`0`, `1` or `2`). Default: `0`; do not enable it without an Infra-defined proxy topology.
+- `PUBLIC_FREELANCER_BOOTSTRAP_ENABLED`: enables the public freelancer bootstrap route. Default: `false`; set `true` explicitly only in approved environments.
 
 Do not use placeholder values from `.env.example` as real secrets.
 

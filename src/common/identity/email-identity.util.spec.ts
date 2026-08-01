@@ -1,4 +1,5 @@
 import {
+  ASCII_EMAIL_IDENTITY_PATTERN,
   EMAIL_IDENTITY_LOCALE,
   normalizeEmailIdentity,
   trimEmailPresentation,
@@ -16,5 +17,16 @@ describe('email identity utility', () => {
     expect(trimEmailPresentation(' User@Example.com ')).toBe(
       'User@Example.com',
     );
+  });
+
+  it('trims non-space ASCII whitespace the same way the runtime helper expects', () => {
+    expect(normalizeEmailIdentity('\tUser@Example.com\n')).toBe(
+      'user@example.com',
+    );
+  });
+
+  it('declares the supported ASCII email identity domain explicitly', () => {
+    expect(ASCII_EMAIL_IDENTITY_PATTERN.test('user@example.com')).toBe(true);
+    expect(ASCII_EMAIL_IDENTITY_PATTERN.test('josé@example.com')).toBe(false);
   });
 });

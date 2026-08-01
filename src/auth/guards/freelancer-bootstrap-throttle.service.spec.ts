@@ -13,7 +13,7 @@ describe('FreelancerBootstrapThrottleService', () => {
     const now = 1_000;
     const normalizedEmail = normalizeEmailIdentity(' Freelancer@Example.test ');
 
-    for (let index = 0; index < 5; index += 1) {
+    for (let index = 0; index < 3; index += 1) {
       expect(() =>
         service.assertWithinLimits(
           '203.0.113.10',
@@ -35,7 +35,7 @@ describe('FreelancerBootstrapThrottleService', () => {
   it('throttles by IP even when the email rotates', () => {
     const now = 5_000;
 
-    for (let index = 0; index < 10; index += 1) {
+    for (let index = 0; index < 5; index += 1) {
       expect(() =>
         service.assertWithinLimits(
           '203.0.113.20',

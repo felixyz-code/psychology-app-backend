@@ -21,6 +21,7 @@ import { TenantObservabilityService } from '../tenant-context/tenant-observabili
 import { Roles } from './decorators/roles.decorator';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
+import { FreelancerBootstrapEnabledGuard } from './guards/freelancer-bootstrap-enabled.guard';
 import { FreelancerBootstrapThrottleGuard } from './guards/freelancer-bootstrap-throttle.guard';
 import { FreelancerBootstrapThrottleService } from './guards/freelancer-bootstrap-throttle.service';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
@@ -103,10 +104,18 @@ describe('Authentication error handling (integration)', () => {
   let prisma: PrismaMock;
   let jwtService: JwtService;
   let throttleService: FreelancerBootstrapThrottleService;
+  let configService: {
+    jwtSecret: string;
+    publicFreelancerBootstrapEnabled: boolean;
+  };
 
   beforeAll(async () => {
     authService = { login: jest.fn(), freelancerBootstrap: jest.fn() };
     prisma = { user: { findUnique: jest.fn() } };
+    configService = {
+      jwtSecret: testJwtSecret,
+      publicFreelancerBootstrapEnabled: true,
+    };
 
     const moduleRef: TestingModule = await Test.createTestingModule({
       imports: [PassportModule, JwtModule.register({ secret: testJwtSecret })],
@@ -125,9 +134,10 @@ describe('Authentication error handling (integration)', () => {
         },
         {
           provide: AppConfigService,
-          useValue: { jwtSecret: testJwtSecret },
+          useValue: configService,
         },
         RequestContextService,
+        FreelancerBootstrapEnabledGuard,
         FreelancerBootstrapThrottleGuard,
         FreelancerBootstrapThrottleService,
         {
@@ -160,6 +170,7 @@ describe('Authentication error handling (integration)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     throttleService.clear();
+    configService.publicFreelancerBootstrapEnabled = true;
     const users = new Map([
       [adminUser.id, adminUser],
       [psychologistUser.id, psychologistUser],
@@ -284,6 +295,15 @@ describe('Authentication error handling (integration)', () => {
       },
     ],
     [
+      'non-ascii bootstrap email',
+      {
+        email: 'josé@example.test',
+        password: 'FreelancerBootstrapSecret1!',
+        name: 'Bootstrap User',
+        organizationName: 'Bootstrap Practice',
+      },
+    ],
+    [
       'missing organizationName',
       {
         email: validEmail,
@@ -345,6 +365,28 @@ describe('Authentication error handling (integration)', () => {
     );
   });
 
+  it('returns 404 when the public bootstrap feature flag is disabled', async () => {
+    configService.publicFreelancerBootstrapEnabled = false;
+
+    const response = await request(app.getHttpServer())
+      .post('/auth/freelancer-bootstrap')
+      .send({
+        email: validEmail,
+        password: 'FreelancerBootstrapSecret1!',
+        name: 'Bootstrap User',
+        organizationName: 'Bootstrap Practice',
+      })
+      .expect(404);
+
+    const errorBody = toErrorBody(response.body as unknown);
+
+    expect(errorBody).toMatchObject({
+      message: 'Not Found',
+      statusCode: 404,
+    });
+    expect(authService.freelancerBootstrap).not.toHaveBeenCalled();
+  });
+
   it('returns the same safe 409 response for bootstrap conflicts without leaking identity details', async () => {
     authService.freelancerBootstrap.mockRejectedValue(
       new ConflictException('Registration could not be completed'),
@@ -375,7 +417,7 @@ describe('Authentication error handling (integration)', () => {
       membership: { id: 'membership-id' },
     });
 
-    for (let attempt = 0; attempt < 5; attempt += 1) {
+    for (let attempt = 0; attempt < 3; attempt += 1) {
       await request(app.getHttpServer())
         .post('/auth/freelancer-bootstrap')
         .send({
@@ -408,7 +450,7 @@ describe('Authentication error handling (integration)', () => {
       statusCode: 429,
     });
     expectSafeErrorBody(errorBody);
-    expect(authService.freelancerBootstrap).toHaveBeenCalledTimes(5);
+    expect(authService.freelancerBootstrap).toHaveBeenCalledTimes(3);
   });
 
   it.each([

@@ -44,6 +44,8 @@ POST-GO-LIVE.3.2 Membership Administration Runtime closed and integrated
 Runtime baseline: 2373ff046d56f455ecb9b5c4cc075f36f9ab778f
 POST-GO-LIVE.3.3 Invitation Administration Runtime closed and integrated
 Runtime baseline: 5bb75dc4ae8deed67543f745abb23bac88508066
+POST-GO-LIVE.3.4 Organization Ownership Transfer Runtime closed and integrated
+Runtime baseline: 77b4b6e6a70ef133459b84ea71c5d9590bfb6d0a
 POST-GO-LIVE.3.5 Public Freelancer Bootstrap Runtime implemented locally and pending review as of Saturday, August 1, 2026
 ```
 
@@ -80,7 +82,7 @@ POST-GO-LIVE.3
  |- 3.1 Organization Administration Runtime IMPLEMENTED / IN REVIEW
  |- 3.2 Membership Administration Runtime CLOSED / INTEGRATED
  |- 3.3 Invitation Administration Runtime CLOSED / INTEGRATED
- |- 3.4 Organization Ownership Transfer Runtime IMPLEMENTED / REVIEW PENDING
+ |- 3.4 Organization Ownership Transfer Runtime CLOSED / INTEGRATED
  `- 3.5 Public Freelancer Bootstrap Runtime IMPLEMENTED / REVIEW PENDING
 POST-GO-LIVE.4                           PENDING
 POST-GO-LIVE.5                           PENDING
@@ -527,8 +529,8 @@ The next implementation sequence after closeout is:
 
 POST-GO-LIVE.3.1 is now implemented locally and in review. POST-GO-LIVE.3.2
 and POST-GO-LIVE.3.3 are closed and integrated on `development`.
-POST-GO-LIVE.3.4 ownership transfer runtime is implemented locally and review
-pending as of Thursday, July 30, 2026. POST-GO-LIVE.3.5 public freelancer
+POST-GO-LIVE.3.4 ownership transfer runtime is closed and integrated on
+`development` as of Friday, July 31, 2026. POST-GO-LIVE.3.5 public freelancer
 bootstrap runtime is implemented locally and pending review as of Saturday,
 August 1, 2026. No phase in this sequence is
 authorized for production until the draft PR, CI, and later review controls
@@ -621,8 +623,7 @@ Compatibility notes:
   project revoked history
 - role and status mutations affect access on the next request without a new
   JWT
-- POST-GO-LIVE.3.3 is closed/integrated and POST-GO-LIVE.3.4 is implemented
-  locally and review pending
+- POST-GO-LIVE.3.3 and POST-GO-LIVE.3.4 are closed/integrated
 
 ## POST-GO-LIVE.3.4
 
@@ -631,7 +632,7 @@ keeps the 3.0 organization contract on the existing persistence model.
 
 Status:
 
-- IMPLEMENTED / IN REVIEW
+- CLOSED / INTEGRATED
 - no Prisma migration required
 - not authorized for production
 

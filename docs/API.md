@@ -136,12 +136,22 @@ Public endpoint.
 
 * The server canonicalizes user identity as
   `email.trim().toLocaleLowerCase('en-US')`.
+* The supported public-bootstrap email domain is ASCII-only. Requests with
+  non-ASCII email characters fail validation, and the migration fails closed
+  if legacy non-ASCII user emails require explicit remediation.
 * The server preserves `email` as presentation data and stores the canonical
   identity in `User.normalizedEmail`.
+* The route is served only when
+  `PUBLIC_FREELANCER_BOOTSTRAP_ENABLED=true`; otherwise the backend returns a
+  safe `404 Not Found`.
 * The bootstrap runs as one serializable PostgreSQL transaction.
 * The transaction creates exactly one `User`, one `Organization` with
   `status = ACTIVE`, and one `OrganizationMembership` with
   `role = OWNER` and `status = ACTIVE`.
+* Route-scoped application throttling allows at most `5` attempts per
+  `15` minutes per client IP and at most `3` attempts per `15` minutes per
+  canonicalized email. This does not replace the required reverse-proxy or WAF
+  rate limiting before production exposure.
 * The bootstrap does not create invitations, does not accept or revoke
   invitations automatically, and does not create a `PsychologistProfile`.
 * JWT issuance happens only after a successful commit.
@@ -186,6 +196,7 @@ Public endpoint.
 * `409 Conflict` when registration cannot be completed safely.
 * `429 Too Many Requests` when the route-scoped bootstrap throttle denies the
   request.
+* `500 Internal Server Error` for unexpected server failures.
 
 ---
 

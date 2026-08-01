@@ -246,6 +246,11 @@ Public freelancer bootstrap is intentionally outside the JWT flow. It is a
 public route that creates a new identity and issues the first JWT only after a
 successful database commit.
 
+The route is additionally protected by an explicit runtime feature flag:
+`PUBLIC_FREELANCER_BOOTSTRAP_ENABLED` must be `true` for the endpoint to be
+served. When the flag is disabled, the backend returns a safe `404 Not Found`
+before applying the bootstrap-specific throttle or persistence flow.
+
 Current roles:
 
 - ADMIN
@@ -470,8 +475,10 @@ uploads, downloads and reports. It must exclude `/health/live` and
 
 POST-GO-LIVE.3.5 adds one explicit application-level exception:
 `POST /auth/freelancer-bootstrap` now enforces a route-scoped in-memory
-throttle by client IP and canonicalized user email. This protects the public
-bootstrap flow without changing other endpoint throttle posture.
+throttle by client IP and canonicalized user email. The current contract is
+`5` attempts per `15` minutes per IP and `3` attempts per `15` minutes per
+canonical email. This protects the public bootstrap flow without changing
+other endpoint throttle posture.
 
 ## Production Operations
 
@@ -608,6 +615,11 @@ The runtime executes one serializable PostgreSQL transaction that:
 Post-commit structured observability emits
 `freelancer_bootstrap_completed` or `freelancer_bootstrap_denied` without
 logging passwords, password hashes, JWTs, or full email addresses.
+
+The in-memory throttle is a single-instance application safeguard only. Edge
+rate limiting at the reverse proxy or WAF remains mandatory before production
+exposure because multiple application instances do not share the in-memory
+buckets.
 
 ## Invitation Administration Runtime (POST-GO-LIVE.3.3)
 

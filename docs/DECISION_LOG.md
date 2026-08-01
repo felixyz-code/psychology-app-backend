@@ -15,13 +15,15 @@ POST-GO-LIVE.3.5 is no longer deferred. The backend now implements:
 
 - canonical user identity through required unique `User.normalizedEmail`,
   derived as `email.trim().toLocaleLowerCase('en-US')`;
+- explicit `PUBLIC_FREELANCER_BOOTSTRAP_ENABLED` runtime gating with a safe
+  disabled-path `404`;
 - shared canonical email normalization for login, freelancer bootstrap, and
   invitation recipient user binding;
 - public `POST /auth/freelancer-bootstrap` that runs one serializable
   PostgreSQL transaction to create one user, one active organization, and one
   active owner membership;
 - route-scoped in-memory bootstrap throttling by client IP and canonical
-  email;
+  email with limits `5/IP/15m` and `3/normalizedEmail/15m`;
 - post-commit structured observability through
   `freelancer_bootstrap_completed` and `freelancer_bootstrap_denied`.
 
@@ -32,7 +34,9 @@ but it still does not introduce refresh tokens, password reset, email
 verification, MFA, invitation auto-lifecycle side effects, multi-organization
 bootstrap, automatic `PsychologistProfile` creation, production rollout, or
 frontend onboarding UX. JWT remains identity-only and tenant context still
-resolves from PostgreSQL on each request.
+resolves from PostgreSQL on each request. The supported public-bootstrap and
+legacy-migration user-email domain is ASCII-only unless a future approved
+contract extends canonicalization and backfill semantics safely.
 
 ## STATUS-POST-GO-LIVE.3.4: Organization Ownership Transfer Runtime Implemented
 
@@ -40,8 +44,9 @@ resolves from PostgreSQL on each request.
 
 Accepted as a local runtime status update on branch
 `codex/post-go-live-3-4-ownership-transfer-runtime` from integrated baseline
-`5bb75dc4ae8deed67543f745abb23bac88508066`, pending draft PR review and CI on
-Thursday, July 30, 2026.
+`5bb75dc4ae8deed67543f745abb23bac88508066`; later closed and integrated into
+`development` at merge commit `77b4b6e6a70ef133459b84ea71c5d9590bfb6d0a` on
+Friday, July 31, 2026.
 
 ### Decision
 

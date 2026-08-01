@@ -46,4 +46,8 @@ export class AppConfigService {
   get trustProxyHops() {
     return this.runtimeConfig.trustProxyHops;
   }
+
+  get publicFreelancerBootstrapEnabled() {
+    return this.runtimeConfig.publicFreelancerBootstrapEnabled;
+  }
 }

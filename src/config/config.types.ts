@@ -10,4 +10,5 @@ export type RuntimeConfig = {
   corsOrigins: string[];
   swaggerEnabled: boolean;
   trustProxyHops: number;
+  publicFreelancerBootstrapEnabled: boolean;
 };

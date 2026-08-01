@@ -6,6 +6,7 @@ import {
   ApiCreatedResponse,
   ApiForbiddenResponse,
   ApiHeader,
+  ApiInternalServerErrorResponse,
   ApiOperation,
   ApiTags,
   ApiTooManyRequestsResponse,
@@ -23,6 +24,7 @@ import { CurrentTenant } from '../tenant-context/decorators/current-tenant.decor
 import type { TenantContext } from '../tenant-context/tenant-context.types';
 import type { AuthenticatedUser } from './types/authenticated-user.type';
 import { UseGuards } from '@nestjs/common';
+import { FreelancerBootstrapEnabledGuard } from './guards/freelancer-bootstrap-enabled.guard';
 import { FreelancerBootstrapThrottleGuard } from './guards/freelancer-bootstrap-throttle.guard';
 
 @ApiTags('auth')
@@ -45,7 +47,7 @@ export class AuthController {
 
   @Post('freelancer-bootstrap')
   @Public()
-  @UseGuards(FreelancerBootstrapThrottleGuard)
+  @UseGuards(FreelancerBootstrapEnabledGuard, FreelancerBootstrapThrottleGuard)
   @ApiOperation({
     summary:
       'Create a new freelancer user, initial active organization, and active owner membership',
@@ -61,6 +63,9 @@ export class AuthController {
   })
   @ApiTooManyRequestsResponse({
     description: 'Too many bootstrap attempts',
+  })
+  @ApiInternalServerErrorResponse({
+    description: 'Unexpected server error',
   })
   freelancerBootstrap(
     @Body() dto: CreateFreelancerBootstrapDto,

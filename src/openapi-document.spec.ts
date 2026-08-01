@@ -119,6 +119,9 @@ describe('OpenAPI document', () => {
     expect(
       document.paths['/auth/freelancer-bootstrap'].post?.responses,
     ).toHaveProperty('429');
+    expect(
+      document.paths['/auth/freelancer-bootstrap'].post?.responses,
+    ).toHaveProperty('500');
     expect(document.paths['/auth/login'].post?.responses).not.toHaveProperty(
       '200',
     );

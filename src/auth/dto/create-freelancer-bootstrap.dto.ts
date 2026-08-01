@@ -4,12 +4,14 @@ import {
   IsEmail,
   IsNotEmpty,
   IsString,
+  Matches,
   MaxLength,
   MinLength,
   Validate,
   ValidatorConstraint,
   ValidatorConstraintInterface,
 } from 'class-validator';
+import { ASCII_EMAIL_IDENTITY_PATTERN } from '../../common/identity/email-identity.util';
 import { trimStringInput } from '../../common/identity/trim-string.transform';
 
 export const MIN_BOOTSTRAP_PASSWORD_LENGTH = 12;
@@ -35,6 +37,9 @@ export class CreateFreelancerBootstrapDto {
     maxLength: 255,
   })
   @Transform(({ value }) => trimStringInput(value))
+  @Matches(ASCII_EMAIL_IDENTITY_PATTERN, {
+    message: 'email must contain only ASCII characters',
+  })
   @IsEmail()
   @MaxLength(255)
   email: string;

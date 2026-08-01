@@ -31,12 +31,18 @@ export function validateRuntimeEnv(env: NodeJS.ProcessEnv): RuntimeConfig {
     readOptional(env, 'SWAGGER_ENABLED'),
     'SWAGGER_ENABLED',
     errors,
-    nodeEnv,
+    nodeEnv !== 'production',
   );
   const port = parsePort(readOptional(env, 'PORT'), errors);
   const trustProxyHops = parseTrustProxyHops(
     readOptional(env, 'TRUST_PROXY_HOPS'),
     errors,
+  );
+  const publicFreelancerBootstrapEnabled = parseOptionalBoolean(
+    readOptional(env, 'PUBLIC_FREELANCER_BOOTSTRAP_ENABLED'),
+    'PUBLIC_FREELANCER_BOOTSTRAP_ENABLED',
+    errors,
+    false,
   );
 
   if (databaseUrl && !isPostgresConnectionString(databaseUrl)) {
@@ -85,6 +91,7 @@ export function validateRuntimeEnv(env: NodeJS.ProcessEnv): RuntimeConfig {
     corsOrigins,
     swaggerEnabled,
     trustProxyHops,
+    publicFreelancerBootstrapEnabled,
   };
 }
 
@@ -184,10 +191,10 @@ function parseOptionalBoolean(
   value: string | undefined,
   key: string,
   errors: string[],
-  nodeEnv: string,
+  defaultValue: boolean,
 ) {
   if (value === undefined) {
-    return nodeEnv !== 'production';
+    return defaultValue;
   }
 
   if (value === 'true') {

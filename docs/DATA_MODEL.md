@@ -194,6 +194,13 @@ identity and is derived exactly as `email.trim().toLocaleLowerCase('en-US')`.
 It is required, unique, and is the lookup key for login, public bootstrap, and
 recipient identity binding.
 
+For POST-GO-LIVE.3.5 the supported public-bootstrap and migrated legacy user
+email domain is ASCII-only. The migration trims PostgreSQL whitespace with
+`regexp_replace(..., '^[[:space:]]+|[[:space:]]+$', '', 'g')`, lowercases the
+trimmed candidate, and fails closed if a legacy user email is blank after
+trimming, exceeds the canonical byte limit, collides canonically, or contains
+non-ASCII characters that require manual remediation.
+
 ---
 
 ## Organization

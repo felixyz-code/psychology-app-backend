@@ -14,6 +14,8 @@ import request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from '../src/app.module';
 import { normalizeEmailIdentity } from '../src/common/identity/email-identity.util';
+import { AppConfigService } from '../src/config/configuration';
+import { configureHttpApp } from '../src/http-app.config';
 import { FreelancerBootstrapThrottleService } from '../src/auth/guards/freelancer-bootstrap-throttle.service';
 
 const describeCertification =
@@ -41,6 +43,7 @@ describeCertification('Freelancer bootstrap runtime', () => {
 
     process.env.DATABASE_URL = databaseUrl;
     process.env.JWT_SECRET = 'freelancer-bootstrap-jwt-key-2026';
+    process.env.PUBLIC_FREELANCER_BOOTSTRAP_ENABLED = 'true';
     prisma = new PrismaClient({ adapter: new PrismaPg(databaseUrl) });
     await prisma.$connect();
 
@@ -49,6 +52,7 @@ describeCertification('Freelancer bootstrap runtime', () => {
     }).compile();
 
     app = moduleRef.createNestApplication();
+    configureHttpApp(app, moduleRef.get(AppConfigService));
     await app.init();
     jwtService = moduleRef.get(JwtService);
     throttleService = moduleRef.get(FreelancerBootstrapThrottleService);
@@ -75,7 +79,7 @@ describeCertification('Freelancer bootstrap runtime', () => {
     const normalizedEmail = normalizeEmailIdentity(email);
     const password = 'FreelancerBootstrapSecret1!';
     const name = ' Dra. Ana Martinez ';
-    const organizationName = ' Consultorio Ána Martínez ';
+    const organizationName = ' Consultorio Ana Martinez ';
 
     const response = await request(app.getHttpServer())
       .post('/auth/freelancer-bootstrap')
@@ -197,6 +201,29 @@ describeCertification('Freelancer bootstrap runtime', () => {
     ).toBe(0);
 
     await cleanupBootstrapEmails([email]);
+  });
+
+  it('rejects non-ASCII bootstrap emails before any persistence side effect', async () => {
+    const nonAsciiEmail = `jos${String.fromCharCode(233)}-${suffix}@example.test`;
+
+    const response = await request(app.getHttpServer())
+      .post('/auth/freelancer-bootstrap')
+      .send({
+        email: nonAsciiEmail,
+        password: 'FreelancerBootstrapSecret1!',
+        name: 'Bootstrap Runtime User',
+        organizationName: `ASCII Guard ${suffix}`,
+      })
+      .expect(400);
+
+    expect(response.body).toMatchObject({
+      error: 'Bad Request',
+      statusCode: 400,
+    });
+
+    expect(JSON.stringify(response.body)).toContain(
+      'email must contain only ASCII characters',
+    );
   });
 
   it('retries the generated slug when another bootstrap already claimed the base candidate', async () => {
