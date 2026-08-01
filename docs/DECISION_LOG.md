@@ -1,13 +1,44 @@
 # Decision Log
 
+## STATUS-POST-GO-LIVE.3.4: Organization Ownership Transfer Runtime Implemented
+
+### Status
+
+Accepted as a local runtime status update on branch
+`codex/post-go-live-3-4-ownership-transfer-runtime` from integrated baseline
+`5bb75dc4ae8deed67543f745abb23bac88508066`, pending draft PR review and CI on
+Thursday, July 30, 2026.
+
+### Decision
+
+POST-GO-LIVE.3.4 is no longer deferred. The backend now implements:
+
+- dedicated owner-only `POST /organizations/:organizationId/ownership-transfer`
+  guarded by the new `ownership.transfer` capability;
+- serializable compare-and-set transfer from current actor `OWNER` to another
+  active same-organization non-owner membership;
+- deterministic conflict handling for self-targeting, suspended organizations,
+  inactive or already-owner targets, stale actors, and lost concurrency;
+- post-commit structured organization-domain observability through
+  `organization_ownership_transferred`.
+
+### Consequences
+
+Ownership transfer no longer requires a future schema phase, but it still does
+not introduce a primary-owner flag, persistent audit table, generic `OWNER`
+grants through membership role patching, production rollout, or frontend
+switching UX. The authoritative owner set remains derived from active
+membership rows only.
+
 ## STATUS-POST-GO-LIVE.3.3: Invitation Administration Runtime Implemented
 
 ### Status
 
 Accepted as a local runtime status update on branch
 `codex/post-go-live-3-3-invitation-administration-runtime` from integrated
-baseline `206371972ee10958f62f01434c9ac2f5631d4ec6`, pending draft PR review
-and CI on Wednesday, July 29, 2026.
+baseline `206371972ee10958f62f01434c9ac2f5631d4ec6`; later closed and
+integrated into `development` by PR `#39` at merge commit
+`5bb75dc4ae8deed67543f745abb23bac88508066` on Thursday, July 30, 2026.
 
 ### Decision
 
@@ -29,8 +60,8 @@ POST-GO-LIVE.3.3 is no longer deferred. The backend now implements:
 Invitation administration still preserves the original persistence model:
 `OrganizationInvitation` remains timestamp-derived, token persistence stays
 digest-only, and resend creates a new invitation row rather than mutating the
-old token in place. Ownership transfer, public token validation, real email
-delivery, audit-log persistence, and production rollout remain deferred.
+old token in place. Public token validation, real email delivery, audit-log
+persistence, and production rollout remain deferred.
 
 ## STATUS-POST-GO-LIVE.3.2: Membership Administration Runtime Implemented
 
@@ -65,9 +96,8 @@ Membership history is now preserved across remove, leave, revoke, and later
 re-entry without reopening the same row. Administrative APIs still list only
 current non-terminal memberships, suspended organizations remain fail-closed on
 membership routes, and role/status changes continue to take effect on the next
-request without requiring a new JWT. Ownership transfer, invitation resend,
-frontend switching UX, branding, plans, billing, and production rollout remain
-deferred.
+request without requiring a new JWT. Frontend switching UX, branding, plans,
+billing, and production rollout remain deferred.
 
 ## STATUS-POST-GO-LIVE.3.1: Organization Administration Runtime Implemented
 
@@ -519,8 +549,9 @@ for organization-selected routes. Invitation recipient actions skip tenant
 selection and bind the digest-identified invitation to the authenticated user's
 normalized email and optional persisted user binding. Membership and invitation
 terminal mutations run in serializable transactions with conditional updates.
-The last active OWNER cannot be suspended, removed, or leave; role changes
-never grant OWNER because ownership transfer remains outside this phase.
+The last active OWNER cannot be suspended, removed, or leave; generic role
+changes never grant OWNER because ownership transfer remains isolated in its
+own dedicated route and capability.
 
 ### Boundary
 

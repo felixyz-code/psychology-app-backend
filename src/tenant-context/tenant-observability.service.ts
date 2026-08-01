@@ -17,6 +17,7 @@ export type OrganizationDomainEvent =
   | 'organization_updated'
   | 'organization_suspended'
   | 'organization_reactivated'
+  | 'organization_ownership_transferred'
   | 'invitation_created'
   | 'invitation_revoked'
   | 'invitation_resent'
@@ -31,12 +32,19 @@ export type OrganizationDomainEvent =
   | 'owner_invariant_denied';
 
 type OrganizationDomainMetadata = {
+  actorUserId?: string;
   targetId?: string;
   targetUserId?: string;
   previousInvitationId?: string;
   newInvitationId?: string;
+  sourceMembershipId?: string;
+  targetMembershipId?: string;
   previousRole?: string;
   newRole?: string;
+  sourcePreviousRole?: string;
+  sourceNewRole?: string;
+  targetPreviousRole?: string;
+  targetNewRole?: string;
   previousStatus?: string;
   newStatus?: string;
 };

@@ -42,7 +42,8 @@ Merged baseline: 7d897ec8db2c5d372fce0b4dc0eaf3bd3b1d4b13
 POST-GO-LIVE.3.1 Organization Administration Runtime implemented locally and in review
 POST-GO-LIVE.3.2 Membership Administration Runtime closed and integrated
 Runtime baseline: 2373ff046d56f455ecb9b5c4cc075f36f9ab778f
-POST-GO-LIVE.3.3 Invitation Administration Runtime implemented locally and review pending
+POST-GO-LIVE.3.3 Invitation Administration Runtime closed and integrated
+Runtime baseline: 5bb75dc4ae8deed67543f745abb23bac88508066
 ```
 
 Current priorities:
@@ -77,7 +78,8 @@ POST-GO-LIVE.3
  |- 3.0 Organization & Membership Contract CLOSED
  |- 3.1 Organization Administration Runtime IMPLEMENTED / IN REVIEW
  |- 3.2 Membership Administration Runtime CLOSED / INTEGRATED
- `- 3.3 Invitation Administration Runtime IMPLEMENTED / REVIEW PENDING
+ |- 3.3 Invitation Administration Runtime CLOSED / INTEGRATED
+ `- 3.4 Organization Ownership Transfer Runtime IMPLEMENTED / REVIEW PENDING
 POST-GO-LIVE.4                           PENDING
 POST-GO-LIVE.5                           PENDING
 POST-GO-LIVE.6                           PENDING
@@ -521,9 +523,12 @@ The next implementation sequence after closeout is:
 4. optional active-organization preference UX;
 5. organization-domain certification and later frontend work.
 
-POST-GO-LIVE.3.1 is now implemented locally and in review. POST-GO-LIVE.3.2 is
-implemented locally and review-pending. Neither phase is authorized for
-production until the draft PR, CI, and later review controls are complete.
+POST-GO-LIVE.3.1 is now implemented locally and in review. POST-GO-LIVE.3.2
+and POST-GO-LIVE.3.3 are closed and integrated on `development`.
+POST-GO-LIVE.3.4 ownership transfer runtime is implemented locally and review
+pending as of Thursday, July 30, 2026. No phase in this sequence is
+authorized for production until the draft PR, CI, and later review controls
+are complete.
 
 ## POST-GO-LIVE.3.1
 
@@ -566,8 +571,8 @@ Compatibility notes:
   Documents, Appointments, and Finance until reactivated
 - membership historical re-entry is implemented in POST-GO-LIVE.3.2 and is
   closed/integrated
-- invitation administration runtime is implemented in POST-GO-LIVE.3.3 and
-  remains review-pending
+- invitation administration runtime is implemented in POST-GO-LIVE.3.3 and is
+  closed/integrated
 - no branding, billing, plans, settings, frontend switching UX, or production
   rollout work is included
 
@@ -612,4 +617,45 @@ Compatibility notes:
   project revoked history
 - role and status mutations affect access on the next request without a new
   JWT
-- POST-GO-LIVE.3.3 is implemented locally and review pending
+- POST-GO-LIVE.3.3 is closed/integrated and POST-GO-LIVE.3.4 is implemented
+  locally and review pending
+
+## POST-GO-LIVE.3.4
+
+Organization Ownership Transfer Runtime follows the 3.3 invitation runtime and
+keeps the 3.0 organization contract on the existing persistence model.
+
+Status:
+
+- IMPLEMENTED / IN REVIEW
+- no Prisma migration required
+- not authorized for production
+
+Implemented scope:
+
+- dedicated owner-only `POST /organizations/:organizationId/ownership-transfer`
+  with the new `ownership.transfer` capability
+- serializable compare-and-set promotion/demotion of target and source
+  memberships
+- deterministic `409` behavior for suspended organizations, self-targeting,
+  inactive targets, existing-owner targets, stale actors, and lost concurrency
+- post-commit structured observability through
+  `organization_ownership_transferred`
+- unit, OpenAPI, PostgreSQL E2E, and PostgreSQL concurrency coverage for the
+  runtime path
+
+Out of scope:
+
+- Prisma schema change, migration, or primary-owner persistence
+- ownership audit table persistence
+- broader membership route redesign
+- frontend switching UX
+- branding, plans, billing, and custom settings
+- production rollout or production backfill
+
+Compatibility notes:
+
+- generic membership role patch still never grants `OWNER`
+- ownership transfer remains the only public route that can assign `OWNER`
+- suspended organizations remain blocked from ordinary membership,
+  invitation, clinical, and financial routes

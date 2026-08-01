@@ -6,6 +6,7 @@ import {
 import {
   MembershipRole,
   MembershipStatus,
+  OrganizationStatus,
   Prisma,
   UserRole,
 } from '@prisma/client';
@@ -174,6 +175,230 @@ describe('MembershipsService policy boundary', () => {
         MembershipStatus.SUSPENDED,
         { ...tenant, organizationRole: MembershipRole.OWNER },
       ),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(observability.organizationDomainEvent).not.toHaveBeenCalled();
+  });
+
+  it('transfers ownership by promoting the target and demoting the actor in one transaction', async () => {
+    const targetId = '00000000-0000-4000-8000-000000000004';
+    const targetUserId = '00000000-0000-4000-8000-000000000005';
+    const tx = {
+      organizationMembership: {
+        findFirst: jest
+          .fn()
+          .mockResolvedValueOnce({
+            id: tenant.membershipId,
+            userId: tenant.userId,
+            role: MembershipRole.OWNER,
+            status: MembershipStatus.ACTIVE,
+            organization: {
+              status: OrganizationStatus.ACTIVE,
+            },
+          })
+          .mockResolvedValueOnce({
+            id: targetId,
+            userId: targetUserId,
+            role: MembershipRole.ADMIN,
+            status: MembershipStatus.ACTIVE,
+          })
+          .mockResolvedValueOnce({
+            id: tenant.membershipId,
+            userId: tenant.userId,
+            role: MembershipRole.ADMIN,
+            status: MembershipStatus.ACTIVE,
+          })
+          .mockResolvedValueOnce({
+            id: targetId,
+            userId: targetUserId,
+            role: MembershipRole.OWNER,
+            status: MembershipStatus.ACTIVE,
+          }),
+        updateMany: jest
+          .fn()
+          .mockResolvedValueOnce({ count: 1 })
+          .mockResolvedValueOnce({ count: 1 }),
+        count: jest.fn().mockResolvedValue(1),
+      },
+    };
+    const observability = {
+      organizationDomainEvent: jest.fn(),
+    };
+    const prisma = {
+      $transaction: jest.fn((work: (client: typeof tx) => unknown) => work(tx)),
+    } as never;
+    const service = new MembershipsService(
+      prisma,
+      { decisionFor: jest.fn().mockReturnValue('ALLOW') } as never,
+      observability as never,
+    );
+
+    const result = await service.transferOwnership(
+      tenant.organizationId,
+      targetId,
+      {
+        ...tenant,
+        organizationRole: MembershipRole.OWNER,
+      },
+    );
+
+    expect(result).toMatchObject({
+      organizationId: tenant.organizationId,
+      sourceMembership: {
+        id: tenant.membershipId,
+        userId: tenant.userId,
+        role: MembershipRole.ADMIN,
+        status: MembershipStatus.ACTIVE,
+      },
+      targetMembership: {
+        id: targetId,
+        userId: targetUserId,
+        role: MembershipRole.OWNER,
+        status: MembershipStatus.ACTIVE,
+      },
+    });
+    expect(result.transferredAt).toBeInstanceOf(Date);
+
+    expect(observability.organizationDomainEvent).toHaveBeenCalledWith(
+      'organization_ownership_transferred',
+      {
+        ...tenant,
+        organizationRole: MembershipRole.OWNER,
+      },
+      'SUCCESS',
+      'OWNERSHIP_TRANSFERRED',
+      {
+        actorUserId: tenant.userId,
+        sourceMembershipId: tenant.membershipId,
+        targetMembershipId: targetId,
+        sourcePreviousRole: MembershipRole.OWNER,
+        sourceNewRole: MembershipRole.ADMIN,
+        targetPreviousRole: MembershipRole.ADMIN,
+        targetNewRole: MembershipRole.OWNER,
+      },
+    );
+  });
+
+  it('rejects ownership transfer when the actor lacks the dedicated capability', async () => {
+    const service = new MembershipsService(
+      {} as never,
+      { decisionFor: jest.fn().mockReturnValue('DENY') } as never,
+      { organizationDomainEvent: jest.fn() } as never,
+    );
+
+    await expect(
+      service.transferOwnership(
+        tenant.organizationId,
+        '00000000-0000-4000-8000-000000000004',
+        tenant,
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('rejects self-target ownership transfer attempts', async () => {
+    const tx = {
+      organizationMembership: {
+        findFirst: jest
+          .fn()
+          .mockResolvedValueOnce({
+            id: tenant.membershipId,
+            userId: tenant.userId,
+            role: MembershipRole.OWNER,
+            status: MembershipStatus.ACTIVE,
+            organization: {
+              status: OrganizationStatus.ACTIVE,
+            },
+          })
+          .mockResolvedValueOnce({
+            id: tenant.membershipId,
+            userId: tenant.userId,
+            role: MembershipRole.OWNER,
+            status: MembershipStatus.ACTIVE,
+          }),
+      },
+    };
+    const prisma = {
+      $transaction: jest.fn((work: (client: typeof tx) => unknown) => work(tx)),
+    } as never;
+    const service = new MembershipsService(
+      prisma,
+      { decisionFor: jest.fn().mockReturnValue('ALLOW') } as never,
+      { organizationDomainEvent: jest.fn() } as never,
+    );
+
+    await expect(
+      service.transferOwnership(tenant.organizationId, tenant.membershipId, {
+        ...tenant,
+        organizationRole: MembershipRole.OWNER,
+      }),
+    ).rejects.toThrow('Ownership transfer target must be another membership');
+  });
+
+  it('does not emit success events when an ownership transfer transaction aborts after the write callback completes', async () => {
+    const targetId = '00000000-0000-4000-8000-000000000004';
+    const targetUserId = '00000000-0000-4000-8000-000000000005';
+    const tx = {
+      organizationMembership: {
+        findFirst: jest
+          .fn()
+          .mockResolvedValueOnce({
+            id: tenant.membershipId,
+            userId: tenant.userId,
+            role: MembershipRole.OWNER,
+            status: MembershipStatus.ACTIVE,
+            organization: {
+              status: OrganizationStatus.ACTIVE,
+            },
+          })
+          .mockResolvedValueOnce({
+            id: targetId,
+            userId: targetUserId,
+            role: MembershipRole.ADMIN,
+            status: MembershipStatus.ACTIVE,
+          })
+          .mockResolvedValueOnce({
+            id: tenant.membershipId,
+            userId: tenant.userId,
+            role: MembershipRole.ADMIN,
+            status: MembershipStatus.ACTIVE,
+          })
+          .mockResolvedValueOnce({
+            id: targetId,
+            userId: targetUserId,
+            role: MembershipRole.OWNER,
+            status: MembershipStatus.ACTIVE,
+          }),
+        updateMany: jest
+          .fn()
+          .mockResolvedValueOnce({ count: 1 })
+          .mockResolvedValueOnce({ count: 1 }),
+        count: jest.fn().mockResolvedValue(1),
+      },
+    };
+    const observability = {
+      organizationDomainEvent: jest.fn(),
+    };
+    const prisma = {
+      $transaction: jest.fn(
+        async (work: (client: typeof tx) => Promise<unknown>) => {
+          await work(tx);
+          throw new Prisma.PrismaClientKnownRequestError('serialization', {
+            code: 'P2034',
+            clientVersion: 'test',
+          });
+        },
+      ),
+    } as never;
+    const service = new MembershipsService(
+      prisma,
+      { decisionFor: jest.fn().mockReturnValue('ALLOW') } as never,
+      observability as never,
+    );
+
+    await expect(
+      service.transferOwnership(tenant.organizationId, targetId, {
+        ...tenant,
+        organizationRole: MembershipRole.OWNER,
+      }),
     ).rejects.toBeInstanceOf(ConflictException);
     expect(observability.organizationDomainEvent).not.toHaveBeenCalled();
   });

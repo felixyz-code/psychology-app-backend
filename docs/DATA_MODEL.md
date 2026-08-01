@@ -663,6 +663,13 @@ creates a replacement row instead of mutating the token in place, and
 acceptance after historical revocation still creates a brand new
 `OrganizationMembership` row rather than reopening history.
 
+POST-GO-LIVE.3.4 ownership transfer likewise introduces no schema change,
+column, migration, or owner-designation table. The runtime reuses the existing
+`OrganizationMembership.role` field and swaps responsibility by promoting one
+active same-organization membership to `OWNER` while demoting the acting owner
+to `ADMIN` inside a serializable transaction. There is still no persisted
+primary owner flag; the active owner set remains derived from membership rows.
+
 The migration is safe for legacy rows: it derives `normalizedEmail` from the
 existing required `email`, then sets it `NOT NULL`. It aborts without exposing
 the value if a legacy email is blank, exceeds the canonical column limit, or
