@@ -71,7 +71,7 @@ describe('InvitationsService', () => {
               }),
             ),
           },
-          user: { findMany: jest.fn().mockResolvedValue([]) },
+          user: { findUnique: jest.fn().mockResolvedValue(null) },
           organizationMembership: {
             findFirst: jest.fn().mockResolvedValue(null),
           },
@@ -117,7 +117,7 @@ describe('InvitationsService', () => {
               updatedAt: new Date('2026-08-03T00:00:00.000Z'),
             }),
           },
-          user: { findMany: jest.fn().mockResolvedValue([]) },
+          user: { findUnique: jest.fn().mockResolvedValue(null) },
           organizationMembership: {
             findFirst: jest.fn().mockResolvedValue(null),
           },
@@ -168,12 +168,10 @@ describe('InvitationsService', () => {
             create: jest.fn(),
           },
           user: {
-            findMany: jest.fn().mockResolvedValue([
-              {
-                id: '00000000-0000-4000-8000-000000000004',
-                email: 'recipient@example.test',
-              },
-            ]),
+            findUnique: jest.fn().mockResolvedValue({
+              id: '00000000-0000-4000-8000-000000000004',
+              email: 'recipient@example.test',
+            }),
           },
           organizationMembership: {
             findFirst: jest
@@ -457,7 +455,7 @@ describe('InvitationsService', () => {
             create,
           },
           user: {
-            findMany: jest.fn().mockResolvedValue([]),
+            findUnique: jest.fn().mockResolvedValue(null),
           },
           organizationMembership: {
             findFirst: jest.fn().mockResolvedValue(null),
@@ -533,7 +531,7 @@ describe('InvitationsService', () => {
             }),
           },
           user: {
-            findMany: jest.fn().mockResolvedValue([]),
+            findUnique: jest.fn().mockResolvedValue(null),
           },
           organizationMembership: {
             findFirst: jest.fn().mockResolvedValue(null),

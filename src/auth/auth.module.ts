@@ -8,6 +8,9 @@ import { PrismaModule } from '../prisma/prisma.module';
 import { TenantContextModule } from '../tenant-context/tenant-context.module';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
+import { FreelancerBootstrapEnabledGuard } from './guards/freelancer-bootstrap-enabled.guard';
+import { FreelancerBootstrapThrottleGuard } from './guards/freelancer-bootstrap-throttle.guard';
+import { FreelancerBootstrapThrottleService } from './guards/freelancer-bootstrap-throttle.service';
 import { RolesGuard } from './guards/roles.guard';
 import { JwtStrategy } from './strategies/jwt.strategy';
 
@@ -29,7 +32,14 @@ import { JwtStrategy } from './strategies/jwt.strategy';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy, RolesGuard],
+  providers: [
+    AuthService,
+    JwtStrategy,
+    RolesGuard,
+    FreelancerBootstrapEnabledGuard,
+    FreelancerBootstrapThrottleGuard,
+    FreelancerBootstrapThrottleService,
+  ],
   exports: [AuthService, JwtModule, PassportModule, RolesGuard],
 })
 export class AuthModule {}

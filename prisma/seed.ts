@@ -2,6 +2,7 @@ import 'dotenv/config';
 import * as bcrypt from 'bcrypt';
 import { mkdir, rm, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
+import { normalizeEmailIdentity } from '../src/common/identity/email-identity.util';
 import { requireDemoSeedPassword } from './seed-demo-password';
 import { PrismaPg } from '@prisma/adapter-pg';
 import {
@@ -112,6 +113,7 @@ type SeedUser = {
   id: string;
   name: string;
   email: string;
+  normalizedEmail: string;
   role: UserRole;
 };
 
@@ -557,7 +559,13 @@ function user(
   email: string,
   role: UserRole = UserRole.PSYCHOLOGIST,
 ): SeedUser {
-  return { id, name, email, role };
+  return {
+    id,
+    name,
+    email,
+    normalizedEmail: normalizeEmailIdentity(email),
+    role,
+  };
 }
 
 function membership(

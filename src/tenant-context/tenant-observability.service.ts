@@ -11,7 +11,9 @@ type TenantEvent =
   | 'tenant_context_missing'
   | 'tenant_header_invalid'
   | 'tenant_selection_denied'
-  | 'tenant_capability_denied';
+  | 'tenant_capability_denied'
+  | 'freelancer_bootstrap_completed'
+  | 'freelancer_bootstrap_denied';
 
 export type OrganizationDomainEvent =
   | 'organization_updated'
@@ -130,6 +132,37 @@ export class TenantObservabilityService {
         organizationId: tenant.organizationId,
         reasonCode,
         ...metadata,
+      }),
+    );
+  }
+
+  freelancerBootstrapCompleted(bootstrap: {
+    userId: string;
+    organizationId: string;
+    membershipId: string;
+  }) {
+    this.logger.log(
+      JSON.stringify({
+        event: 'freelancer_bootstrap_completed',
+        outcome: 'SUCCESS',
+        requestId: this.requestContext.requestId ?? 'unavailable',
+        reasonCode: 'BOOTSTRAP_COMPLETED',
+        ...bootstrap,
+      }),
+    );
+  }
+
+  freelancerBootstrapDenied(
+    reasonCode: 'REGISTRATION_CONFLICT' | 'SLUG_CONFLICT' | 'RATE_LIMITED',
+    ipAddress: string,
+  ) {
+    this.logger.warn(
+      JSON.stringify({
+        event: 'freelancer_bootstrap_denied',
+        outcome: 'DENY',
+        requestId: this.requestContext.requestId ?? 'unavailable',
+        reasonCode,
+        ipAddress,
       }),
     );
   }

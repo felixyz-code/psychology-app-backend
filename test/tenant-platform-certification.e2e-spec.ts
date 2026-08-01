@@ -24,6 +24,7 @@ import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
 import request from 'supertest';
 import { App } from 'supertest/types';
+import { normalizeEmailIdentity } from '../src/common/identity/email-identity.util';
 import { AppModule } from '../src/app.module';
 import { CapabilityResolverService } from '../src/tenant-context/authorization/capability-resolver.service';
 import { CapabilityDecision } from '../src/tenant-context/authorization/organization-capability';
@@ -648,6 +649,7 @@ function user(id: string, email: string) {
     id,
     name: 'Tenant Platform Certification User',
     email,
+    normalizedEmail: normalizeEmailIdentity(email),
     passwordHash: 'not-a-real-password',
     role: UserRole.PSYCHOLOGIST,
   };

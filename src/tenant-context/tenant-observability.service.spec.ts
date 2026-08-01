@@ -40,4 +40,30 @@ describe('TenantObservabilityService', () => {
     expect(events).not.toContain('X-Organization-Id:');
     expect(events).not.toContain('rawRequestPayload');
   });
+
+  it('emits freelancer bootstrap events without password, jwt, or full email payloads', () => {
+    const context = new RequestContextService();
+    const service = new TenantObservabilityService(context);
+    const log = jest.spyOn(Logger.prototype, 'log').mockImplementation();
+    const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
+
+    context.run('request-bootstrap-456', () => {
+      service.freelancerBootstrapCompleted({
+        userId: '11111111-1111-4111-8111-111111111111',
+        organizationId: '22222222-2222-4222-8222-222222222222',
+        membershipId: '33333333-3333-4333-8333-333333333333',
+      });
+      service.freelancerBootstrapDenied('RATE_LIMITED', '203.0.113.10');
+    });
+
+    const entries = [...log.mock.calls, ...warn.mock.calls]
+      .map(([event]) => String(event))
+      .join('\n');
+    expect(entries).toContain('request-bootstrap-456');
+    expect(entries).toContain('freelancer_bootstrap_completed');
+    expect(entries).toContain('freelancer_bootstrap_denied');
+    expect(entries).not.toContain('freelancer@example.test');
+    expect(entries).not.toContain('password');
+    expect(entries).not.toContain('eyJ');
+  });
 });

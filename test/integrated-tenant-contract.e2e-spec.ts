@@ -23,6 +23,7 @@ import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
 import request from 'supertest';
 import { App } from 'supertest/types';
+import { normalizeEmailIdentity } from '../src/common/identity/email-identity.util';
 import { AppModule } from '../src/app.module';
 
 const describeCertification =
@@ -1175,6 +1176,7 @@ function user(id: string, email: string, passwordHash = 'not-a-real-password') {
     id,
     name: 'Integrated Tenant Test User',
     email,
+    normalizedEmail: normalizeEmailIdentity(email),
     passwordHash,
     role: UserRole.PSYCHOLOGIST,
   };

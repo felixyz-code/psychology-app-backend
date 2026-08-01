@@ -13,6 +13,7 @@ import { randomUUID } from 'node:crypto';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from '../src/app.module';
+import { normalizeEmailIdentity } from '../src/common/identity/email-identity.util';
 import { normalizeInvitationEmail } from '../src/organizations/invitation-runtime';
 
 const describeCertification =
@@ -712,6 +713,7 @@ function user(id: string, email: string, role: UserRole) {
     id,
     name: 'Invitation Runtime User',
     email,
+    normalizedEmail: normalizeEmailIdentity(email),
     passwordHash: 'not-a-real-password',
     role,
   };

@@ -1,14 +1,15 @@
 import { UnauthorizedException } from '@nestjs/common';
-import { UserRole } from '@prisma/client';
+import { Prisma, UserRole } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
 import { TenantResolutionMode } from '../common/request-context/request-context.service';
 import { AuthService } from './auth.service';
 
-jest.mock('bcrypt', () => ({ compare: jest.fn() }));
+jest.mock('bcrypt', () => ({ compare: jest.fn(), hash: jest.fn() }));
 
 type PrismaMock = {
+  $transaction: jest.Mock;
   user: {
     findUnique: jest.Mock;
   };
@@ -43,9 +44,15 @@ describe('AuthService', () => {
   let prisma: PrismaMock;
   let jwtService: { signAsync: jest.Mock };
   let bcryptCompare: jest.MockedFunction<typeof bcrypt.compare>;
+  let bcryptHash: jest.MockedFunction<typeof bcrypt.hash>;
+  let observability: {
+    freelancerBootstrapCompleted: jest.Mock;
+    freelancerBootstrapDenied: jest.Mock;
+  };
 
   beforeEach(() => {
     prisma = {
+      $transaction: jest.fn(),
       user: {
         findUnique: jest.fn(),
       },
@@ -59,9 +66,15 @@ describe('AuthService', () => {
     bcryptCompare = bcrypt.compare as jest.MockedFunction<
       typeof bcrypt.compare
     >;
+    bcryptHash = bcrypt.hash as jest.MockedFunction<typeof bcrypt.hash>;
+    observability = {
+      freelancerBootstrapCompleted: jest.fn(),
+      freelancerBootstrapDenied: jest.fn(),
+    };
     service = new AuthService(
       prisma as unknown as PrismaService,
       jwtService as unknown as JwtService,
+      observability as never,
     );
   });
 
@@ -75,7 +88,10 @@ describe('AuthService', () => {
     jwtService.signAsync.mockResolvedValue('access-token');
 
     await expect(
-      service.login({ email: user.email, password: 'correct-password' }),
+      service.login({
+        email: ` ${user.email.toUpperCase()} `,
+        password: 'correct-password',
+      }),
     ).resolves.toEqual({
       accessToken: 'access-token',
       user: {
@@ -86,6 +102,9 @@ describe('AuthService', () => {
       },
     });
 
+    expect(prisma.user.findUnique).toHaveBeenCalledWith({
+      where: { normalizedEmail: user.email },
+    });
     expect(bcryptCompare).toHaveBeenCalledWith(
       'correct-password',
       user.passwordHash,
@@ -211,5 +230,132 @@ describe('AuthService', () => {
       tenantContext,
     });
     expect(prisma.organizationMembership.findMany).not.toHaveBeenCalled();
+  });
+
+  it('creates the freelancer bootstrap user, organization, membership, and post-commit jwt', async () => {
+    const createdAt = new Date('2026-08-01T12:00:00.000Z');
+    bcryptHash.mockResolvedValue('hashed-password' as never);
+    jwtService.signAsync.mockResolvedValue('bootstrap-token');
+    prisma.$transaction.mockImplementation(
+      async (work: (tx: Record<string, unknown>) => Promise<unknown>) =>
+        work({
+          user: {
+            findUnique: jest.fn().mockResolvedValue(null),
+            create: jest.fn().mockResolvedValue({
+              id: 'user-bootstrap-id',
+              name: 'Dra. Ana Martinez',
+              email: 'Ana@example.test',
+              role: UserRole.PSYCHOLOGIST,
+            }),
+          },
+          organization: {
+            create: jest.fn().mockResolvedValue({
+              id: 'organization-bootstrap-id',
+              slug: 'consultorio-ana-martinez',
+              legalName: 'Consultorio Ana Martinez',
+              displayName: 'Consultorio Ana Martinez',
+              status: 'ACTIVE',
+              timezone: 'UTC',
+              locale: 'es-MX',
+              currency: 'MXN',
+            }),
+          },
+          organizationMembership: {
+            create: jest.fn().mockResolvedValue({
+              id: 'membership-bootstrap-id',
+              organizationId: 'organization-bootstrap-id',
+              userId: 'user-bootstrap-id',
+              role: 'OWNER',
+              status: 'ACTIVE',
+              joinedAt: createdAt,
+            }),
+          },
+        }),
+    );
+
+    await expect(
+      service.freelancerBootstrap(
+        {
+          email: ' Ana@example.test ',
+          password: 'FreelancerBootstrapSecret1!',
+          name: ' Dra. Ana Martinez ',
+          organizationName: ' Consultorio Ana Martinez ',
+        },
+        '203.0.113.40',
+      ),
+    ).resolves.toMatchObject({
+      accessToken: 'bootstrap-token',
+      user: {
+        id: 'user-bootstrap-id',
+        email: 'Ana@example.test',
+        role: UserRole.PSYCHOLOGIST,
+      },
+      organization: {
+        id: 'organization-bootstrap-id',
+        slug: 'consultorio-ana-martinez',
+        status: 'ACTIVE',
+      },
+      membership: {
+        id: 'membership-bootstrap-id',
+        role: 'OWNER',
+        status: 'ACTIVE',
+        joinedAt: createdAt,
+      },
+    });
+
+    expect(bcryptHash).toHaveBeenCalledWith('FreelancerBootstrapSecret1!', 10);
+    expect(prisma.$transaction).toHaveBeenCalledWith(
+      expect.any(Function),
+      expect.objectContaining({
+        isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+      }),
+    );
+    expect(observability.freelancerBootstrapCompleted).toHaveBeenCalledWith({
+      userId: 'user-bootstrap-id',
+      organizationId: 'organization-bootstrap-id',
+      membershipId: 'membership-bootstrap-id',
+    });
+    expect(observability.freelancerBootstrapDenied).not.toHaveBeenCalled();
+  });
+
+  it('returns a uniform bootstrap conflict without emitting success observability', async () => {
+    bcryptHash.mockResolvedValue('hashed-password' as never);
+    prisma.$transaction.mockImplementation(
+      async (work: (tx: Record<string, unknown>) => Promise<unknown>) =>
+        work({
+          user: {
+            findUnique: jest.fn().mockResolvedValue({
+              id: 'existing-user-id',
+            }),
+          },
+          organization: {
+            create: jest.fn(),
+          },
+          organizationMembership: {
+            create: jest.fn(),
+          },
+        }),
+    );
+
+    await expect(
+      service.freelancerBootstrap(
+        {
+          email: 'Existing@example.test',
+          password: 'FreelancerBootstrapSecret1!',
+          name: 'Existing User',
+          organizationName: 'Existing Practice',
+        },
+        '203.0.113.41',
+      ),
+    ).rejects.toMatchObject({
+      message: 'Registration could not be completed',
+    });
+
+    expect(observability.freelancerBootstrapDenied).toHaveBeenCalledWith(
+      'REGISTRATION_CONFLICT',
+      '203.0.113.41',
+    );
+    expect(observability.freelancerBootstrapCompleted).not.toHaveBeenCalled();
+    expect(jwtService.signAsync).not.toHaveBeenCalled();
   });
 });

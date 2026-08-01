@@ -1,5 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
 import { createHash, randomBytes } from 'node:crypto';
+import { normalizeEmailIdentity } from '../common/identity/email-identity.util';
 
 export enum InvitationLogicalStatus {
   PENDING = 'PENDING',
@@ -20,7 +21,7 @@ export type InvitationLifecycleSnapshot = {
 const TOKEN_PATTERN = /^[A-Za-z0-9_-]{43}$/;
 
 export function normalizeInvitationEmail(email: string) {
-  return email.trim().toLocaleLowerCase('en-US');
+  return normalizeEmailIdentity(email);
 }
 
 export function deriveInvitationLogicalStatus(

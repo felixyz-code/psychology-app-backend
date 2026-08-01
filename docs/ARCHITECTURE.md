@@ -177,6 +177,33 @@ Prisma ORM
 PostgreSQL
 ```
 
+Public bootstrap lifecycle:
+
+```text
+Client
+    |
+    v
+POST /auth/freelancer-bootstrap
+    |
+    v
+DTO trim/validation
+    |
+    v
+Route-scoped bootstrap throttle
+    |
+    v
+AuthService.freelancerBootstrap
+    |
+    v
+Serializable Prisma transaction
+    |
+    v
+Post-commit observability
+    |
+    v
+Identity-only JWT
+```
+
 ---
 
 # Authorization Flow
@@ -214,6 +241,15 @@ Ownership Validation
 
 Business Logic
 ```
+
+Public freelancer bootstrap is intentionally outside the JWT flow. It is a
+public route that creates a new identity and issues the first JWT only after a
+successful database commit.
+
+The route is additionally protected by an explicit runtime feature flag:
+`PUBLIC_FREELANCER_BOOTSTRAP_ENABLED` must be `true` for the endpoint to be
+served. When the flag is disabled, the backend returns a safe `404 Not Found`
+before applying the bootstrap-specific throttle or persistence flow.
 
 Current roles:
 
@@ -437,6 +473,13 @@ must enforce route-specific controls for login, authenticated API routes,
 uploads, downloads and reports. It must exclude `/health/live` and
 `/health/ready`, which are deliberately unauthenticated probe endpoints.
 
+POST-GO-LIVE.3.5 adds one explicit application-level exception:
+`POST /auth/freelancer-bootstrap` now enforces a route-scoped in-memory
+throttle by client IP and canonicalized user email. The current contract is
+`5` attempts per `15` minutes per IP and `3` attempts per `15` minutes per
+canonical email. This protects the public bootstrap flow without changing
+other endpoint throttle posture.
+
 ## Production Operations
 
 Container startup validates configuration, optionally applies versioned Prisma
@@ -551,6 +594,32 @@ Post-commit structured observability emits
 `organization_ownership_transferred` only after the transaction succeeds. This
 keeps the existing architecture rule that business audit telemetry must not
 claim success before durable commit.
+
+## Public Freelancer Bootstrap Runtime (POST-GO-LIVE.3.5)
+
+The public bootstrap runtime stays inside the existing `AuthModule` and adds no
+tenant claim to JWT, no invitation side effect, and no bootstrap-specific
+controller helper outside Auth. One shared canonical email helper is reused for
+login, bootstrap, and invitation recipient identity.
+
+The runtime executes one serializable PostgreSQL transaction that:
+
+1. canonicalizes user email identity;
+2. verifies that no canonical user already exists;
+3. creates the `User` with presentation `email` plus canonical
+   `normalizedEmail`;
+4. creates one `ACTIVE` organization with a server-generated slug;
+5. creates one `OWNER` `ACTIVE` membership;
+6. commits before emitting observability or JWT.
+
+Post-commit structured observability emits
+`freelancer_bootstrap_completed` or `freelancer_bootstrap_denied` without
+logging passwords, password hashes, JWTs, or full email addresses.
+
+The in-memory throttle is a single-instance application safeguard only. Edge
+rate limiting at the reverse proxy or WAF remains mandatory before production
+exposure because multiple application instances do not share the in-memory
+buckets.
 
 ## Invitation Administration Runtime (POST-GO-LIVE.3.3)
 

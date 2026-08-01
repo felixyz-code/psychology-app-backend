@@ -39,7 +39,7 @@ Current characteristics:
 * Swagger supports `Authorize` using Bearer Token.
 * All route IDs are UUIDs.
 * Clinical endpoints require JWT Bearer authentication.
-* Public endpoint: `POST /auth/login`
+* Public endpoints: `POST /auth/login`, `POST /auth/freelancer-bootstrap`
 
 ## Authentication
 
@@ -111,6 +111,92 @@ Public endpoint.
 
 * `401 Unauthorized` when email does not exist.
 * `401 Unauthorized` when password is invalid.
+
+## `POST /auth/freelancer-bootstrap`
+
+Creates one public freelancer account, one initial active organization, and
+one active owner membership in a single bootstrap flow.
+
+### Authentication
+
+Public endpoint.
+
+### Body
+
+```json
+{
+  "email": "string",
+  "password": "string",
+  "name": "string",
+  "organizationName": "string"
+}
+```
+
+### Runtime Rules
+
+* The server canonicalizes user identity as
+  `email.trim().toLocaleLowerCase('en-US')`.
+* The supported public-bootstrap email domain is ASCII-only. Requests with
+  non-ASCII email characters fail validation, and the migration fails closed
+  if legacy non-ASCII user emails require explicit remediation.
+* The server preserves `email` as presentation data and stores the canonical
+  identity in `User.normalizedEmail`.
+* The route is served only when
+  `PUBLIC_FREELANCER_BOOTSTRAP_ENABLED=true`; otherwise the backend returns a
+  safe `404 Not Found`.
+* The bootstrap runs as one serializable PostgreSQL transaction.
+* The transaction creates exactly one `User`, one `Organization` with
+  `status = ACTIVE`, and one `OrganizationMembership` with
+  `role = OWNER` and `status = ACTIVE`.
+* Route-scoped application throttling allows at most `5` attempts per
+  `15` minutes per client IP and at most `3` attempts per `15` minutes per
+  canonicalized email. This does not replace the required reverse-proxy or WAF
+  rate limiting before production exposure.
+* The bootstrap does not create invitations, does not accept or revoke
+  invitations automatically, and does not create a `PsychologistProfile`.
+* JWT issuance happens only after a successful commit.
+* The JWT remains identity-only and does not contain tenant, organization,
+  membership, or capability claims.
+
+### Response
+
+```json
+{
+  "accessToken": "string",
+  "user": {
+    "id": "uuid",
+    "name": "string",
+    "email": "string",
+    "role": "ADMIN | PSYCHOLOGIST"
+  },
+  "organization": {
+    "id": "uuid",
+    "slug": "string",
+    "legalName": "string",
+    "displayName": "string",
+    "status": "ACTIVE",
+    "timezone": "string",
+    "locale": "string",
+    "currency": "string"
+  },
+  "membership": {
+    "id": "uuid",
+    "organizationId": "uuid",
+    "userId": "uuid",
+    "role": "OWNER",
+    "status": "ACTIVE",
+    "joinedAt": "date-time"
+  }
+}
+```
+
+### Errors
+
+* `400 Bad Request` for invalid payloads.
+* `409 Conflict` when registration cannot be completed safely.
+* `429 Too Many Requests` when the route-scoped bootstrap throttle denies the
+  request.
+* `500 Internal Server Error` for unexpected server failures.
 
 ---
 
