@@ -169,6 +169,7 @@ Represents an authenticated system user.
 * `id`
 * `name`
 * `email`
+* `normalizedEmail`
 * `passwordHash`
 * `role`
 
@@ -187,6 +188,81 @@ Users act as the ownership root for psychologist-scoped resources.
 ### Business Notes
 
 Current roles are `ADMIN` and `PSYCHOLOGIST`.
+
+`email` remains the presentation value. `normalizedEmail` is the canonical user
+identity and is derived exactly as `email.trim().toLocaleLowerCase('en-US')`.
+It is required, unique, and is the lookup key for login, public bootstrap, and
+recipient identity binding.
+
+---
+
+## Organization
+
+### Purpose
+
+Represents one tenant boundary for administrative, clinical, and operational
+data.
+
+### Database Table
+
+`organizations`
+
+### Main Fields
+
+* `id`
+* `slug`
+* `legalName`
+* `displayName`
+* `status`
+* `timezone`
+* `locale`
+* `currency`
+
+### Relationships
+
+* Has many `OrganizationMembership` records
+* Has many `OrganizationInvitation` records
+* May have one `OrganizationSettings`
+* May have one `OrganizationBranding`
+
+### Business Notes
+
+POST-GO-LIVE.3.5 public freelancer bootstrap creates exactly one initial
+organization with `status = ACTIVE`, a server-generated `slug`, and default
+timezone/locale/currency when no later administration change has been applied.
+
+---
+
+## OrganizationMembership
+
+### Purpose
+
+Represents a user's authority inside one organization.
+
+### Database Table
+
+`organization_memberships`
+
+### Main Fields
+
+* `id`
+* `organizationId`
+* `userId`
+* `role`
+* `status`
+* `joinedAt`
+
+### Relationships
+
+* Belongs to one `Organization`
+* Belongs to one `User`
+* May participate in `PatientAssignment`
+
+### Business Notes
+
+POST-GO-LIVE.3.5 public freelancer bootstrap creates exactly one initial
+membership with `role = OWNER`, `status = ACTIVE`, and a committed `joinedAt`
+timestamp. Bootstrap never creates multiple memberships for the same request.
 
 ---
 
@@ -539,6 +615,13 @@ filters are deferred until data has been backfilled and validated.
 `PsychologistProfile` is one-to-one with a user but grants neither membership
 nor clinical access. `PatientAssignment` is stored for future historical
 professional assignment; it is not yet populated or used by authorization.
+
+POST-GO-LIVE.3.5 adds canonical user identity to the same additive foundation.
+`User.normalizedEmail` is backfilled from legacy `email`, made `NOT NULL`, and
+protected by a unique index through the versioned Prisma migration
+`20260801120000_add_user_normalized_email_bootstrap_runtime`. The migration is
+fail-closed for blank canonical emails, overlength canonical emails, and legacy
+canonical collisions; it never merges or deletes users automatically.
 
 ### POST-GO-LIVE.2.1D0 assignment and tenant boundary
 

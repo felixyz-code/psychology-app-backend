@@ -16,6 +16,7 @@ Backend API for managing authentication, patients, case files, session notes, do
 ## Main Features
 
 * JWT login
+* Public freelancer bootstrap
 * Role-based access
 * Ownership filtering
 * Patient management
@@ -118,6 +119,9 @@ Swagger UI is available at:
 ```
 
 Use `POST /auth/login` to obtain a JWT and then use Swagger `Authorize` with Bearer Token.
+
+Swagger also documents the public self-bootstrap route
+`POST /auth/freelancer-bootstrap` for the independent freelancer baseline.
 
 ## Environment Variables
 

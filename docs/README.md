@@ -69,6 +69,7 @@ Defines the REST API contract.
 Includes:
 
 - Authentication
+- Public freelancer bootstrap
 - Ownership rules
 - Endpoints
 - Request and response contracts
@@ -142,7 +143,8 @@ membership administration runtime baseline. POST-GO-LIVE.3.3 invitation
 administration runtime is closed and integrated on merge commit
 `5bb75dc4ae8deed67543f745abb23bac88508066` via PR `#39`. POST-GO-LIVE.3.4
 ownership transfer runtime is implemented locally and review pending as of
-Thursday, July 30, 2026.
+Thursday, July 30, 2026. POST-GO-LIVE.3.5 public freelancer bootstrap runtime
+is implemented locally and review pending as of Saturday, August 1, 2026.
 
 Additional ADRs for the organization domain include:
 

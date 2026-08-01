@@ -5,12 +5,39 @@ import {
   PrismaClient,
 } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
+import { normalizeEmailIdentity } from '../common/identity/email-identity.util';
 
 import { parseLegacyBackfillManifest } from './legacy-backfill/manifest';
 import { createLegacyBackfillPlan } from './legacy-backfill/legacy-backfill.service';
 
 const runPersistenceTests =
   process.env.RUN_PERSISTENCE_TESTS === 'true' ? describe : describe.skip;
+
+const seededOrganizationIds = [
+  seedUuid(22000000, 1),
+  seedUuid(22000000, 2),
+  seedUuid(22000000, 3),
+];
+
+const seededPatientEmails = [
+  'patient.owner.a@example.test',
+  'patient.assigned.a@example.test',
+  'patient.unassigned.a@example.test',
+  'patient.b@example.test',
+  'patient.multi.a@example.test',
+  'patient.multi.b@example.test',
+];
+
+const seededUpdateIds = {
+  patients: [1, 2, 3, 4, 5, 6].map((value) => seedUuid(25000000, value)),
+  caseFiles: [1, 2, 3, 4, 5, 6].map((value) => seedUuid(26000000, value)),
+  sessionNotes: [1, 2, 3].map((value) => seedUuid(27000000, value)),
+  documents: [1, 2, 3].map((value) => seedUuid(28000000, value)),
+  appointments: [1, 2, 3, 4].map((value) => seedUuid(29000000, value)),
+  financialTransactions: [1, 2, 3, 4, 5, 6, 7].map((value) =>
+    seedUuid(30000000, value),
+  ),
+};
 
 runPersistenceTests('PostgreSQL persistence integration', () => {
   let prisma: PrismaClient;
@@ -45,12 +72,24 @@ runPersistenceTests('PostgreSQL persistence integration', () => {
       appointments,
       transactions,
     ] = await Promise.all([
-      prisma.patient.count(),
-      prisma.caseFile.count(),
-      prisma.sessionNote.count(),
-      prisma.document.count(),
-      prisma.appointment.count(),
-      prisma.financialTransaction.count(),
+      prisma.patient.count({
+        where: { organizationId: { in: seededOrganizationIds } },
+      }),
+      prisma.caseFile.count({
+        where: { organizationId: { in: seededOrganizationIds } },
+      }),
+      prisma.sessionNote.count({
+        where: { organizationId: { in: seededOrganizationIds } },
+      }),
+      prisma.document.count({
+        where: { organizationId: { in: seededOrganizationIds } },
+      }),
+      prisma.appointment.count({
+        where: { organizationId: { in: seededOrganizationIds } },
+      }),
+      prisma.financialTransaction.count({
+        where: { organizationId: { in: seededOrganizationIds } },
+      }),
     ]);
 
     expect({
@@ -100,9 +139,50 @@ runPersistenceTests('PostgreSQL persistence integration', () => {
     ).rejects.toMatchObject({ code: 'P2025' });
   });
 
+  it('enforces canonical user email uniqueness across presentation variants', async () => {
+    const suffix = randomUUID();
+    const firstUserId = randomUUID();
+    const secondUserId = randomUUID();
+    const firstEmail = `Canonical-${suffix}@example.test`;
+    const normalizedEmail = normalizeEmailIdentity(
+      `  CANONICAL-${suffix}@EXAMPLE.TEST  `,
+    );
+
+    try {
+      await prisma.user.create({
+        data: {
+          id: firstUserId,
+          name: 'Canonical Email User A',
+          email: firstEmail,
+          normalizedEmail,
+          passwordHash: 'not-a-real-password',
+          role: 'PSYCHOLOGIST',
+        },
+      });
+
+      await expect(
+        prisma.user.create({
+          data: {
+            id: secondUserId,
+            name: 'Canonical Email User B',
+            email: `  CANONICAL-${suffix}@EXAMPLE.TEST  `,
+            normalizedEmail,
+            passwordHash: 'not-a-real-password',
+            role: 'PSYCHOLOGIST',
+          },
+        }),
+      ).rejects.toMatchObject({ code: 'P2002' });
+    } finally {
+      await prisma.user.deleteMany({
+        where: { id: { in: [firstUserId, secondUserId] } },
+      });
+    }
+  });
+
   it('groups financial totals in PostgreSQL', async () => {
     const groups = await prisma.financialTransaction.groupBy({
       by: ['type'],
+      where: { organizationId: { in: seededOrganizationIds } },
       _count: { _all: true },
       _sum: { amount: true },
     });
@@ -128,6 +208,9 @@ runPersistenceTests('PostgreSQL persistence integration', () => {
           id: memberUserId,
           name: 'SaaS Membership Test User',
           email: `saas-member-${suffix}@example.test`,
+          normalizedEmail: normalizeEmailIdentity(
+            `saas-member-${suffix}@example.test`,
+          ),
           passwordHash: 'not-a-real-password',
           role: 'PSYCHOLOGIST',
         },
@@ -137,6 +220,9 @@ runPersistenceTests('PostgreSQL persistence integration', () => {
           id: profileOnlyUserId,
           name: 'SaaS Profile Test User',
           email: `saas-profile-${suffix}@example.test`,
+          normalizedEmail: normalizeEmailIdentity(
+            `saas-profile-${suffix}@example.test`,
+          ),
           passwordHash: 'not-a-real-password',
           role: 'PSYCHOLOGIST',
         },
@@ -221,9 +307,7 @@ runPersistenceTests('PostgreSQL persistence integration', () => {
         }),
       ).toBeNull();
 
-      expect(
-        await prisma.patient.count({ where: { organizationId: null } }),
-      ).toBe(0);
+      expect(await countSeedLegacyNullRows(prisma)).toBe(0);
     } finally {
       await prisma.organizationMembership.deleteMany({
         where: { userId: memberUserId },
@@ -254,6 +338,9 @@ runPersistenceTests('PostgreSQL persistence integration', () => {
           id: userId,
           name: 'Historical Reentry User',
           email: `historical-reentry-${suffix}@example.test`,
+          normalizedEmail: normalizeEmailIdentity(
+            `historical-reentry-${suffix}@example.test`,
+          ),
           passwordHash: 'not-a-real-password',
           role: 'PSYCHOLOGIST',
         },
@@ -502,19 +589,95 @@ runPersistenceTests('PostgreSQL persistence integration', () => {
         'ORGANIZATION_MANIFEST_CONFLICT',
       ]),
     );
-    expect(dryRunPlan.updates).toEqual({
-      patients: [],
-      caseFiles: [],
-      sessionNotes: [],
-      documents: [],
-      appointments: [],
-      financialTransactions: [],
-    });
-    expect(
-      await prisma.patient.count({ where: { organizationId: null } }),
-    ).toBe(0);
+    expectNoSeedUpdates(dryRunPlan.updates);
+    expect(await countSeedLegacyNullRows(prisma)).toBe(0);
   });
 });
+
+function expectNoSeedUpdates(updates: {
+  patients: string[];
+  caseFiles: string[];
+  sessionNotes: string[];
+  documents: string[];
+  appointments: string[];
+  financialTransactions: string[];
+}) {
+  expect(updates.patients).toEqual(
+    expect.not.arrayContaining(seededUpdateIds.patients),
+  );
+  expect(updates.caseFiles).toEqual(
+    expect.not.arrayContaining(seededUpdateIds.caseFiles),
+  );
+  expect(updates.sessionNotes).toEqual(
+    expect.not.arrayContaining(seededUpdateIds.sessionNotes),
+  );
+  expect(updates.documents).toEqual(
+    expect.not.arrayContaining(seededUpdateIds.documents),
+  );
+  expect(updates.appointments).toEqual(
+    expect.not.arrayContaining(seededUpdateIds.appointments),
+  );
+  expect(updates.financialTransactions).toEqual(
+    expect.not.arrayContaining(seededUpdateIds.financialTransactions),
+  );
+}
+
+async function countSeedLegacyNullRows(prisma: PrismaClient) {
+  const [
+    patients,
+    caseFiles,
+    sessionNotes,
+    documents,
+    appointments,
+    transactions,
+  ] = await Promise.all([
+    prisma.patient.count({
+      where: {
+        email: { in: seededPatientEmails },
+        organizationId: null,
+      },
+    }),
+    prisma.caseFile.count({
+      where: {
+        id: { in: seededUpdateIds.caseFiles },
+        organizationId: null,
+      },
+    }),
+    prisma.sessionNote.count({
+      where: {
+        id: { in: seededUpdateIds.sessionNotes },
+        organizationId: null,
+      },
+    }),
+    prisma.document.count({
+      where: {
+        id: { in: seededUpdateIds.documents },
+        organizationId: null,
+      },
+    }),
+    prisma.appointment.count({
+      where: {
+        id: { in: seededUpdateIds.appointments },
+        organizationId: null,
+      },
+    }),
+    prisma.financialTransaction.count({
+      where: {
+        id: { in: seededUpdateIds.financialTransactions },
+        organizationId: null,
+      },
+    }),
+  ]);
+
+  return (
+    patients +
+    caseFiles +
+    sessionNotes +
+    documents +
+    appointments +
+    transactions
+  );
+}
 
 function organizationRecord(id: string, slug: string) {
   return {
@@ -528,4 +691,10 @@ function organizationRecord(id: string, slug: string) {
 
 function tokenDigestSeed() {
   return randomUUID().replace(/-/g, '').repeat(2).slice(0, 64);
+}
+
+function seedUuid(namespace: number, value: number) {
+  return `${namespace.toString().padStart(8, '0')}-0000-4000-8000-${value
+    .toString()
+    .padStart(12, '0')}`;
 }

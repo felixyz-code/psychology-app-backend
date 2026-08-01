@@ -44,7 +44,7 @@ describe('OpenAPI document', () => {
   it('documents every certified route and the Bearer security scheme', () => {
     const document = createDocument(app);
 
-    expect(Object.keys(document.paths)).toHaveLength(42);
+    expect(Object.keys(document.paths)).toHaveLength(43);
     expect(document.components?.securitySchemes?.bearer).toEqual({
       type: 'http',
       scheme: 'bearer',
@@ -52,6 +52,9 @@ describe('OpenAPI document', () => {
       description: 'Paste the JWT access token here',
     });
     expect(document.paths['/auth/login'].post?.security).toBeUndefined();
+    expect(
+      document.paths['/auth/freelancer-bootstrap'].post?.security,
+    ).toBeUndefined();
     expect(document.paths['/auth/context'].get?.security).toEqual([
       { bearer: [] },
     ]);
@@ -107,6 +110,15 @@ describe('OpenAPI document', () => {
     const document = createDocument(app);
 
     expect(document.paths['/auth/login'].post?.responses).toHaveProperty('201');
+    expect(
+      document.paths['/auth/freelancer-bootstrap'].post?.responses,
+    ).toHaveProperty('201');
+    expect(
+      document.paths['/auth/freelancer-bootstrap'].post?.responses,
+    ).toHaveProperty('409');
+    expect(
+      document.paths['/auth/freelancer-bootstrap'].post?.responses,
+    ).toHaveProperty('429');
     expect(document.paths['/auth/login'].post?.responses).not.toHaveProperty(
       '200',
     );
@@ -156,6 +168,20 @@ describe('OpenAPI document', () => {
       )['application/json']?.schema,
     ).toEqual({
       $ref: '#/components/schemas/OwnershipTransferResponseDto',
+    });
+    expect(
+      getRequestContent(document, '/auth/freelancer-bootstrap', 'post')[
+        'application/json'
+      ]?.schema,
+    ).toEqual({
+      $ref: '#/components/schemas/CreateFreelancerBootstrapDto',
+    });
+    expect(
+      getResponseContent(document, '/auth/freelancer-bootstrap', 'post', '201')[
+        'application/json'
+      ]?.schema,
+    ).toEqual({
+      $ref: '#/components/schemas/FreelancerBootstrapResponseDto',
     });
   });
 

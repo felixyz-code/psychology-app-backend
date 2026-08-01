@@ -13,6 +13,7 @@ import { randomUUID } from 'node:crypto';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from '../src/app.module';
+import { normalizeEmailIdentity } from '../src/common/identity/email-identity.util';
 
 const describeCertification =
   process.env.RUN_TENANT_CERTIFICATION_TESTS === 'true'
@@ -241,6 +242,7 @@ function user(id: string, email: string, role: UserRole) {
     id,
     name: 'Organization Runtime User',
     email,
+    normalizedEmail: normalizeEmailIdentity(email),
     passwordHash: 'not-a-real-password',
     role,
   };

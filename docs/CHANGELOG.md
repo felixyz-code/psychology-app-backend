@@ -2,6 +2,42 @@
 
 ---
 
+# POST-GO-LIVE.3.5 Public Freelancer Bootstrap Runtime
+
+## Status
+
+Implemented locally and pending technical review, draft PR publication, and
+CI on Saturday, August 1, 2026.
+
+## Highlights
+
+* Added canonical user identity through required unique
+  `User.normalizedEmail`.
+* Added Prisma migration
+  `20260801120000_add_user_normalized_email_bootstrap_runtime` with fail-closed
+  legacy backfill and collision guards.
+* Switched login and recipient user binding to canonical
+  `normalizedEmail` lookup.
+* Added public `POST /auth/freelancer-bootstrap` that creates one
+  `User`, one `ACTIVE` organization, and one `OWNER` `ACTIVE` membership in
+  one serializable transaction.
+* Added route-scoped bootstrap throttling by client IP and canonical email.
+* Added post-commit bootstrap observability events
+  `freelancer_bootstrap_completed` and `freelancer_bootstrap_denied`.
+* Extended unit, OpenAPI, persistence, PostgreSQL E2E, and concurrency
+  coverage for canonical identity and freelancer bootstrap runtime paths.
+
+## Compatibility
+
+* No refresh-token flow.
+* No password reset.
+* No email verification.
+* No MFA.
+* No invitation auto-bind, auto-accept, or auto-revoke side effects.
+* No automatic `PsychologistProfile` creation.
+* JWT remains identity-only and does not carry tenant, organization,
+  membership, or capability claims.
+
 # POST-GO-LIVE.3.4 Organization Ownership Transfer Runtime
 
 ## Status

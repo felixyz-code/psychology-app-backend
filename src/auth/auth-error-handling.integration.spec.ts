@@ -1,4 +1,5 @@
 import {
+  ConflictException,
   Controller,
   Get,
   INestApplication,
@@ -14,10 +15,14 @@ import { UserRole } from '@prisma/client';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { AppConfigService } from '../config/configuration';
+import { RequestContextService } from '../common/request-context/request-context.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { TenantObservabilityService } from '../tenant-context/tenant-observability.service';
 import { Roles } from './decorators/roles.decorator';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
+import { FreelancerBootstrapThrottleGuard } from './guards/freelancer-bootstrap-throttle.guard';
+import { FreelancerBootstrapThrottleService } from './guards/freelancer-bootstrap-throttle.service';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { RolesGuard } from './guards/roles.guard';
 import { JwtStrategy } from './strategies/jwt.strategy';
@@ -34,6 +39,7 @@ type PrismaMock = {
 
 type AuthServiceMock = {
   login: jest.Mock;
+  freelancerBootstrap: jest.Mock;
 };
 
 const adminUser = {
@@ -96,9 +102,10 @@ describe('Authentication error handling (integration)', () => {
   let authService: AuthServiceMock;
   let prisma: PrismaMock;
   let jwtService: JwtService;
+  let throttleService: FreelancerBootstrapThrottleService;
 
   beforeAll(async () => {
-    authService = { login: jest.fn() };
+    authService = { login: jest.fn(), freelancerBootstrap: jest.fn() };
     prisma = { user: { findUnique: jest.fn() } };
 
     const moduleRef: TestingModule = await Test.createTestingModule({
@@ -120,6 +127,13 @@ describe('Authentication error handling (integration)', () => {
           provide: AppConfigService,
           useValue: { jwtSecret: testJwtSecret },
         },
+        RequestContextService,
+        FreelancerBootstrapThrottleGuard,
+        FreelancerBootstrapThrottleService,
+        {
+          provide: TenantObservabilityService,
+          useValue: { freelancerBootstrapDenied: jest.fn() },
+        },
         {
           provide: APP_GUARD,
           useClass: JwtAuthGuard,
@@ -140,10 +154,12 @@ describe('Authentication error handling (integration)', () => {
     );
     await app.init();
     jwtService = moduleRef.get(JwtService);
+    throttleService = moduleRef.get(FreelancerBootstrapThrottleService);
   });
 
   beforeEach(() => {
     jest.clearAllMocks();
+    throttleService.clear();
     const users = new Map([
       [adminUser.id, adminUser],
       [psychologistUser.id, psychologistUser],
@@ -255,6 +271,144 @@ describe('Authentication error handling (integration)', () => {
       email: validEmail,
       password: validPassword,
     });
+  });
+
+  it.each([
+    [
+      'invalid bootstrap email',
+      {
+        email: 'not-an-email',
+        password: 'FreelancerBootstrapSecret1!',
+        name: 'Bootstrap User',
+        organizationName: 'Bootstrap Practice',
+      },
+    ],
+    [
+      'missing organizationName',
+      {
+        email: validEmail,
+        password: 'FreelancerBootstrapSecret1!',
+        name: 'Bootstrap User',
+      },
+    ],
+    [
+      'short bootstrap password',
+      {
+        email: validEmail,
+        password: 'short',
+        name: 'Bootstrap User',
+        organizationName: 'Bootstrap Practice',
+      },
+    ],
+  ])('returns a safe standard 400 response for %s', async (_scenario, body) => {
+    const response = await request(app.getHttpServer())
+      .post('/auth/freelancer-bootstrap')
+      .send(body)
+      .expect(400);
+
+    const errorBody = toErrorBody(response.body as unknown);
+
+    expect(errorBody.statusCode).toBe(400);
+    expect(errorBody.error).toBe('Bad Request');
+    expect(Array.isArray(errorBody.message)).toBe(true);
+    expectSafeErrorBody(errorBody);
+    expect(authService.freelancerBootstrap).not.toHaveBeenCalled();
+  });
+
+  it('strips extra bootstrap fields instead of rejecting the request', async () => {
+    authService.freelancerBootstrap.mockResolvedValue({
+      accessToken: 'issued-token',
+      user: { id: 'user-id' },
+      organization: { id: 'organization-id' },
+      membership: { id: 'membership-id' },
+    });
+
+    await request(app.getHttpServer())
+      .post('/auth/freelancer-bootstrap')
+      .send({
+        email: validEmail,
+        password: 'FreelancerBootstrapSecret1!',
+        name: 'Bootstrap User',
+        organizationName: 'Bootstrap Practice',
+        role: 'OWNER',
+      })
+      .expect(201);
+
+    expect(authService.freelancerBootstrap).toHaveBeenCalledWith(
+      {
+        email: validEmail,
+        password: 'FreelancerBootstrapSecret1!',
+        name: 'Bootstrap User',
+        organizationName: 'Bootstrap Practice',
+      },
+      expect.any(String),
+    );
+  });
+
+  it('returns the same safe 409 response for bootstrap conflicts without leaking identity details', async () => {
+    authService.freelancerBootstrap.mockRejectedValue(
+      new ConflictException('Registration could not be completed'),
+    );
+
+    const response = await request(app.getHttpServer())
+      .post('/auth/freelancer-bootstrap')
+      .send({
+        email: ' Existing@Example.test ',
+        password: 'FreelancerBootstrapSecret1!',
+        name: 'Existing User',
+        organizationName: 'Existing Practice',
+      })
+      .expect(409);
+
+    const errorBody = toErrorBody(response.body as unknown);
+
+    expect(errorBody.message).toBe('Registration could not be completed');
+    expectSafeErrorBody(errorBody);
+    expect(JSON.stringify(errorBody)).not.toContain('Existing@Example.test');
+  });
+
+  it('returns a uniform safe 429 response after repeated bootstrap attempts for the same normalized email', async () => {
+    authService.freelancerBootstrap.mockResolvedValue({
+      accessToken: 'issued-token',
+      user: { id: 'user-id' },
+      organization: { id: 'organization-id' },
+      membership: { id: 'membership-id' },
+    });
+
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      await request(app.getHttpServer())
+        .post('/auth/freelancer-bootstrap')
+        .send({
+          email:
+            attempt % 2 === 0
+              ? ' Freelancer@Example.test '
+              : 'freelancer@example.test',
+          password: 'FreelancerBootstrapSecret1!',
+          name: 'Bootstrap User',
+          organizationName: `Bootstrap Practice ${attempt}`,
+        })
+        .expect(201);
+    }
+
+    const throttled = await request(app.getHttpServer())
+      .post('/auth/freelancer-bootstrap')
+      .send({
+        email: 'FREELANCER@example.test',
+        password: 'FreelancerBootstrapSecret1!',
+        name: 'Bootstrap User',
+        organizationName: 'Bootstrap Practice Final',
+      })
+      .expect(429);
+
+    const errorBody = toErrorBody(throttled.body as unknown);
+
+    expect(errorBody).toEqual({
+      message: 'Too many bootstrap attempts',
+      error: 'Too Many Requests',
+      statusCode: 429,
+    });
+    expectSafeErrorBody(errorBody);
+    expect(authService.freelancerBootstrap).toHaveBeenCalledTimes(5);
   });
 
   it.each([

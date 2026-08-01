@@ -591,23 +591,12 @@ export class InvitationsService {
     email: string,
   ) {
     const canonicalEmail = normalizeInvitationEmail(email);
-    const users = await tx.user.findMany({
+    return tx.user.findUnique({
       where: {
-        email: {
-          equals: email.trim(),
-          mode: 'insensitive',
-        },
+        normalizedEmail: canonicalEmail,
       },
       select: { id: true, email: true },
-      orderBy: { id: 'asc' },
     });
-    const matchingUsers = users.filter(
-      (user) => normalizeInvitationEmail(user.email) === canonicalEmail,
-    );
-    if (matchingUsers.length > 1) {
-      throw new ConflictException('Invitation recipient identity is ambiguous');
-    }
-    return matchingUsers[0] ?? null;
   }
 
   private async assertNoNonTerminalMembership(

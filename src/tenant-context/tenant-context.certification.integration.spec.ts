@@ -9,6 +9,7 @@ import {
 } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
 import { AuthenticatedUser } from '../auth/types/authenticated-user.type';
+import { normalizeEmailIdentity } from '../common/identity/email-identity.util';
 import { TenantResolutionMode } from '../common/request-context/request-context.service';
 import { RequestContextService } from '../common/request-context/request-context.service';
 import { TenantResolutionFailure } from './tenant-context.types';
@@ -205,6 +206,7 @@ function user(currentUser: TestUser, email: string) {
     id: currentUser.id,
     name: 'Tenant Certification User',
     email,
+    normalizedEmail: normalizeEmailIdentity(email),
     passwordHash: 'not-a-real-password',
     role: currentUser.role,
   };

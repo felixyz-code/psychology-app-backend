@@ -44,6 +44,7 @@ POST-GO-LIVE.3.2 Membership Administration Runtime closed and integrated
 Runtime baseline: 2373ff046d56f455ecb9b5c4cc075f36f9ab778f
 POST-GO-LIVE.3.3 Invitation Administration Runtime closed and integrated
 Runtime baseline: 5bb75dc4ae8deed67543f745abb23bac88508066
+POST-GO-LIVE.3.5 Public Freelancer Bootstrap Runtime implemented locally and pending review as of Saturday, August 1, 2026
 ```
 
 Current priorities:
@@ -79,7 +80,8 @@ POST-GO-LIVE.3
  |- 3.1 Organization Administration Runtime IMPLEMENTED / IN REVIEW
  |- 3.2 Membership Administration Runtime CLOSED / INTEGRATED
  |- 3.3 Invitation Administration Runtime CLOSED / INTEGRATED
- `- 3.4 Organization Ownership Transfer Runtime IMPLEMENTED / REVIEW PENDING
+ |- 3.4 Organization Ownership Transfer Runtime IMPLEMENTED / REVIEW PENDING
+ `- 3.5 Public Freelancer Bootstrap Runtime IMPLEMENTED / REVIEW PENDING
 POST-GO-LIVE.4                           PENDING
 POST-GO-LIVE.5                           PENDING
 POST-GO-LIVE.6                           PENDING
@@ -526,7 +528,9 @@ The next implementation sequence after closeout is:
 POST-GO-LIVE.3.1 is now implemented locally and in review. POST-GO-LIVE.3.2
 and POST-GO-LIVE.3.3 are closed and integrated on `development`.
 POST-GO-LIVE.3.4 ownership transfer runtime is implemented locally and review
-pending as of Thursday, July 30, 2026. No phase in this sequence is
+pending as of Thursday, July 30, 2026. POST-GO-LIVE.3.5 public freelancer
+bootstrap runtime is implemented locally and pending review as of Saturday,
+August 1, 2026. No phase in this sequence is
 authorized for production until the draft PR, CI, and later review controls
 are complete.
 

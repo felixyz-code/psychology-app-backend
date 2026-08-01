@@ -1,5 +1,39 @@
 # Decision Log
 
+## STATUS-POST-GO-LIVE.3.5: Public Freelancer Bootstrap Runtime Implemented
+
+### Status
+
+Accepted as a local runtime status update on branch
+`codex/post-go-live-3-5-public-bootstrap-runtime` from baseline
+`77b4b6e6a70ef133459b84ea71c5d9590bfb6d0a`, pending draft PR review and CI on
+Saturday, August 1, 2026.
+
+### Decision
+
+POST-GO-LIVE.3.5 is no longer deferred. The backend now implements:
+
+- canonical user identity through required unique `User.normalizedEmail`,
+  derived as `email.trim().toLocaleLowerCase('en-US')`;
+- shared canonical email normalization for login, freelancer bootstrap, and
+  invitation recipient user binding;
+- public `POST /auth/freelancer-bootstrap` that runs one serializable
+  PostgreSQL transaction to create one user, one active organization, and one
+  active owner membership;
+- route-scoped in-memory bootstrap throttling by client IP and canonical
+  email;
+- post-commit structured observability through
+  `freelancer_bootstrap_completed` and `freelancer_bootstrap_denied`.
+
+### Consequences
+
+The backend now supports public self-bootstrap for the freelancer baseline,
+but it still does not introduce refresh tokens, password reset, email
+verification, MFA, invitation auto-lifecycle side effects, multi-organization
+bootstrap, automatic `PsychologistProfile` creation, production rollout, or
+frontend onboarding UX. JWT remains identity-only and tenant context still
+resolves from PostgreSQL on each request.
+
 ## STATUS-POST-GO-LIVE.3.4: Organization Ownership Transfer Runtime Implemented
 
 ### Status
