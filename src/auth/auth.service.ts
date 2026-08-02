@@ -344,7 +344,7 @@ export class AuthService {
   }
 
   private async clearPreferredOrganization(user: AuthenticatedUser) {
-    const result = await this.prisma.$transaction(async (tx) => {
+    const result = await serializableTransaction(this.prisma, async (tx) => {
       const currentUser = await tx.user.findUnique({
         where: { id: user.id },
         select: { preferredOrganizationId: true },
@@ -354,10 +354,14 @@ export class AuthService {
         throw new UnauthorizedException('Unauthorized');
       }
 
-      await tx.user.update({
+      const updated = await tx.user.updateMany({
         where: { id: user.id },
         data: { preferredOrganizationId: null },
       });
+
+      if (updated.count !== 1) {
+        throw new ConflictException('Concurrent operation conflict');
+      }
 
       return {
         preferredOrganizationId: null,

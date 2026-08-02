@@ -84,7 +84,10 @@ npx.cmd prisma migrate deploy
 npx.cmd prisma migrate status
 ```
 
-El baseline esperado conserva exactamente 4 migraciones aplicadas.
+La certificacion debe comprobar que todas las migraciones versionadas del
+repositorio estan aplicadas y que `npx.cmd prisma migrate status` reporta el
+schema al dia. Como referencia historica, el repositorio contiene 7
+migraciones versionadas al domingo 2 de agosto de 2026.
 
 ## Ejecucion Del Seed
 
@@ -188,7 +191,8 @@ El seed representa `OWNER`, `ADMIN`, `PSYCHOLOGIST`, `RECEPTIONIST`,
 
 POST-GO-LIVE.2.2A esta certificado con PostgreSQL 16 local real:
 
-- exactamente 4 migraciones aplicadas;
+- todas las migraciones versionadas del repositorio aplicadas y
+  `prisma migrate status` al dia;
 - seed ejecutado dos veces sobre una base descartable limpia;
 - `npm.cmd run seed:certify` aprobado dos veces;
 - reset determinista sin acumulacion de registros;

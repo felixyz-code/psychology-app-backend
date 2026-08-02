@@ -461,9 +461,7 @@ describe('AuthService', () => {
             findUnique: jest.fn().mockResolvedValue({
               preferredOrganizationId: 'organization-a',
             }),
-            update: jest.fn().mockResolvedValue({
-              preferredOrganizationId: null,
-            }),
+            updateMany: jest.fn().mockResolvedValue({ count: 1 }),
           },
         }),
     );
@@ -482,6 +480,12 @@ describe('AuthService', () => {
       userId: user.id,
       previousPreferredOrganizationId: 'organization-a',
     });
+    expect(prisma.$transaction).toHaveBeenCalledWith(
+      expect.any(Function),
+      expect.objectContaining({
+        isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+      }),
+    );
   });
 
   it('returns a redacted not found response for an inaccessible organization and emits a deny event', async () => {
@@ -628,6 +632,53 @@ describe('AuthService', () => {
     ).toHaveLength(1);
   });
 
+  it('retries a clear when commit aborts after the callback and emits success only after the committed retry', async () => {
+    prisma.$transaction
+      .mockImplementationOnce(
+        async (work: (tx: Record<string, unknown>) => Promise<unknown>) => {
+          await work({
+            user: {
+              findUnique: jest.fn().mockResolvedValue({
+                preferredOrganizationId: 'organization-a',
+              }),
+              updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+            },
+          });
+          throw new Prisma.PrismaClientKnownRequestError('serialization', {
+            code: 'P2034',
+            clientVersion: 'test',
+          });
+        },
+      )
+      .mockImplementationOnce(
+        async (work: (tx: Record<string, unknown>) => Promise<unknown>) =>
+          work({
+            user: {
+              findUnique: jest.fn().mockResolvedValue({
+                preferredOrganizationId: 'organization-a',
+              }),
+              updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+            },
+          }),
+      );
+
+    await expect(
+      service.updatePreferredOrganization(user, {
+        organizationId: null,
+      }),
+    ).resolves.toEqual({
+      preferredOrganizationId: null,
+    });
+
+    expect(prisma.$transaction).toHaveBeenCalledTimes(2);
+    expect(
+      observability.activeOrganizationPreferenceChanged.mock.calls.filter(
+        ([outcome, reasonCode]) =>
+          outcome === 'SUCCESS' && reasonCode === 'PREFERENCE_CLEARED',
+      ),
+    ).toHaveLength(1);
+  });
+
   it('surfaces a final concurrent conflict without emitting a success event', async () => {
     prisma.$transaction.mockRejectedValue(
       new Prisma.PrismaClientKnownRequestError('serialization', {
@@ -639,6 +690,25 @@ describe('AuthService', () => {
     await expect(
       service.updatePreferredOrganization(user, {
         organizationId: 'organization-a',
+      }),
+    ).rejects.toBeInstanceOf(ConflictException);
+
+    expect(
+      observability.activeOrganizationPreferenceChanged,
+    ).not.toHaveBeenCalledWith('SUCCESS', expect.anything(), expect.anything());
+  });
+
+  it('surfaces a final concurrent conflict during clear without emitting a success event', async () => {
+    prisma.$transaction.mockRejectedValue(
+      new Prisma.PrismaClientKnownRequestError('serialization', {
+        code: 'P2034',
+        clientVersion: 'test',
+      }),
+    );
+
+    await expect(
+      service.updatePreferredOrganization(user, {
+        organizationId: null,
       }),
     ).rejects.toBeInstanceOf(ConflictException);
 

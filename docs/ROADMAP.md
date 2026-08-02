@@ -460,7 +460,8 @@ Status: CERTIFIED
 Evidence:
 
 - PostgreSQL 16 local real;
-- exactly 4 migrations applied;
+- all versioned repository migrations applied and `prisma migrate status`
+  reporting the schema up to date;
 - seed executed twice;
 - deterministic reset;
 - `seed:certify` passed twice;

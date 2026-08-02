@@ -171,17 +171,18 @@ describeCertification('Preferred organization concurrency runtime', () => {
 
   it('keeps the final preference aligned with one successful write when set A races set B', async () => {
     const release = await lockTables(['users']);
+    const token = bearerToken(actorUserId, UserRole.PSYCHOLOGIST);
 
     const setA = trackRequest(
       request(app.getHttpServer())
         .put('/auth/context/preference')
-        .set('Authorization', bearerToken(actorUserId, UserRole.PSYCHOLOGIST))
+        .set('Authorization', token)
         .send({ organizationId: organizationAId }),
     );
     const setB = trackRequest(
       request(app.getHttpServer())
         .put('/auth/context/preference')
-        .set('Authorization', bearerToken(actorUserId, UserRole.PSYCHOLOGIST))
+        .set('Authorization', token)
         .send({ organizationId: organizationBId }),
     );
 
@@ -192,19 +193,32 @@ describeCertification('Preferred organization concurrency runtime', () => {
       setA.promise,
       setB.promise,
     ]);
-    expect([
-      [200, 200],
-      [200, 409],
-    ]).toContainEqual([responseA.status, responseB.status].sort());
+    const successfulPreference = latestSuccessfulPreference([
+      {
+        label: 'setA',
+        requestedPreference: organizationAId,
+        response: responseA,
+        completedAt: setA.completedAt(),
+      },
+      {
+        label: 'setB',
+        requestedPreference: organizationBId,
+        response: responseB,
+        completedAt: setB.completedAt(),
+      },
+    ]);
 
     const persisted = await prisma.user.findUniqueOrThrow({
       where: { id: actorUserId },
       select: { preferredOrganizationId: true },
     });
-    expect([organizationAId, organizationBId]).toContain(
-      persisted.preferredOrganizationId,
+    expect(persisted.preferredOrganizationId).toBe(successfulPreference);
+    await expectUnresolvedContext(token, successfulPreference);
+    await expectMembershipAuthorityUnchanged();
+    expect(successPreferenceEvents()).toBe(
+      [responseA, responseB].filter((response) => response.status === 200)
+        .length,
     );
-    expect(successPreferenceEvents()).toBeGreaterThanOrEqual(1);
   });
 
   it('never grants authority when a set races membership suspension', async () => {
@@ -236,10 +250,37 @@ describeCertification('Preferred organization concurrency runtime', () => {
     expect([200, 404, 409]).toContain(setResponse.status);
     expect([200, 409]).toContain(suspendResponse.status);
 
+    const membershipState =
+      await prisma.organizationMembership.findUniqueOrThrow({
+        where: { id: actorMembershipAId },
+        select: { status: true },
+      });
+    const persisted = await prisma.user.findUniqueOrThrow({
+      where: { id: actorUserId },
+      select: { preferredOrganizationId: true },
+    });
     const context = await request(app.getHttpServer())
       .get('/auth/context')
       .set('Authorization', bearerToken(actorUserId, UserRole.PSYCHOLOGIST))
       .expect(200);
+
+    if (membershipState.status === MembershipStatus.SUSPENDED) {
+      expect(context.body).toMatchObject({
+        preferredOrganizationId: null,
+      });
+      return;
+    }
+
+    expect(membershipState.status).toBe(MembershipStatus.ACTIVE);
+    if (setResponse.status === 200) {
+      expect(persisted.preferredOrganizationId).toBe(organizationAId);
+      expect(context.body).toMatchObject({
+        preferredOrganizationId: organizationAId,
+      });
+      return;
+    }
+
+    expect(persisted.preferredOrganizationId).toBeNull();
     expect(context.body).toMatchObject({
       preferredOrganizationId: null,
     });
@@ -272,10 +313,36 @@ describeCertification('Preferred organization concurrency runtime', () => {
     expect([200, 404, 409]).toContain(setResponse.status);
     expect([200, 409]).toContain(suspendResponse.status);
 
+    const organizationState = await prisma.organization.findUniqueOrThrow({
+      where: { id: organizationAId },
+      select: { status: true },
+    });
+    const persisted = await prisma.user.findUniqueOrThrow({
+      where: { id: actorUserId },
+      select: { preferredOrganizationId: true },
+    });
     const context = await request(app.getHttpServer())
       .get('/auth/context')
       .set('Authorization', bearerToken(actorUserId, UserRole.PSYCHOLOGIST))
       .expect(200);
+
+    if (organizationState.status === OrganizationStatus.SUSPENDED) {
+      expect(context.body).toMatchObject({
+        preferredOrganizationId: null,
+      });
+      return;
+    }
+
+    expect(organizationState.status).toBe(OrganizationStatus.ACTIVE);
+    if (setResponse.status === 200) {
+      expect(persisted.preferredOrganizationId).toBe(organizationAId);
+      expect(context.body).toMatchObject({
+        preferredOrganizationId: organizationAId,
+      });
+      return;
+    }
+
+    expect(persisted.preferredOrganizationId).toBeNull();
     expect(context.body).toMatchObject({
       preferredOrganizationId: null,
     });
@@ -288,17 +355,18 @@ describeCertification('Preferred organization concurrency runtime', () => {
     });
 
     const release = await lockTables(['users']);
+    const token = bearerToken(actorUserId, UserRole.PSYCHOLOGIST);
 
     const clearPreference = trackRequest(
       request(app.getHttpServer())
         .put('/auth/context/preference')
-        .set('Authorization', bearerToken(actorUserId, UserRole.PSYCHOLOGIST))
+        .set('Authorization', token)
         .send({ organizationId: null }),
     );
     const setPreference = trackRequest(
       request(app.getHttpServer())
         .put('/auth/context/preference')
-        .set('Authorization', bearerToken(actorUserId, UserRole.PSYCHOLOGIST))
+        .set('Authorization', token)
         .send({ organizationId: organizationBId }),
     );
 
@@ -309,17 +377,31 @@ describeCertification('Preferred organization concurrency runtime', () => {
       clearPreference.promise,
       setPreference.promise,
     ]);
-    expect([
-      [200, 200],
-      [200, 409],
-    ]).toContainEqual([clearResponse.status, setResponse.status].sort());
+    const successfulPreference = latestSuccessfulPreference([
+      {
+        label: 'clearPreference',
+        requestedPreference: null,
+        response: clearResponse,
+        completedAt: clearPreference.completedAt(),
+      },
+      {
+        label: 'setPreference',
+        requestedPreference: organizationBId,
+        response: setResponse,
+        completedAt: setPreference.completedAt(),
+      },
+    ]);
 
     const persisted = await prisma.user.findUniqueOrThrow({
       where: { id: actorUserId },
       select: { preferredOrganizationId: true },
     });
-    expect([null, organizationBId]).toContain(
-      persisted.preferredOrganizationId,
+    expect(persisted.preferredOrganizationId).toBe(successfulPreference);
+    await expectUnresolvedContext(token, successfulPreference);
+    await expectMembershipAuthorityUnchanged();
+    expect(successPreferenceEvents()).toBe(
+      [clearResponse, setResponse].filter((response) => response.status === 200)
+        .length,
     );
   });
 
@@ -357,6 +439,52 @@ describeCertification('Preferred organization concurrency runtime', () => {
       .length;
   }
 
+  async function expectUnresolvedContext(
+    token: string,
+    expectedPreference: string | null,
+  ) {
+    const response = await request(app.getHttpServer())
+      .get('/auth/context')
+      .set('Authorization', token)
+      .expect(200);
+    const body = response.body as {
+      status: string;
+      preferredOrganizationId: string | null;
+      selectableMemberships: unknown[];
+    };
+
+    expect(body).toMatchObject({
+      status: 'UNRESOLVED',
+      preferredOrganizationId: expectedPreference,
+    });
+    expect(body.selectableMemberships).toHaveLength(2);
+  }
+
+  async function expectMembershipAuthorityUnchanged() {
+    const memberships = await prisma.organizationMembership.findMany({
+      where: { userId: actorUserId },
+      orderBy: [{ organizationId: 'asc' }, { id: 'asc' }],
+      select: {
+        organizationId: true,
+        role: true,
+        status: true,
+      },
+    });
+
+    expect(memberships).toEqual([
+      {
+        organizationId: organizationAId,
+        role: MembershipRole.PSYCHOLOGIST,
+        status: MembershipStatus.ACTIVE,
+      },
+      {
+        organizationId: organizationBId,
+        role: MembershipRole.PSYCHOLOGIST,
+        status: MembershipStatus.ACTIVE,
+      },
+    ]);
+  }
+
   function bearerToken(userId: string, role: UserRole) {
     return `Bearer ${jwtService.sign({
       sub: userId,
@@ -369,14 +497,48 @@ describeCertification('Preferred organization concurrency runtime', () => {
 
 function trackRequest<T>(promise: PromiseLike<T>) {
   let settled = false;
+  let completedAt: bigint | null = null;
   const trackedPromise = Promise.resolve(promise).finally(() => {
     settled = true;
+    completedAt = process.hrtime.bigint();
   });
 
   return {
     promise: trackedPromise,
     isSettled: () => settled,
+    completedAt: () => completedAt,
   };
+}
+
+function latestSuccessfulPreference(
+  operations: Array<{
+    label: string;
+    requestedPreference: string | null;
+    response: { status: number };
+    completedAt: bigint | null;
+  }>,
+) {
+  const successful = operations.filter(
+    (operation) => operation.response.status === 200,
+  );
+
+  expect(successful.length).toBeGreaterThanOrEqual(1);
+  successful.forEach((operation) => {
+    expect(operation.completedAt).not.toBeNull();
+  });
+
+  return successful
+    .sort((left, right) => {
+      const leftCompletedAt = left.completedAt ?? 0n;
+      const rightCompletedAt = right.completedAt ?? 0n;
+
+      if (leftCompletedAt === rightCompletedAt) {
+        return left.label.localeCompare(right.label);
+      }
+
+      return leftCompletedAt < rightCompletedAt ? -1 : 1;
+    })
+    .at(-1)!.requestedPreference;
 }
 
 function delay(ms: number) {
