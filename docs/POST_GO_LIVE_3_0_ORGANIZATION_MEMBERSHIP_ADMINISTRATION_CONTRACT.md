@@ -501,7 +501,7 @@ Important audit conclusion:
 | Membership re-entry | Unique `(organizationId, userId)` | Removed user cannot rejoin via a new row | Blocks 3.2 | High | 3.2 migration |
 | Ownership transfer | Generic role change forbids `OWNER` | Missing explicit add-owner / transfer flow | Blocks 3.2 | High | 3.2 |
 | Invitation resend | No route | Missing resend semantics and replay posture | Blocks 3.3 | Medium | 3.3 |
-| Active organization preference | Header-only selection plus UX-only persisted preference runtime | Preferred organization stored on `User` without tenant authority | Implemented locally, review pending | Low | 3.6 |
+| Active organization preference | Header-only selection plus UX-only persisted preference runtime | Preferred organization stored on `User` without tenant authority | Closed and integrated on `development` | Low | 3.6 |
 | Public freelancer signup | No runtime route | Missing public bootstrap flow | Deferable for org admin, blocker for self-service onboarding | Medium | 3.5 |
 | Admin audit persistence | Observability only | No dedicated administrative audit store | Deferable | Medium | 3.5+ |
 | Member list projection | Narrow sanitized list | No search, pagination, richer projections, or email policy split | Blocks 3.2 | Medium | 3.2 |
