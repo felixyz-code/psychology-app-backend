@@ -55,6 +55,12 @@ checkpoint listed above. Merge-parent inspection and ancestry validation
 confirm those commits are legitimate ancestors of
 `6c65a4d8956723071514c40ec6942ecc39c0dcd2`.
 
+For POST-GO-LIVE.3.0 specifically, the contract baseline was merged by PR
+`#35` at `7d897ec8db2c5d372fce0b4dc0eaf3bd3b1d4b13`. The later
+documentation-only 3.0 closeout merged by PR `#36` at
+`6c8ecbbfb566a1cb8c6b113f5493e04adbf80b12` remains part of the certified
+ancestry chain, but it is not the functional Phase 3 baseline.
+
 ## Versioned migrations
 
 Phase 3 closes over the current seven versioned Prisma migrations:
@@ -180,7 +186,9 @@ backend repository. The current certified closeout count is:
 
 The collection covers auth, tenant context, organization administration,
 membership administration, invitation administration, ownership transfer,
-preferred organization UX, and final fixture restoration.
+preferred organization UX, explicit independence from `X-Organization-Id`,
+`preferredOrganizationId` null/valid/stale paths, and final fixture
+restoration.
 
 ## Tests and CI
 
@@ -289,6 +297,6 @@ Phase 3 can be treated as formally closed only after:
 
 ## Closeout statement
 
-Phase 3 is backend functional-platform complete for its approved scope. It is
-not yet production rolled out, and its formal baseline still depends on the
-merge of the documentation-only closeout PR.
+Phase 3 is backend functional platform complete for Phase 3 scope. It is not
+yet production rolled out, and its formal baseline still depends on the merge
+of the documentation-only closeout PR.

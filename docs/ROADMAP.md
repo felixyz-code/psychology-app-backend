@@ -445,7 +445,8 @@ through D3 modules.
 
 Tenant platform certification is published for D5-R review. The next eligible
 control is D5-R review, controlled merge, post-merge verification, and the
-explicit POST-GO-LIVE.2.1D closure decision. POST-GO-LIVE.3 remains unstarted.
+explicit POST-GO-LIVE.2.1D closure decision. At that historical D5 checkpoint,
+POST-GO-LIVE.3 had not started yet.
 
 ## POST-GO-LIVE.2.2
 
@@ -559,12 +560,13 @@ approved rollout and operations gate exists.
 
 ## POST-GO-LIVE.3.1
 
-Organization Administration Runtime is the next planned phase after the merged
-3.0 contract baseline.
+Organization Administration Runtime is the first integrated runtime phase after
+the merged 3.0 contract baseline.
 
 Status:
 
-- IMPLEMENTED / IN REVIEW
+- CLOSED / INTEGRATED
+- merge commit: `2373ff046d56f455ecb9b5c4cc075f36f9ab778f`
 - no Prisma migration required
 - not authorized for production
 
