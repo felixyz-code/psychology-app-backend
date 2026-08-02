@@ -214,7 +214,7 @@ describeCertification('Preferred organization concurrency runtime', () => {
     });
     expect(persisted.preferredOrganizationId).toBe(successfulPreference);
     await expectUnresolvedContext(token, successfulPreference);
-    await expectMembershipAuthorityUnchanged();
+    await expectMembershipAuthorityUnchanged(expectedActorMemberships());
     expect(successPreferenceEvents()).toBe(
       [responseA, responseB].filter((response) => response.status === 200)
         .length,
@@ -398,7 +398,7 @@ describeCertification('Preferred organization concurrency runtime', () => {
     });
     expect(persisted.preferredOrganizationId).toBe(successfulPreference);
     await expectUnresolvedContext(token, successfulPreference);
-    await expectMembershipAuthorityUnchanged();
+    await expectMembershipAuthorityUnchanged(expectedActorMemberships());
     expect(successPreferenceEvents()).toBe(
       [clearResponse, setResponse].filter((response) => response.status === 200)
         .length,
@@ -460,29 +460,66 @@ describeCertification('Preferred organization concurrency runtime', () => {
     expect(body.selectableMemberships).toHaveLength(2);
   }
 
-  async function expectMembershipAuthorityUnchanged() {
+  function expectedActorMemberships() {
+    return [
+      {
+        id: actorMembershipAId,
+        organizationId: organizationAId,
+        userId: actorUserId,
+        role: MembershipRole.PSYCHOLOGIST,
+        status: MembershipStatus.ACTIVE,
+      },
+      {
+        id: actorMembershipBId,
+        organizationId: organizationBId,
+        userId: actorUserId,
+        role: MembershipRole.PSYCHOLOGIST,
+        status: MembershipStatus.ACTIVE,
+      },
+    ];
+  }
+
+  async function expectMembershipAuthorityUnchanged(
+    expectedMemberships: Array<{
+      id: string;
+      organizationId: string;
+      userId: string;
+      role: MembershipRole;
+      status: MembershipStatus;
+    }>,
+  ) {
     const memberships = await prisma.organizationMembership.findMany({
       where: { userId: actorUserId },
-      orderBy: [{ organizationId: 'asc' }, { id: 'asc' }],
       select: {
+        id: true,
         organizationId: true,
+        userId: true,
         role: true,
         status: true,
       },
     });
 
-    expect(memberships).toEqual([
-      {
-        organizationId: organizationAId,
-        role: MembershipRole.PSYCHOLOGIST,
-        status: MembershipStatus.ACTIVE,
-      },
-      {
-        organizationId: organizationBId,
-        role: MembershipRole.PSYCHOLOGIST,
-        status: MembershipStatus.ACTIVE,
-      },
-    ]);
+    expect(memberships).toHaveLength(expectedMemberships.length);
+
+    const membershipsByOrganizationId = new Map(
+      memberships.map((membership) => [membership.organizationId, membership]),
+    );
+
+    expect(membershipsByOrganizationId.size).toBe(expectedMemberships.length);
+
+    for (const expectedMembership of expectedMemberships) {
+      const membership = membershipsByOrganizationId.get(
+        expectedMembership.organizationId,
+      );
+
+      if (!membership) {
+        throw new Error(
+          `Expected membership for organization ${expectedMembership.organizationId}`,
+        );
+      }
+
+      expect(membership).toMatchObject(expectedMembership);
+    }
   }
 
   function bearerToken(userId: string, role: UserRole) {
