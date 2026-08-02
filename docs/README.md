@@ -144,8 +144,10 @@ administration runtime is closed and integrated on merge commit
 `5bb75dc4ae8deed67543f745abb23bac88508066` via PR `#39`. POST-GO-LIVE.3.4
 ownership transfer runtime is closed and integrated on merge commit
 `77b4b6e6a70ef133459b84ea71c5d9590bfb6d0a` as of Friday, July 31, 2026.
-POST-GO-LIVE.3.5 public freelancer bootstrap runtime is implemented locally
-and review pending as of Saturday, August 1, 2026.
+POST-GO-LIVE.3.5 public freelancer bootstrap runtime is closed and integrated
+on merge commit `7b456901074807891c0384e214181e2ec8417d37` via PR `#41` on
+Sunday, August 2, 2026. POST-GO-LIVE.3.6 preferred organization UX runtime is
+implemented locally and pending review as of Sunday, August 2, 2026.
 
 Additional ADRs for the organization domain include:
 

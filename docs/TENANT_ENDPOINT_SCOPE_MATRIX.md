@@ -9,7 +9,8 @@
 | GET | `/health/live` | Health | No | — | Public | N/A | Public | None |
 | GET | `/health/ready` | Health | No | — | Public | N/A | Public | None |
 | POST | `/auth/login` | Auth | No | — | Public | N/A | Public | None |
-| GET | `/auth/context` | Auth | Optional | `organization.read` when resolved | Caller memberships only | 403 selection | Implemented tenant-optional | 2.1I bootstrap |
+| GET | `/auth/context` | Auth | Optional | `organization.read` when resolved | Caller memberships only; response includes sanitized `preferredOrganizationId` UX metadata only | 403 selection | Implemented tenant-optional | 2.1I bootstrap + 3.6 runtime |
+| PUT | `/auth/context/preference` | Auth | No tenant selection | Authenticated caller only; serializable `ACTIVE` membership + `ACTIVE` organization validation for non-null writes; clear accepts `null` | Redacted 404 / 400 | Implemented | 3.6 runtime |
 | POST | `/patients` | Patients | Yes | `patient.create` | Creates tenant patient and active self-assignment; temporary legacy psychologist restriction | 404 | D1 aligned | Complete in 2.1D1 |
 | GET | `/patients` | Patients | Yes | `patient.read` | Tenant + active assignment + temporary legacy psychologist restriction | Empty list | D1 aligned | Complete in 2.1D1 |
 | GET | `/patients/:id` | Patients | Yes | `patient.read` | Tenant + active assignment + temporary legacy psychologist restriction | 404 | D1 aligned | Complete in 2.1D1 |

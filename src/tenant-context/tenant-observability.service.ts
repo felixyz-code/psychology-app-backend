@@ -13,7 +13,8 @@ type TenantEvent =
   | 'tenant_selection_denied'
   | 'tenant_capability_denied'
   | 'freelancer_bootstrap_completed'
-  | 'freelancer_bootstrap_denied';
+  | 'freelancer_bootstrap_denied'
+  | 'active_organization_preference_changed';
 
 export type OrganizationDomainEvent =
   | 'organization_updated'
@@ -49,6 +50,12 @@ type OrganizationDomainMetadata = {
   targetNewRole?: string;
   previousStatus?: string;
   newStatus?: string;
+};
+
+type PreferenceChangeMetadata = {
+  userId: string;
+  preferredOrganizationId?: string;
+  previousPreferredOrganizationId?: string;
 };
 
 @Injectable()
@@ -165,6 +172,32 @@ export class TenantObservabilityService {
         ipAddress,
       }),
     );
+  }
+
+  activeOrganizationPreferenceChanged(
+    outcome: 'SUCCESS' | 'DENY',
+    reasonCode:
+      | 'PREFERENCE_UPDATED'
+      | 'PREFERENCE_CLEARED'
+      | 'INELIGIBLE_ORGANIZATION'
+      | 'INACTIVE_MEMBERSHIP'
+      | 'INACTIVE_ORGANIZATION',
+    metadata: PreferenceChangeMetadata,
+  ) {
+    const entry = {
+      event: 'active_organization_preference_changed',
+      outcome,
+      requestId: this.requestContext.requestId ?? 'unavailable',
+      reasonCode,
+      ...metadata,
+    };
+
+    if (outcome === 'SUCCESS') {
+      this.logger.log(JSON.stringify(entry));
+      return;
+    }
+
+    this.logger.warn(JSON.stringify(entry));
   }
 
   private write(event: TenantEvent, outcome: string, details: object) {

@@ -84,7 +84,10 @@ npx.cmd prisma migrate deploy
 npx.cmd prisma migrate status
 ```
 
-El baseline esperado conserva exactamente 4 migraciones aplicadas.
+La certificacion debe comprobar que todas las migraciones versionadas del
+repositorio estan aplicadas y que `npx.cmd prisma migrate status` reporta el
+schema al dia. Como referencia historica, el repositorio contiene 7
+migraciones versionadas al domingo 2 de agosto de 2026.
 
 ## Ejecucion Del Seed
 
@@ -113,6 +116,12 @@ Validacion opt-in:
 
 ```powershell
 npm.cmd run seed:certify
+```
+
+La certificacion Postman/local opt-in para el flujo de preferencia UX:
+
+```powershell
+npm.cmd run postman:certify
 ```
 
 ## Segunda Corrida
@@ -182,7 +191,8 @@ El seed representa `OWNER`, `ADMIN`, `PSYCHOLOGIST`, `RECEPTIONIST`,
 
 POST-GO-LIVE.2.2A esta certificado con PostgreSQL 16 local real:
 
-- exactamente 4 migraciones aplicadas;
+- todas las migraciones versionadas del repositorio aplicadas y
+  `prisma migrate status` al dia;
 - seed ejecutado dos veces sobre una base descartable limpia;
 - `npm.cmd run seed:certify` aprobado dos veces;
 - reset determinista sin acumulacion de registros;
@@ -222,21 +232,25 @@ La coleccion conserva el estilo de la coleccion MVP anterior:
 - carpetas funcionales por modulo;
 - casos positivos y negativos en la misma corrida local.
 
-POST-GO-LIVE.2.2B esta implementado y validado estaticamente:
+POST-GO-LIVE.2.2B y POST-GO-LIVE.3.6 tooling local mantienen una coleccion
+versionada y un runner local reproducible:
 
 - JSON valido;
 - Postman collection schema v2.1;
-- 13 carpetas;
-- 68 requests;
+- 14 carpetas;
+- 93 requests;
 - las URLs usan `{{baseUrl}}` en `raw` y `host`;
 - cada request incluye scripts de test;
 - variables dinamicas para JWTs e IDs runtime exportadas vacias;
 - fixtures fijos solo para escenarios seed documentados;
 - sin tokens, PHI, API keys, URLs productivas, reportes o dumps.
 
-La validacion estatica no sustituye una ejecucion funcional completa. Antes de
-usar esta coleccion como gate de release debe ejecutarse con un runner local
-aprobado y sin cloud.
+La carpeta `POST-GO-LIVE.3.6 - Preferred Organization` certifica el flujo UX
+de preferencia persistida, incluyendo set, switch, clear, independencia de
+`X-Organization-Id`, errores redacted e invalid payloads. El comando
+`npm.cmd run postman:certify` valida la estructura versionada de la coleccion y
+ejecuta un flujo HTTP equivalente in-process contra la app local con el seed
+determinista. No requiere Newman, Postman Cloud ni sesiones personales.
 
 ## Environment
 
@@ -355,11 +369,12 @@ controlada a la regla general de captura dinamica.
 
 ## Runner Postman
 
-La ejecucion funcional integral de Postman queda diferida. No se acepto reducir
-controles de seguridad, introducir dependencias criticas ni usar sesiones
-personales para certificar artefactos locales.
+El repositorio no depende de un runner Postman cloud ni de un login personal.
+La certificacion local aprobada para esta etapa es:
 
-Riesgo diferido: ACCEPTED AS DEVELOPMENT TOOLING.
+```powershell
+npm.cmd run postman:certify
+```
 
 ### Runner Evaluation and Deferred Certification
 
@@ -389,16 +404,16 @@ Get-AuthenticodeSignature "$env:USERPROFILE\AppData\Local\Microsoft\WindowsApps\
 Get-FileHash "$env:USERPROFILE\AppData\Local\Microsoft\WindowsApps\postman.exe" -Algorithm SHA256
 ```
 
-Hasta que se apruebe un runner reproducible sin cloud, la coleccion debe
-mantenerse como artefacto local versionado y no debe usarse como evidencia final
-unica de certificacion automatizada.
+La coleccion se mantiene como artefacto local versionado y el runner local del
+repositorio evita depender de sincronizacion cloud. Postman Desktop y Postman
+CLI siguen siendo opcionales para inspeccion manual, no requisitos del gate
+local automatizado.
 
 ## Limitaciones Diferidas
 
-- Ejecucion integral mediante runner Postman.
-- Automatizacion CLI.
-- Integracion CI.
-- Uso de la coleccion como gate de release.
+- Ejecucion mediante Newman o Postman CLI oficial como requisito obligatorio.
+- Integracion CI del runner local.
+- Uso del artefacto Postman como gate unico de release.
 
 ## Cleanup
 

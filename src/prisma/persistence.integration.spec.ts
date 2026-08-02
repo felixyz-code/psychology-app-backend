@@ -179,6 +179,185 @@ runPersistenceTests('PostgreSQL persistence integration', () => {
     }
   });
 
+  it('keeps the preferred-organization seed fixtures deterministic and UX-only', async () => {
+    const fixtures = await prisma.user.findMany({
+      where: {
+        email: {
+          in: [
+            'no.membership@example.test',
+            'multi.member@example.test',
+            'suspended.organization@example.test',
+          ],
+        },
+      },
+      select: {
+        email: true,
+        preferredOrganizationId: true,
+        memberships: {
+          select: {
+            organizationId: true,
+            status: true,
+            organization: {
+              select: {
+                status: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: { email: 'asc' },
+    });
+
+    const byEmail = new Map(
+      fixtures.map((fixture) => [fixture.email, fixture]),
+    );
+    expect(byEmail.get('no.membership@example.test')).toMatchObject({
+      preferredOrganizationId: null,
+    });
+    expect(byEmail.get('multi.member@example.test')).toMatchObject({
+      preferredOrganizationId: seededOrganizationIds[1],
+    });
+    expect(
+      byEmail
+        .get('multi.member@example.test')
+        ?.memberships.find(
+          (membership) =>
+            membership.organizationId === seededOrganizationIds[1],
+        ),
+    ).toMatchObject({
+      status: 'ACTIVE',
+      organization: { status: 'ACTIVE' },
+    });
+    expect(byEmail.get('suspended.organization@example.test')).toMatchObject({
+      preferredOrganizationId: seededOrganizationIds[2],
+    });
+  });
+
+  it('persists a valid preferred organization without creating memberships or changing capabilities', async () => {
+    const suffix = randomUUID();
+    const organizationId = randomUUID();
+    const userId = randomUUID();
+    const membershipId = randomUUID();
+
+    try {
+      await prisma.user.create({
+        data: {
+          id: userId,
+          name: 'Preferred Organization Persistence User',
+          email: `preferred-org-${suffix}@example.test`,
+          normalizedEmail: normalizeEmailIdentity(
+            `preferred-org-${suffix}@example.test`,
+          ),
+          passwordHash: 'not-a-real-password',
+          role: 'PSYCHOLOGIST',
+        },
+      });
+      await prisma.organization.create({
+        data: {
+          id: organizationId,
+          slug: `preferred-org-${suffix}`,
+          legalName: 'Preferred Organization Persistence',
+          displayName: 'Preferred Organization Persistence',
+          status: 'ACTIVE',
+        },
+      });
+      await prisma.organizationMembership.create({
+        data: {
+          id: membershipId,
+          organizationId,
+          userId,
+          role: 'PSYCHOLOGIST',
+          status: 'ACTIVE',
+          joinedAt: new Date('2026-08-02T00:00:00.000Z'),
+        },
+      });
+
+      await prisma.user.update({
+        where: { id: userId },
+        data: { preferredOrganizationId: organizationId },
+      });
+
+      expect(
+        await prisma.user.findUnique({
+          where: { id: userId },
+          select: {
+            preferredOrganizationId: true,
+            memberships: {
+              select: { id: true, role: true, status: true },
+            },
+          },
+        }),
+      ).toMatchObject({
+        preferredOrganizationId: organizationId,
+        memberships: [
+          {
+            id: membershipId,
+            role: MembershipRole.PSYCHOLOGIST,
+            status: 'ACTIVE',
+          },
+        ],
+      });
+      expect(
+        await prisma.organizationMembership.count({
+          where: { organizationId, userId },
+        }),
+      ).toBe(1);
+    } finally {
+      await prisma.organizationMembership.deleteMany({
+        where: { organizationId, userId },
+      });
+      await prisma.organization.deleteMany({ where: { id: organizationId } });
+      await prisma.user.deleteMany({ where: { id: userId } });
+    }
+  });
+
+  it('cleans the preferred organization with ON DELETE SET NULL', async () => {
+    const suffix = randomUUID();
+    const organizationId = randomUUID();
+    const userId = randomUUID();
+
+    try {
+      await prisma.organization.create({
+        data: {
+          id: organizationId,
+          slug: `preferred-delete-${suffix}`,
+          legalName: 'Preferred Delete Persistence',
+          displayName: 'Preferred Delete Persistence',
+          status: 'ACTIVE',
+        },
+      });
+      await prisma.user.create({
+        data: {
+          id: userId,
+          name: 'Preferred Delete User',
+          email: `preferred-delete-${suffix}@example.test`,
+          normalizedEmail: normalizeEmailIdentity(
+            `preferred-delete-${suffix}@example.test`,
+          ),
+          passwordHash: 'not-a-real-password',
+          role: 'PSYCHOLOGIST',
+          preferredOrganizationId: organizationId,
+        },
+      });
+
+      await prisma.organization.delete({
+        where: { id: organizationId },
+      });
+
+      expect(
+        await prisma.user.findUnique({
+          where: { id: userId },
+          select: { preferredOrganizationId: true },
+        }),
+      ).toEqual({
+        preferredOrganizationId: null,
+      });
+    } finally {
+      await prisma.organization.deleteMany({ where: { id: organizationId } });
+      await prisma.user.deleteMany({ where: { id: userId } });
+    }
+  });
+
   it('groups financial totals in PostgreSQL', async () => {
     const groups = await prisma.financialTransaction.groupBy({
       by: ['type'],

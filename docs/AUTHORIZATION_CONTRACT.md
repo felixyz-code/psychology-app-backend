@@ -18,6 +18,11 @@ This is the primary source of truth for POST-GO-LIVE.2.1 authorization. Future i
 
 No client-supplied `organizationId` has authorization meaning. A platform administrator does not currently exist. A future platform role requires a separate model, protocol, recorded reason, and security audit; it is not implied by legacy `ADMIN`.
 
+`User.preferredOrganizationId`, when present, is persisted UX metadata only.
+It may be read or written through the auth-context UX flow, but it never
+becomes tenant authority, never substitutes `X-Organization-Id`, never enters
+JWT claims, and never broadens capability or membership scope.
+
 ## Authorization pipeline
 
 `JWT authentication → user lookup → tenant resolution → capability policy → tenant-aware repository → ownership/assignment policy → audit event`

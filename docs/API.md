@@ -1531,9 +1531,55 @@ For a multi-membership or otherwise unresolved request it returns `UNRESOLVED`
 and only the caller's selectable active memberships (`organizationId`,
 `membershipId`, organization display name and organization role), allowing the
 frontend to choose `X-Organization-Id` without a bootstrap cycle. A user with
-no memberships receives `LEGACY_COMPATIBILITY` and an empty list. It does not
-return organizations belonging to other users, clinical records, tokens, or
-persisted selection preferences.
+no memberships receives `LEGACY_COMPATIBILITY` and an empty list. All three
+response variants now include `preferredOrganizationId: uuid | null` as a
+persisted UX hint only. The server returns the persisted value only while the
+caller still has an `ACTIVE` membership in that `ACTIVE` organization; stale
+preferences are sanitized to `null` on read, never resolve tenant context, and
+never override `X-Organization-Id`.
+
+### `PUT /auth/context/preference`
+
+Bearer Token required; tenant context not required.
+
+Persists one nullable preferred organization UUID on the authenticated `User`
+strictly as UX metadata.
+
+### Body
+
+```json
+{
+  "organizationId": "uuid | null"
+}
+```
+
+### Behavior
+
+* The route requires explicit intent: missing `organizationId`, empty strings,
+  invalid UUIDs, and extra properties fail validation.
+* `organizationId = null` clears the persisted UX preference.
+* Non-null writes run inside a serializable PostgreSQL transaction and succeed
+  only when the caller currently has an `ACTIVE` membership in the target
+  `ACTIVE` organization.
+* The write never changes JWT contents, capabilities, membership state,
+  `TenantContextGuard`, or request-time tenant authority.
+* `X-Organization-Id` remains the only selection hint for tenant-required
+  requests.
+
+### Response
+
+```json
+{
+  "preferredOrganizationId": "uuid | null"
+}
+```
+
+### Errors
+
+* `400 Bad Request` for invalid payloads.
+* `401 Unauthorized` for missing or invalid JWT.
+* Redacted `404 Not Found` for inaccessible, missing, suspended, or otherwise
+  ineligible organizations.
 
 # References
 

@@ -1270,6 +1270,1341 @@
       ]
     },
     {
+      "name": "POST-GO-LIVE.3.6 - Preferred Organization",
+      "item": [
+        {
+          "name": "Login - Multi Membership User",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer ",
+                "type": "text"
+              },
+              {
+                "key": "{{tenantHeaderName}}",
+                "value": "",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{multiMemberEmail}}\",\n  \"password\": \"{{defaultPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 201\", function () { pm.response.to.have.status(201); });",
+                  "const body = pm.response.json();",
+                  "pm.collectionVariables.set(\"multiMemberToken\", body.accessToken);",
+                  "pm.collectionVariables.set(\"originalAccessToken\", body.accessToken);",
+                  "pm.collectionVariables.set(\"accessToken\", body.accessToken);",
+                  "pm.collectionVariables.set(\"currentUserId\", body.user.id);",
+                  "pm.collectionVariables.set(\"currentUserEmail\", body.user.email);",
+                  "pm.test(\"Multi-membership login returns JWT and user\", function () { pm.expect(body.accessToken).to.be.a(\"string\").and.not.empty; pm.expect(body.user.email).to.eql(pm.collectionVariables.get(\"multiMemberEmail\")); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Context - Initial Preferred Organization",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{multiMemberToken}}",
+                "type": "text"
+              },
+              {
+                "key": "{{tenantHeaderName}}",
+                "value": "",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/context",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "context"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.collectionVariables.set(\"preferredOrganizationId\", body.preferredOrganizationId ?? \"\");",
+                  "pm.test(\"Response does not mint a new JWT\", function () { pm.expect(pm.response.text()).not.to.include(\"accessToken\"); });",
+                  "pm.test(\"Original JWT is still reused\", function () { pm.expect(pm.collectionVariables.get(\"multiMemberToken\")).to.eql(pm.collectionVariables.get(\"originalAccessToken\")); });",
+                  "pm.test(\"Initial context is unresolved with seeded preference B\", function () { pm.expect(body.status).to.eql(\"UNRESOLVED\"); pm.expect(body.preferredOrganizationId).to.eql(pm.collectionVariables.get(\"organizationBId\")); pm.expect(body.selectableMemberships).to.be.an(\"array\").with.lengthOf(2); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Set Preferred Organization A",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{multiMemberToken}}",
+                "type": "text"
+              },
+              {
+                "key": "{{tenantHeaderName}}",
+                "value": "",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/context/preference",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "context",
+                "preference"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"organizationId\": \"{{organizationAId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.collectionVariables.set(\"preferredOrganizationId\", body.preferredOrganizationId ?? \"\");",
+                  "pm.test(\"Response does not mint a new JWT\", function () { pm.expect(pm.response.text()).not.to.include(\"accessToken\"); });",
+                  "pm.test(\"Original JWT is still reused\", function () { pm.expect(pm.collectionVariables.get(\"multiMemberToken\")).to.eql(pm.collectionVariables.get(\"originalAccessToken\")); });",
+                  "pm.test(\"Preference A is persisted\", function () { pm.expect(body.preferredOrganizationId).to.eql(pm.collectionVariables.get(\"organizationAId\")); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Context - Preferred Organization A",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{multiMemberToken}}",
+                "type": "text"
+              },
+              {
+                "key": "{{tenantHeaderName}}",
+                "value": "",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/context",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "context"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test(\"Response does not mint a new JWT\", function () { pm.expect(pm.response.text()).not.to.include(\"accessToken\"); });",
+                  "pm.test(\"Original JWT is still reused\", function () { pm.expect(pm.collectionVariables.get(\"multiMemberToken\")).to.eql(pm.collectionVariables.get(\"originalAccessToken\")); });",
+                  "pm.test(\"Context returns preferred organization A\", function () { pm.expect(body.preferredOrganizationId).to.eql(pm.collectionVariables.get(\"organizationAId\")); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Tenant Header B Overrides Preferred Organization A",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{multiMemberToken}}",
+                "type": "text"
+              },
+              {
+                "key": "{{tenantHeaderName}}",
+                "value": "{{organizationBId}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/patients",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "patients"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test(\"Response does not mint a new JWT\", function () { pm.expect(pm.response.text()).not.to.include(\"accessToken\"); });",
+                  "pm.test(\"Original JWT is still reused\", function () { pm.expect(pm.collectionVariables.get(\"multiMemberToken\")).to.eql(pm.collectionVariables.get(\"originalAccessToken\")); });",
+                  "pm.test(\"Tenant B header remains authoritative\", function () { pm.expect(body).to.be.an(\"array\").with.lengthOf(1); pm.expect(body[0].id).to.eql(pm.collectionVariables.get(\"multiPatientBId\")); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Context - Preferred Organization A Persists",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{multiMemberToken}}",
+                "type": "text"
+              },
+              {
+                "key": "{{tenantHeaderName}}",
+                "value": "",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/context",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "context"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test(\"Response does not mint a new JWT\", function () { pm.expect(pm.response.text()).not.to.include(\"accessToken\"); });",
+                  "pm.test(\"Original JWT is still reused\", function () { pm.expect(pm.collectionVariables.get(\"multiMemberToken\")).to.eql(pm.collectionVariables.get(\"originalAccessToken\")); });",
+                  "pm.test(\"Preference A remains UX-only after operating in tenant B\", function () { pm.expect(body.preferredOrganizationId).to.eql(pm.collectionVariables.get(\"organizationAId\")); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Set Preferred Organization B",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{multiMemberToken}}",
+                "type": "text"
+              },
+              {
+                "key": "{{tenantHeaderName}}",
+                "value": "",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/context/preference",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "context",
+                "preference"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"organizationId\": \"{{organizationBId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.collectionVariables.set(\"preferredOrganizationId\", body.preferredOrganizationId ?? \"\");",
+                  "pm.test(\"Response does not mint a new JWT\", function () { pm.expect(pm.response.text()).not.to.include(\"accessToken\"); });",
+                  "pm.test(\"Original JWT is still reused\", function () { pm.expect(pm.collectionVariables.get(\"multiMemberToken\")).to.eql(pm.collectionVariables.get(\"originalAccessToken\")); });",
+                  "pm.test(\"Preference B is persisted\", function () { pm.expect(body.preferredOrganizationId).to.eql(pm.collectionVariables.get(\"organizationBId\")); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Context - Preferred Organization B",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{multiMemberToken}}",
+                "type": "text"
+              },
+              {
+                "key": "{{tenantHeaderName}}",
+                "value": "",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/context",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "context"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test(\"Response does not mint a new JWT\", function () { pm.expect(pm.response.text()).not.to.include(\"accessToken\"); });",
+                  "pm.test(\"Original JWT is still reused\", function () { pm.expect(pm.collectionVariables.get(\"multiMemberToken\")).to.eql(pm.collectionVariables.get(\"originalAccessToken\")); });",
+                  "pm.test(\"Context returns preferred organization B\", function () { pm.expect(body.preferredOrganizationId).to.eql(pm.collectionVariables.get(\"organizationBId\")); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Clear Preferred Organization",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{multiMemberToken}}",
+                "type": "text"
+              },
+              {
+                "key": "{{tenantHeaderName}}",
+                "value": "",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/context/preference",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "context",
+                "preference"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"organizationId\": null\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.collectionVariables.set(\"preferredOrganizationId\", body.preferredOrganizationId ?? \"\");",
+                  "pm.test(\"Response does not mint a new JWT\", function () { pm.expect(pm.response.text()).not.to.include(\"accessToken\"); });",
+                  "pm.test(\"Original JWT is still reused\", function () { pm.expect(pm.collectionVariables.get(\"multiMemberToken\")).to.eql(pm.collectionVariables.get(\"originalAccessToken\")); });",
+                  "pm.test(\"Preference is cleared explicitly\", function () { pm.expect(body.preferredOrganizationId).to.eql(null); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Context - Preferred Organization Cleared",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{multiMemberToken}}",
+                "type": "text"
+              },
+              {
+                "key": "{{tenantHeaderName}}",
+                "value": "",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/context",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "context"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test(\"Response does not mint a new JWT\", function () { pm.expect(pm.response.text()).not.to.include(\"accessToken\"); });",
+                  "pm.test(\"Original JWT is still reused\", function () { pm.expect(pm.collectionVariables.get(\"multiMemberToken\")).to.eql(pm.collectionVariables.get(\"originalAccessToken\")); });",
+                  "pm.test(\"Context returns null after clearing preference\", function () { pm.expect(body.preferredOrganizationId).to.eql(null); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Set Ineligible Organization Denied",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{multiMemberToken}}",
+                "type": "text"
+              },
+              {
+                "key": "{{tenantHeaderName}}",
+                "value": "",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/context/preference",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "context",
+                "preference"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"organizationId\": \"{{ineligibleOrganizationId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 404\", function () { pm.response.to.have.status(404); });",
+                  "pm.test(\"Response does not mint a new JWT\", function () { pm.expect(pm.response.text()).not.to.include(\"accessToken\"); });",
+                  "pm.test(\"Original JWT is still reused\", function () { pm.expect(pm.collectionVariables.get(\"multiMemberToken\")).to.eql(pm.collectionVariables.get(\"originalAccessToken\")); });",
+                  "pm.test(\"Redacted deny body does not leak Prisma internals\", function () { pm.expect(pm.response.text()).not.to.include(\"P20\"); pm.expect(pm.response.text()).not.to.include(\"SQLSTATE\"); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Context - Preference Still Cleared After Deny",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{multiMemberToken}}",
+                "type": "text"
+              },
+              {
+                "key": "{{tenantHeaderName}}",
+                "value": "",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/context",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "context"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test(\"Response does not mint a new JWT\", function () { pm.expect(pm.response.text()).not.to.include(\"accessToken\"); });",
+                  "pm.test(\"Original JWT is still reused\", function () { pm.expect(pm.collectionVariables.get(\"multiMemberToken\")).to.eql(pm.collectionVariables.get(\"originalAccessToken\")); });",
+                  "pm.test(\"Negative write leaves the previous preference untouched\", function () { pm.expect(body.preferredOrganizationId).to.eql(null); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login - Suspended Membership User",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer ",
+                "type": "text"
+              },
+              {
+                "key": "{{tenantHeaderName}}",
+                "value": "",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{suspendedMembershipEmail}}\",\n  \"password\": \"{{defaultPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 201\", function () { pm.response.to.have.status(201); });",
+                  "const body = pm.response.json();",
+                  "pm.collectionVariables.set(\"suspendedMembershipToken\", body.accessToken);",
+                  "pm.collectionVariables.set(\"accessToken\", body.accessToken);",
+                  "pm.collectionVariables.set(\"currentUserId\", body.user.id);",
+                  "pm.collectionVariables.set(\"currentUserEmail\", body.user.email);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Suspended Membership Preference Denied",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{suspendedMembershipToken}}",
+                "type": "text"
+              },
+              {
+                "key": "{{tenantHeaderName}}",
+                "value": "",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/context/preference",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "context",
+                "preference"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"organizationId\": \"{{organizationAId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 404\", function () { pm.response.to.have.status(404); });",
+                  "pm.test(\"Response does not mint a new JWT\", function () { pm.expect(pm.response.text()).not.to.include(\"accessToken\"); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Context - Suspended Membership Remains Null",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{suspendedMembershipToken}}",
+                "type": "text"
+              },
+              {
+                "key": "{{tenantHeaderName}}",
+                "value": "",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/context",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "context"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test(\"Response does not mint a new JWT\", function () { pm.expect(pm.response.text()).not.to.include(\"accessToken\"); });",
+                  "pm.test(\"Suspended membership stays unresolved with null preference\", function () { pm.expect(body.status).to.eql(\"UNRESOLVED\"); pm.expect(body.preferredOrganizationId).to.eql(null); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login - Suspended Organization User",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer ",
+                "type": "text"
+              },
+              {
+                "key": "{{tenantHeaderName}}",
+                "value": "",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{suspendedOrganizationEmail}}\",\n  \"password\": \"{{defaultPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 201\", function () { pm.response.to.have.status(201); });",
+                  "const body = pm.response.json();",
+                  "pm.collectionVariables.set(\"suspendedOrganizationToken\", body.accessToken);",
+                  "pm.collectionVariables.set(\"accessToken\", body.accessToken);",
+                  "pm.collectionVariables.set(\"currentUserId\", body.user.id);",
+                  "pm.collectionVariables.set(\"currentUserEmail\", body.user.email);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Context - Suspended Organization Preference Sanitized",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{suspendedOrganizationToken}}",
+                "type": "text"
+              },
+              {
+                "key": "{{tenantHeaderName}}",
+                "value": "",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/context",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "context"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test(\"Response does not mint a new JWT\", function () { pm.expect(pm.response.text()).not.to.include(\"accessToken\"); });",
+                  "pm.test(\"Stale suspended-organization preference is sanitized to null\", function () { pm.expect(body.status).to.eql(\"UNRESOLVED\"); pm.expect(body.preferredOrganizationId).to.eql(null); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Suspended Organization Preference Denied",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{suspendedOrganizationToken}}",
+                "type": "text"
+              },
+              {
+                "key": "{{tenantHeaderName}}",
+                "value": "",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/context/preference",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "context",
+                "preference"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"organizationId\": \"{{suspendedOrganizationId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 404\", function () { pm.response.to.have.status(404); });",
+                  "pm.test(\"Response does not mint a new JWT\", function () { pm.expect(pm.response.text()).not.to.include(\"accessToken\"); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login - No Membership User",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer ",
+                "type": "text"
+              },
+              {
+                "key": "{{tenantHeaderName}}",
+                "value": "",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{noMembershipEmail}}\",\n  \"password\": \"{{defaultPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 201\", function () { pm.response.to.have.status(201); });",
+                  "const body = pm.response.json();",
+                  "pm.collectionVariables.set(\"noMembershipToken\", body.accessToken);",
+                  "pm.collectionVariables.set(\"accessToken\", body.accessToken);",
+                  "pm.collectionVariables.set(\"currentUserId\", body.user.id);",
+                  "pm.collectionVariables.set(\"currentUserEmail\", body.user.email);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "No Membership Context",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{noMembershipToken}}",
+                "type": "text"
+              },
+              {
+                "key": "{{tenantHeaderName}}",
+                "value": "",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/context",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "context"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test(\"Response does not mint a new JWT\", function () { pm.expect(pm.response.text()).not.to.include(\"accessToken\"); });",
+                  "pm.test(\"No-membership user receives legacy compatibility with null preference\", function () { pm.expect(body.status).to.eql(\"LEGACY_COMPATIBILITY\"); pm.expect(body.preferredOrganizationId).to.eql(null); pm.expect(body.selectableMemberships).to.eql([]); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "No Membership Preference Denied",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{noMembershipToken}}",
+                "type": "text"
+              },
+              {
+                "key": "{{tenantHeaderName}}",
+                "value": "",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/context/preference",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "context",
+                "preference"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"organizationId\": \"{{organizationAId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 404\", function () { pm.response.to.have.status(404); });",
+                  "pm.test(\"Response does not mint a new JWT\", function () { pm.expect(pm.response.text()).not.to.include(\"accessToken\"); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Invalid Payload - UUID",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{multiMemberToken}}",
+                "type": "text"
+              },
+              {
+                "key": "{{tenantHeaderName}}",
+                "value": "",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/context/preference",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "context",
+                "preference"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"organizationId\": \"not-a-uuid\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"Original JWT is still reused\", function () { pm.expect(pm.collectionVariables.get(\"multiMemberToken\")).to.eql(pm.collectionVariables.get(\"originalAccessToken\")); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Invalid Payload - Missing Field",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{multiMemberToken}}",
+                "type": "text"
+              },
+              {
+                "key": "{{tenantHeaderName}}",
+                "value": "",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/context/preference",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "context",
+                "preference"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"Original JWT is still reused\", function () { pm.expect(pm.collectionVariables.get(\"multiMemberToken\")).to.eql(pm.collectionVariables.get(\"originalAccessToken\")); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Invalid Payload - Empty String",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{multiMemberToken}}",
+                "type": "text"
+              },
+              {
+                "key": "{{tenantHeaderName}}",
+                "value": "",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/context/preference",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "context",
+                "preference"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"organizationId\": \"\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"Original JWT is still reused\", function () { pm.expect(pm.collectionVariables.get(\"multiMemberToken\")).to.eql(pm.collectionVariables.get(\"originalAccessToken\")); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Invalid Payload - Extra Field",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{multiMemberToken}}",
+                "type": "text"
+              },
+              {
+                "key": "{{tenantHeaderName}}",
+                "value": "",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/context/preference",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "context",
+                "preference"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"organizationId\": \"{{organizationAId}}\",\n  \"membershipId\": \"24000000-0000-4000-8000-000000000011\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"Original JWT is still reused\", function () { pm.expect(pm.collectionVariables.get(\"multiMemberToken\")).to.eql(pm.collectionVariables.get(\"originalAccessToken\")); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
       "name": "03 - Patients",
       "item": [
         {

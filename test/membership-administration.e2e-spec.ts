@@ -495,6 +495,7 @@ describeCertification('Membership administration runtime', () => {
       .expect((response) => {
         expect(response.body).toMatchObject({
           status: 'RESOLVED',
+          preferredOrganizationId: null,
           tenantContext: {
             membershipId: psychologistMembershipId,
             organizationId: organizationAlphaId,

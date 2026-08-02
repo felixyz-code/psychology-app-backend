@@ -317,6 +317,7 @@ describeCertification('Patients tenant-aware HTTP certification', () => {
 
     expect(contextResponse.body).toMatchObject({
       status: 'RESOLVED',
+      preferredOrganizationId: null,
       tenantContext: {
         userId: psychologistAId,
         organizationId: organizationAId,

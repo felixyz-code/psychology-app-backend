@@ -155,6 +155,7 @@ describeCertification('Freelancer bootstrap runtime', () => {
       .expect(200);
     expect(context.body).toMatchObject({
       status: 'RESOLVED',
+      preferredOrganizationId: null,
       tenantContext: {
         userId: body.user.id,
         organizationId: body.organization.id,

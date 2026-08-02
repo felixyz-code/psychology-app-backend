@@ -138,6 +138,7 @@ describeCertification('Tenant platform certification', () => {
       .expect(200);
     expect(context.body).toMatchObject({
       status: 'RESOLVED',
+      preferredOrganizationId: null,
       tenantContext: {
         userId: psychologistAId,
         organizationId: organizationAId,

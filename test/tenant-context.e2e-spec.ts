@@ -12,6 +12,7 @@ import { randomUUID } from 'node:crypto';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from '../src/app.module';
+import { AuthContextUnresolvedDto } from '../src/auth/dto/auth-context-response.dto';
 import { normalizeEmailIdentity } from '../src/common/identity/email-identity.util';
 import { PrismaService } from '../src/prisma/prisma.service';
 
@@ -127,6 +128,7 @@ describeCertification('Tenant context runtime guard integration', () => {
       .expect(200);
     expect(single.body).toMatchObject({
       status: 'RESOLVED',
+      preferredOrganizationId: null,
       tenantContext: {
         organizationId: organizationOneId,
         organizationRole: MembershipRole.PSYCHOLOGIST,
@@ -146,6 +148,7 @@ describeCertification('Tenant context runtime guard integration', () => {
       throw new Error('Expected an unresolved tenant context response');
     }
     expect(unresolvedBody.status).toBe('UNRESOLVED');
+    expect(unresolvedBody.preferredOrganizationId).toBeNull();
     expect(unresolvedBody.selectableMemberships).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ organizationId: organizationMultipleOneId }),
@@ -160,6 +163,7 @@ describeCertification('Tenant context runtime guard integration', () => {
       .expect(200);
     expect(selected.body).toMatchObject({
       status: 'RESOLVED',
+      preferredOrganizationId: null,
       tenantContext: { organizationId: organizationMultipleTwoId },
     });
   });
@@ -169,7 +173,10 @@ describeCertification('Tenant context runtime guard integration', () => {
       .get('/auth/context')
       .set('Authorization', bearerToken(userLegacyId, UserRole.PSYCHOLOGIST))
       .expect(200);
-    expect(legacy.body).toMatchObject({ status: 'LEGACY_COMPATIBILITY' });
+    expect(legacy.body).toMatchObject({
+      status: 'LEGACY_COMPATIBILITY',
+      preferredOrganizationId: null,
+    });
     await request(app.getHttpServer())
       .get('/auth/context')
       .set('Authorization', bearerToken(userOneId, UserRole.ADMIN))
@@ -226,19 +233,16 @@ function membership(
   };
 }
 
-type UnresolvedTenantContextResponse = {
-  status: 'UNRESOLVED';
-  selectableMemberships: ReadonlyArray<{ organizationId: string }>;
-};
-
 function isUnresolvedTenantContextResponse(
   value: unknown,
-): value is UnresolvedTenantContextResponse {
+): value is AuthContextUnresolvedDto {
   if (!isRecord(value) || value.status !== 'UNRESOLVED') {
     return false;
   }
 
   return (
+    (value.preferredOrganizationId === null ||
+      typeof value.preferredOrganizationId === 'string') &&
     Array.isArray(value.selectableMemberships) &&
     value.selectableMemberships.every(
       (membership) =>
