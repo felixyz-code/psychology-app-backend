@@ -41,6 +41,7 @@ type PrismaMock = {
 type AuthServiceMock = {
   login: jest.Mock;
   freelancerBootstrap: jest.Mock;
+  updatePreferredOrganization: jest.Mock;
 };
 
 const adminUser = {
@@ -110,7 +111,11 @@ describe('Authentication error handling (integration)', () => {
   };
 
   beforeAll(async () => {
-    authService = { login: jest.fn(), freelancerBootstrap: jest.fn() };
+    authService = {
+      login: jest.fn(),
+      freelancerBootstrap: jest.fn(),
+      updatePreferredOrganization: jest.fn(),
+    };
     prisma = { user: { findUnique: jest.fn() } };
     configService = {
       jwtSecret: testJwtSecret,
@@ -362,6 +367,67 @@ describe('Authentication error handling (integration)', () => {
         organizationName: 'Bootstrap Practice',
       },
       expect.any(String),
+    );
+  });
+
+  it.each([
+    ['missing organizationId', {}],
+    ['invalid uuid', { organizationId: 'not-a-uuid' }],
+    ['empty string', { organizationId: '' }],
+  ])(
+    'returns a safe standard 400 response for invalid preferred-organization payload: %s',
+    async (_scenario, body) => {
+      const response = await request(app.getHttpServer())
+        .put('/auth/context/preference')
+        .set('Authorization', `Bearer ${issueToken(psychologistUser.id)}`)
+        .send(body)
+        .expect(400);
+
+      const errorBody = toErrorBody(response.body as unknown);
+
+      expect(errorBody.statusCode).toBe(400);
+      expect(errorBody.error).toBe('Bad Request');
+      expectSafeErrorBody(errorBody);
+      expect(authService.updatePreferredOrganization).not.toHaveBeenCalled();
+    },
+  );
+
+  it('rejects extra preferred-organization fields instead of silently stripping them', async () => {
+    const response = await request(app.getHttpServer())
+      .put('/auth/context/preference')
+      .set('Authorization', `Bearer ${issueToken(psychologistUser.id)}`)
+      .send({
+        organizationId: null,
+        membershipId: 'should-not-be-accepted',
+      })
+      .expect(400);
+
+    const errorBody = toErrorBody(response.body as unknown);
+
+    expect(errorBody.statusCode).toBe(400);
+    expect(errorBody.error).toBe('Bad Request');
+    expect(JSON.stringify(errorBody)).toContain(
+      'property membershipId should not exist',
+    );
+    expect(authService.updatePreferredOrganization).not.toHaveBeenCalled();
+  });
+
+  it('accepts an explicit null preferred-organization clear payload', async () => {
+    authService.updatePreferredOrganization.mockResolvedValue({
+      preferredOrganizationId: null,
+    });
+
+    await request(app.getHttpServer())
+      .put('/auth/context/preference')
+      .set('Authorization', `Bearer ${issueToken(psychologistUser.id)}`)
+      .send({ organizationId: null })
+      .expect(200, {
+        preferredOrganizationId: null,
+      });
+
+    expect(authService.updatePreferredOrganization).toHaveBeenCalledWith(
+      psychologistUser,
+      { organizationId: null },
     );
   });
 

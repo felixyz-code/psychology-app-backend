@@ -100,11 +100,13 @@ model User {
   normalizedEmail       String                   @unique @db.VarChar(255)
   passwordHash          String                   @map("password") @db.VarChar(255)
   role                  UserRole
+  preferredOrganizationId        String?                  @db.Uuid
   patients              Patient[]
   sessionNotes          SessionNote[]
   uploadedDocuments     Document[]
   appointments          Appointment[]
   financialTransactions FinancialTransaction[]
+  preferredOrganization          Organization?            @relation("UserPreferredOrganization", fields: [preferredOrganizationId], references: [id], onDelete: SetNull, onUpdate: Cascade)
   memberships                     OrganizationMembership[]
   invitedOrganizationInvitations  OrganizationInvitation[] @relation("OrganizationInvitationInvitedUser")
   acceptedOrganizationInvitations OrganizationInvitation[] @relation("OrganizationInvitationAcceptedByUser")
@@ -112,6 +114,7 @@ model User {
   createdAt                       DateTime                 @default(now())
   updatedAt                       DateTime                 @updatedAt
 
+  @@index([preferredOrganizationId])
   @@map("users")
 }
 
@@ -128,6 +131,7 @@ model Organization {
   invitations  OrganizationInvitation[]
   settings     OrganizationSettings?
   branding     OrganizationBranding?
+  preferredByUsers User[]               @relation("UserPreferredOrganization")
   patients     Patient[]
   caseFiles    CaseFile[]
   sessionNotes SessionNote[]

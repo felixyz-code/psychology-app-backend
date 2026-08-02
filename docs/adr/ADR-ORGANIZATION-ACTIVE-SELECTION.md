@@ -175,8 +175,9 @@ Normative posture:
 - a future persisted preference may exist for UX, but it is preference only,
   never authority.
 
-If a future preference endpoint is added, it stores only a preferred default
-organization for the next bootstrap experience. It does not bypass:
+The current runtime now implements that posture through
+`PUT /auth/context/preference`. It stores only a preferred default
+organization for UX. It does not bypass:
 
 - active membership validation;
 - active organization validation;

@@ -2,12 +2,45 @@
 
 ---
 
-# POST-GO-LIVE.3.5 Public Freelancer Bootstrap Runtime
+# POST-GO-LIVE.3.6 Preferred Organization UX Runtime
 
 ## Status
 
 Implemented locally and pending technical review, draft PR publication, and
-CI on Saturday, August 1, 2026.
+CI on Sunday, August 2, 2026.
+
+## Highlights
+
+* Added nullable `User.preferredOrganizationId` plus a safe FK with
+  `ON DELETE SET NULL` and no authorization semantics.
+* Added `PUT /auth/context/preference` as a JWT-authenticated UX-only
+  preference write endpoint with explicit DTO validation and serializable
+  eligibility checks.
+* Extended `GET /auth/context` so `RESOLVED`, `UNRESOLVED`, and
+  `LEGACY_COMPATIBILITY` all expose sanitized
+  `preferredOrganizationId: uuid | null`.
+* Added post-commit observability event
+  `active_organization_preference_changed`.
+* Extended development seed, seed certification, Postman artifacts, OpenAPI,
+  persistence, PostgreSQL E2E, and concurrency coverage for preferred
+  organization behavior.
+
+## Compatibility
+
+* `X-Organization-Id` remains the only tenant-selection hint for
+  tenant-required requests.
+* JWT remains identity-only and is never reissued by preference writes.
+* `TenantContextGuard`, capabilities, membership state, and request-time
+  tenant authority are unchanged.
+* Stale persisted preferences are sanitized to `null` on read and are never
+  auto-corrected or used as request fallback.
+
+# POST-GO-LIVE.3.5 Public Freelancer Bootstrap Runtime
+
+## Status
+
+Closed and integrated on `development` at merge commit
+`7b456901074807891c0384e214181e2ec8417d37` on Sunday, August 2, 2026.
 
 ## Highlights
 

@@ -1,4 +1,8 @@
-import { UnauthorizedException } from '@nestjs/common';
+import {
+  ConflictException,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { Prisma, UserRole } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { JwtService } from '@nestjs/jwt';
@@ -12,6 +16,7 @@ type PrismaMock = {
   $transaction: jest.Mock;
   user: {
     findUnique: jest.Mock;
+    update: jest.Mock;
   };
   organizationMembership: {
     findMany: jest.Mock;
@@ -48,6 +53,7 @@ describe('AuthService', () => {
   let observability: {
     freelancerBootstrapCompleted: jest.Mock;
     freelancerBootstrapDenied: jest.Mock;
+    activeOrganizationPreferenceChanged: jest.Mock;
   };
 
   beforeEach(() => {
@@ -55,6 +61,7 @@ describe('AuthService', () => {
       $transaction: jest.fn(),
       user: {
         findUnique: jest.fn(),
+        update: jest.fn(),
       },
       organizationMembership: {
         findMany: jest.fn(),
@@ -70,6 +77,7 @@ describe('AuthService', () => {
     observability = {
       freelancerBootstrapCompleted: jest.fn(),
       freelancerBootstrapDenied: jest.fn(),
+      activeOrganizationPreferenceChanged: jest.fn(),
     };
     service = new AuthService(
       prisma as unknown as PrismaService,
@@ -140,6 +148,9 @@ describe('AuthService', () => {
   });
 
   it('returns only the current user selectable memberships when tenant resolution is ambiguous', async () => {
+    prisma.user.findUnique.mockResolvedValue({
+      preferredOrganizationId: 'organization-b',
+    });
     prisma.organizationMembership.findMany.mockResolvedValue([
       {
         id: 'membership-a-revoked',
@@ -175,6 +186,7 @@ describe('AuthService', () => {
 
     await expect(service.getTenantContext(user)).resolves.toEqual({
       status: 'UNRESOLVED',
+      preferredOrganizationId: 'organization-b',
       selectableMemberships: [
         {
           membershipId: 'membership-a',
@@ -189,6 +201,10 @@ describe('AuthService', () => {
           organizationRole: 'PSYCHOLOGIST',
         },
       ],
+    });
+    expect(prisma.user.findUnique).toHaveBeenCalledWith({
+      where: { id: user.id },
+      select: { preferredOrganizationId: true },
     });
     expect(prisma.organizationMembership.findMany).toHaveBeenCalledWith({
       where: {
@@ -213,7 +229,32 @@ describe('AuthService', () => {
     });
   });
 
-  it('does not query memberships again when a guard has already resolved context', async () => {
+  it('returns resolved context plus the sanitized preferred organization from current eligibility', async () => {
+    prisma.user.findUnique.mockResolvedValue({
+      preferredOrganizationId: 'organization-a',
+    });
+    prisma.organizationMembership.findMany.mockResolvedValue([
+      {
+        id: 'membership-a',
+        role: 'OWNER',
+        status: 'ACTIVE',
+        organization: {
+          id: 'organization-a',
+          displayName: 'Organization A',
+          status: 'ACTIVE',
+        },
+      },
+      {
+        id: 'membership-b',
+        role: 'PSYCHOLOGIST',
+        status: 'ACTIVE',
+        organization: {
+          id: 'organization-b',
+          displayName: 'Organization B',
+          status: 'ACTIVE',
+        },
+      },
+    ]);
     const tenantContext = {
       userId: user.id,
       organizationId: 'organization-a',
@@ -228,8 +269,22 @@ describe('AuthService', () => {
     ).resolves.toEqual({
       status: 'RESOLVED',
       tenantContext,
+      preferredOrganizationId: 'organization-a',
     });
-    expect(prisma.organizationMembership.findMany).not.toHaveBeenCalled();
+    expect(prisma.organizationMembership.findMany).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns legacy compatibility with a sanitized null preferred organization when the persisted value is stale', async () => {
+    prisma.user.findUnique.mockResolvedValue({
+      preferredOrganizationId: 'organization-stale',
+    });
+    prisma.organizationMembership.findMany.mockResolvedValue([]);
+
+    await expect(service.getTenantContext(user)).resolves.toEqual({
+      status: 'LEGACY_COMPATIBILITY',
+      selectableMemberships: [],
+      preferredOrganizationId: null,
+    });
   });
 
   it('creates the freelancer bootstrap user, organization, membership, and post-commit jwt', async () => {
@@ -357,5 +412,238 @@ describe('AuthService', () => {
     );
     expect(observability.freelancerBootstrapCompleted).not.toHaveBeenCalled();
     expect(jwtService.signAsync).not.toHaveBeenCalled();
+  });
+
+  it('persists an eligible preferred organization and emits one post-commit success event', async () => {
+    prisma.$transaction.mockImplementation(
+      async (work: (tx: Record<string, unknown>) => Promise<unknown>) =>
+        work({
+          user: {
+            findUnique: jest.fn().mockResolvedValue({
+              preferredOrganizationId: 'organization-old',
+            }),
+            updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+          },
+          organizationMembership: {
+            findFirst: jest.fn().mockResolvedValue({
+              id: 'membership-a',
+              status: 'ACTIVE',
+              organization: {
+                status: 'ACTIVE',
+              },
+            }),
+          },
+        }),
+    );
+
+    await expect(
+      service.updatePreferredOrganization(user, {
+        organizationId: 'organization-a',
+      }),
+    ).resolves.toEqual({
+      preferredOrganizationId: 'organization-a',
+    });
+
+    expect(
+      observability.activeOrganizationPreferenceChanged,
+    ).toHaveBeenCalledWith('SUCCESS', 'PREFERENCE_UPDATED', {
+      userId: user.id,
+      preferredOrganizationId: 'organization-a',
+      previousPreferredOrganizationId: 'organization-old',
+    });
+  });
+
+  it('clears the preferred organization and emits a post-commit clear event', async () => {
+    prisma.$transaction.mockImplementation(
+      async (work: (tx: Record<string, unknown>) => Promise<unknown>) =>
+        work({
+          user: {
+            findUnique: jest.fn().mockResolvedValue({
+              preferredOrganizationId: 'organization-a',
+            }),
+            update: jest.fn().mockResolvedValue({
+              preferredOrganizationId: null,
+            }),
+          },
+        }),
+    );
+
+    await expect(
+      service.updatePreferredOrganization(user, {
+        organizationId: null,
+      }),
+    ).resolves.toEqual({
+      preferredOrganizationId: null,
+    });
+
+    expect(
+      observability.activeOrganizationPreferenceChanged,
+    ).toHaveBeenCalledWith('SUCCESS', 'PREFERENCE_CLEARED', {
+      userId: user.id,
+      previousPreferredOrganizationId: 'organization-a',
+    });
+  });
+
+  it('returns a redacted not found response for an inaccessible organization and emits a deny event', async () => {
+    prisma.$transaction.mockImplementation(
+      async (work: (tx: Record<string, unknown>) => Promise<unknown>) =>
+        work({
+          user: {
+            findUnique: jest.fn().mockResolvedValue({
+              preferredOrganizationId: null,
+            }),
+          },
+          organizationMembership: {
+            findFirst: jest.fn().mockResolvedValue(null),
+          },
+        }),
+    );
+
+    await expect(
+      service.updatePreferredOrganization(user, {
+        organizationId: 'organization-x',
+      }),
+    ).rejects.toBeInstanceOf(NotFoundException);
+
+    expect(
+      observability.activeOrganizationPreferenceChanged,
+    ).toHaveBeenCalledWith('DENY', 'INELIGIBLE_ORGANIZATION', {
+      userId: user.id,
+      preferredOrganizationId: 'organization-x',
+    });
+  });
+
+  it('returns a redacted not found response for an inactive membership and emits a deny event', async () => {
+    prisma.$transaction.mockImplementation(
+      async (work: (tx: Record<string, unknown>) => Promise<unknown>) =>
+        work({
+          user: {
+            findUnique: jest.fn().mockResolvedValue({
+              preferredOrganizationId: null,
+            }),
+          },
+          organizationMembership: {
+            findFirst: jest.fn().mockResolvedValue({
+              id: 'membership-a',
+              status: 'SUSPENDED',
+              organization: {
+                status: 'ACTIVE',
+              },
+            }),
+          },
+        }),
+    );
+
+    await expect(
+      service.updatePreferredOrganization(user, {
+        organizationId: 'organization-a',
+      }),
+    ).rejects.toBeInstanceOf(NotFoundException);
+
+    expect(
+      observability.activeOrganizationPreferenceChanged,
+    ).toHaveBeenCalledWith('DENY', 'INACTIVE_MEMBERSHIP', {
+      userId: user.id,
+      preferredOrganizationId: 'organization-a',
+    });
+  });
+
+  it('returns a redacted not found response for an inactive organization and emits a deny event', async () => {
+    prisma.$transaction.mockImplementation(
+      async (work: (tx: Record<string, unknown>) => Promise<unknown>) =>
+        work({
+          user: {
+            findUnique: jest.fn().mockResolvedValue({
+              preferredOrganizationId: null,
+            }),
+          },
+          organizationMembership: {
+            findFirst: jest.fn().mockResolvedValue({
+              id: 'membership-a',
+              status: 'ACTIVE',
+              organization: {
+                status: 'SUSPENDED',
+              },
+            }),
+          },
+        }),
+    );
+
+    await expect(
+      service.updatePreferredOrganization(user, {
+        organizationId: 'organization-a',
+      }),
+    ).rejects.toBeInstanceOf(NotFoundException);
+
+    expect(
+      observability.activeOrganizationPreferenceChanged,
+    ).toHaveBeenCalledWith('DENY', 'INACTIVE_ORGANIZATION', {
+      userId: user.id,
+      preferredOrganizationId: 'organization-a',
+    });
+  });
+
+  it('retries serialization conflicts and emits the success event only once after commit', async () => {
+    prisma.$transaction
+      .mockRejectedValueOnce(
+        new Prisma.PrismaClientKnownRequestError('serialization', {
+          code: 'P2034',
+          clientVersion: 'test',
+        }),
+      )
+      .mockImplementationOnce(
+        async (work: (tx: Record<string, unknown>) => Promise<unknown>) =>
+          work({
+            user: {
+              findUnique: jest.fn().mockResolvedValue({
+                preferredOrganizationId: null,
+              }),
+              updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+            },
+            organizationMembership: {
+              findFirst: jest.fn().mockResolvedValue({
+                id: 'membership-a',
+                status: 'ACTIVE',
+                organization: {
+                  status: 'ACTIVE',
+                },
+              }),
+            },
+          }),
+      );
+
+    await expect(
+      service.updatePreferredOrganization(user, {
+        organizationId: 'organization-a',
+      }),
+    ).resolves.toEqual({
+      preferredOrganizationId: 'organization-a',
+    });
+
+    expect(prisma.$transaction).toHaveBeenCalledTimes(2);
+    expect(
+      observability.activeOrganizationPreferenceChanged.mock.calls.filter(
+        ([outcome]) => outcome === 'SUCCESS',
+      ),
+    ).toHaveLength(1);
+  });
+
+  it('surfaces a final concurrent conflict without emitting a success event', async () => {
+    prisma.$transaction.mockRejectedValue(
+      new Prisma.PrismaClientKnownRequestError('serialization', {
+        code: 'P2034',
+        clientVersion: 'test',
+      }),
+    );
+
+    await expect(
+      service.updatePreferredOrganization(user, {
+        organizationId: 'organization-a',
+      }),
+    ).rejects.toBeInstanceOf(ConflictException);
+
+    expect(
+      observability.activeOrganizationPreferenceChanged,
+    ).not.toHaveBeenCalledWith('SUCCESS', expect.anything(), expect.anything());
   });
 });

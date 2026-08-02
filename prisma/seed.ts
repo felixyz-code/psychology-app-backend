@@ -115,6 +115,7 @@ type SeedUser = {
   email: string;
   normalizedEmail: string;
   role: UserRole;
+  preferredOrganizationId: string | null;
 };
 
 const organizations = [
@@ -147,7 +148,13 @@ const users: SeedUser[] = [
   user(ids.readonlyA, 'Read Only A', 'readonly.a@example.test'),
   user(ids.ownerB, 'Owner B', 'owner.b@example.test'),
   user(ids.psychologistB, 'Psychologist B', 'psychologist.b@example.test'),
-  user(ids.multiMember, 'Multi Member', 'multi.member@example.test'),
+  user(
+    ids.multiMember,
+    'Multi Member',
+    'multi.member@example.test',
+    UserRole.PSYCHOLOGIST,
+    ids.orgB,
+  ),
   user(
     ids.suspendedMember,
     'Suspended Membership A',
@@ -157,6 +164,8 @@ const users: SeedUser[] = [
     ids.suspendedOrgUser,
     'Suspended Organization User',
     'suspended.organization@example.test',
+    UserRole.PSYCHOLOGIST,
+    ids.orgSuspended,
   ),
   user(ids.noMembership, 'No Membership User', 'no.membership@example.test'),
 ];
@@ -558,6 +567,7 @@ function user(
   name: string,
   email: string,
   role: UserRole = UserRole.PSYCHOLOGIST,
+  preferredOrganizationId: string | null = null,
 ): SeedUser {
   return {
     id,
@@ -565,6 +575,7 @@ function user(
     email,
     normalizedEmail: normalizeEmailIdentity(email),
     role,
+    preferredOrganizationId,
   };
 }
 
@@ -911,15 +922,13 @@ async function createSeedDocumentFiles() {
 }
 
 async function seedTenantDevelopmentData(passwordHash: string) {
-  await prisma.$transaction([
-    prisma.user.createMany({
-      data: users.map((seedUser) => ({
-        ...seedUser,
-        passwordHash,
-      })),
-    }),
-    prisma.organization.createMany({ data: organizations }),
-  ]);
+  await prisma.organization.createMany({ data: organizations });
+  await prisma.user.createMany({
+    data: users.map((seedUser) => ({
+      ...seedUser,
+      passwordHash,
+    })),
+  });
 
   await prisma.$transaction([
     prisma.organizationSettings.createMany({

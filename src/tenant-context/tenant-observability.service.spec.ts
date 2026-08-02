@@ -66,4 +66,46 @@ describe('TenantObservabilityService', () => {
     expect(entries).not.toContain('password');
     expect(entries).not.toContain('eyJ');
   });
+
+  it('emits preferred-organization UX events without tenant authority or sensitive payloads', () => {
+    const context = new RequestContextService();
+    const service = new TenantObservabilityService(context);
+    const log = jest.spyOn(Logger.prototype, 'log').mockImplementation();
+    const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
+
+    context.run('request-preference-789', () => {
+      service.activeOrganizationPreferenceChanged(
+        'SUCCESS',
+        'PREFERENCE_UPDATED',
+        {
+          userId: '11111111-1111-4111-8111-111111111111',
+          preferredOrganizationId: '22222222-2222-4222-8222-222222222222',
+          previousPreferredOrganizationId:
+            '33333333-3333-4333-8333-333333333333',
+        },
+      );
+      service.activeOrganizationPreferenceChanged(
+        'DENY',
+        'INACTIVE_ORGANIZATION',
+        {
+          userId: '11111111-1111-4111-8111-111111111111',
+          preferredOrganizationId: '44444444-4444-4444-8444-444444444444',
+        },
+      );
+    });
+
+    const entries = [...log.mock.calls, ...warn.mock.calls]
+      .map(([event]) => String(event))
+      .filter((entry) =>
+        entry.includes('active_organization_preference_changed'),
+      )
+      .join('\n');
+    expect(entries).toContain('request-preference-789');
+    expect(entries).toContain('active_organization_preference_changed');
+    expect(entries).toContain('PREFERENCE_UPDATED');
+    expect(entries).toContain('INACTIVE_ORGANIZATION');
+    expect(entries).not.toContain('Bearer secret-token');
+    expect(entries).not.toContain('clinician@example.test');
+    expect(entries).not.toContain('membershipId');
+  });
 });

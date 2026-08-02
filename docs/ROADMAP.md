@@ -46,7 +46,9 @@ POST-GO-LIVE.3.3 Invitation Administration Runtime closed and integrated
 Runtime baseline: 5bb75dc4ae8deed67543f745abb23bac88508066
 POST-GO-LIVE.3.4 Organization Ownership Transfer Runtime closed and integrated
 Runtime baseline: 77b4b6e6a70ef133459b84ea71c5d9590bfb6d0a
-POST-GO-LIVE.3.5 Public Freelancer Bootstrap Runtime implemented locally and pending review as of Saturday, August 1, 2026
+POST-GO-LIVE.3.5 Public Freelancer Bootstrap Runtime closed and integrated
+Runtime baseline: 7b456901074807891c0384e214181e2ec8417d37
+POST-GO-LIVE.3.6 Preferred Organization UX Runtime implemented locally and pending review as of Sunday, August 2, 2026
 ```
 
 Current priorities:
@@ -83,7 +85,8 @@ POST-GO-LIVE.3
  |- 3.2 Membership Administration Runtime CLOSED / INTEGRATED
  |- 3.3 Invitation Administration Runtime CLOSED / INTEGRATED
  |- 3.4 Organization Ownership Transfer Runtime CLOSED / INTEGRATED
- `- 3.5 Public Freelancer Bootstrap Runtime IMPLEMENTED / REVIEW PENDING
+ |- 3.5 Public Freelancer Bootstrap Runtime CLOSED / INTEGRATED
+ `- 3.6 Preferred Organization UX Runtime IMPLEMENTED / REVIEW PENDING
 POST-GO-LIVE.4                           PENDING
 POST-GO-LIVE.5                           PENDING
 POST-GO-LIVE.6                           PENDING
@@ -468,25 +471,29 @@ Evidence:
 POST-GO-LIVE.2.2B - Postman Collection Refresh:
 
 ```text
-Status: IMPLEMENTED AND STATICALLY VALIDATED
-Postman functional runner certification: DEFERRED
+Status: IMPLEMENTED, VERSIONED, AND LOCALLY CERTIFIABLE
+Local postman:certify runner: AVAILABLE
 ```
 
 Evidence:
 
 - Postman v2.1 collection is valid JSON;
-- 13 folders and 68 requests;
+- 14 folders and 93 requests;
 - local environment is sanitized;
 - URLs use `{{baseUrl}}`;
 - dynamic JWT and runtime ID variables are empty in exports;
-- endpoints align with the converted tenant-aware clinical and financial
-  backend routes.
+  endpoints align with the converted tenant-aware clinical and financial
+  backend routes;
+- `npm.cmd run postman:certify` validates the versioned collection structure
+  and executes the preferred-organization UX flow through a repo-local runner
+  without Postman Cloud or personal sessions.
 
-The functional Postman runner certification is deferred because Newman added an
-unacceptable critical dependency risk, Postman CLI requested authentication /
-cloud publication behavior during the observed local run, and Postman Desktop
-would require using or altering a personal signed-in session. The collection is
-published as a development artifact with that limitation explicit. It does not
+The repository still does not require Newman or Postman CLI as the release gate
+because Newman added an unacceptable critical dependency risk, Postman CLI
+requested authentication / cloud publication behavior during the observed local
+run, and Postman Desktop would require using or altering a personal signed-in
+session. The collection remains a local development artifact with that
+limitation explicit. It does not
 replace D1-D5 certification, PostgreSQL E2E, Jest regression, or OpenAPI
 contract tests.
 
@@ -531,8 +538,10 @@ POST-GO-LIVE.3.1 is now implemented locally and in review. POST-GO-LIVE.3.2
 and POST-GO-LIVE.3.3 are closed and integrated on `development`.
 POST-GO-LIVE.3.4 ownership transfer runtime is closed and integrated on
 `development` as of Friday, July 31, 2026. POST-GO-LIVE.3.5 public freelancer
-bootstrap runtime is implemented locally and pending review as of Saturday,
-August 1, 2026. No phase in this sequence is
+bootstrap runtime is closed and integrated on `development` at merge commit
+`7b456901074807891c0384e214181e2ec8417d37` on Sunday, August 2, 2026.
+POST-GO-LIVE.3.6 preferred organization UX runtime is implemented locally and
+pending review as of Sunday, August 2, 2026. No phase in this sequence is
 authorized for production until the draft PR, CI, and later review controls
 are complete.
 

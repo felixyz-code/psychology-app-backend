@@ -1,13 +1,46 @@
 # Decision Log
 
+## STATUS-POST-GO-LIVE.3.6: Preferred Organization UX Runtime Implemented
+
+### Status
+
+Accepted as a local runtime status update on branch
+`codex/post-go-live-3-6-preferred-organization-runtime` from integrated
+baseline `7b456901074807891c0384e214181e2ec8417d37`, pending draft PR review
+and CI on Sunday, August 2, 2026.
+
+### Decision
+
+POST-GO-LIVE.3.6 is no longer deferred. The backend now implements:
+
+- nullable persisted `User.preferredOrganizationId` with a safe FK to
+  `Organization`;
+- `PUT /auth/context/preference` for explicit set or clear operations;
+- serializable user-scoped eligibility validation for `ACTIVE` membership plus
+  `ACTIVE` organization state before non-null writes;
+- sanitized `preferredOrganizationId` in every `GET /auth/context` variant;
+- post-commit structured observability through
+  `active_organization_preference_changed`;
+- local Postman collection and repo-local certification tooling for the
+  preferred-organization UX flow.
+
+### Consequences
+
+The backend now remembers a UX-only default organization without creating
+tenant session state, JWT tenant claims, capability changes, or tenant
+fallback behavior. `X-Organization-Id` remains the sole request-time tenant
+selection hint, and the server continues to validate membership and
+organization state in PostgreSQL on every tenant-aware request.
+
 ## STATUS-POST-GO-LIVE.3.5: Public Freelancer Bootstrap Runtime Implemented
 
 ### Status
 
 Accepted as a local runtime status update on branch
 `codex/post-go-live-3-5-public-bootstrap-runtime` from baseline
-`77b4b6e6a70ef133459b84ea71c5d9590bfb6d0a`, pending draft PR review and CI on
-Saturday, August 1, 2026.
+`77b4b6e6a70ef133459b84ea71c5d9590bfb6d0a`; later closed and integrated into
+`development` at merge commit `7b456901074807891c0384e214181e2ec8417d37` on
+Sunday, August 2, 2026.
 
 ### Decision
 

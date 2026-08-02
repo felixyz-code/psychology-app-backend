@@ -1,4 +1,5 @@
 import {
+  ApiExtraModels,
   ApiBody,
   ApiBadRequestResponse,
   ApiBearerAuth,
@@ -7,12 +8,24 @@ import {
   ApiForbiddenResponse,
   ApiHeader,
   ApiInternalServerErrorResponse,
+  ApiNotFoundResponse,
+  ApiOkResponse,
   ApiOperation,
   ApiTags,
   ApiTooManyRequestsResponse,
   ApiUnauthorizedResponse,
+  getSchemaPath,
 } from '@nestjs/swagger';
-import { Body, Controller, Get, Post, Req } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Post,
+  Put,
+  Req,
+  UsePipes,
+  ValidationPipe,
+} from '@nestjs/common';
 import { Public } from './decorators/public.decorator';
 import { CurrentUser } from './decorators/current-user.decorator';
 import { AuthService } from './auth.service';
@@ -26,8 +39,24 @@ import type { AuthenticatedUser } from './types/authenticated-user.type';
 import { UseGuards } from '@nestjs/common';
 import { FreelancerBootstrapEnabledGuard } from './guards/freelancer-bootstrap-enabled.guard';
 import { FreelancerBootstrapThrottleGuard } from './guards/freelancer-bootstrap-throttle.guard';
+import { SkipTenantContext } from '../tenant-context/decorators/skip-tenant-context.decorator';
+import {
+  AuthContextPreferenceResponseDto,
+  UpdateAuthContextPreferenceDto,
+} from './dto/auth-context-preference.dto';
+import {
+  AuthContextLegacyCompatibilityDto,
+  AuthContextResolvedDto,
+  AuthContextUnresolvedDto,
+} from './dto/auth-context-response.dto';
 
 @ApiTags('auth')
+@ApiExtraModels(
+  AuthContextResolvedDto,
+  AuthContextUnresolvedDto,
+  AuthContextLegacyCompatibilityDto,
+  AuthContextPreferenceResponseDto,
+)
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
@@ -88,6 +117,17 @@ export class AuthController {
   @ApiBadRequestResponse({
     description: 'Invalid organization selection header',
   })
+  @ApiOkResponse({
+    description:
+      'Validated request tenant context plus the current UX-only preferred organization when still eligible.',
+    schema: {
+      oneOf: [
+        { $ref: getSchemaPath(AuthContextResolvedDto) },
+        { $ref: getSchemaPath(AuthContextUnresolvedDto) },
+        { $ref: getSchemaPath(AuthContextLegacyCompatibilityDto) },
+      ],
+    },
+  })
   @ApiUnauthorizedResponse({ description: 'Authentication is required' })
   @ApiForbiddenResponse({
     description: 'Organization selection is not eligible',
@@ -97,5 +137,37 @@ export class AuthController {
     @CurrentTenant() tenantContext?: TenantContext,
   ) {
     return this.authService.getTenantContext(user, tenantContext);
+  }
+
+  @Put('context/preference')
+  @SkipTenantContext()
+  @ApiBearerAuth('bearer')
+  @UsePipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+    }),
+  )
+  @ApiOperation({
+    summary: 'Persist the preferred organization UX hint',
+    description:
+      'UX preference only; does not select or authorize tenant access.',
+  })
+  @ApiBody({ type: UpdateAuthContextPreferenceDto })
+  @ApiOkResponse({ type: AuthContextPreferenceResponseDto })
+  @ApiBadRequestResponse({ description: 'Invalid preference payload' })
+  @ApiUnauthorizedResponse({ description: 'Authentication is required' })
+  @ApiNotFoundResponse({
+    description: 'Organization is not eligible for this user preference',
+  })
+  @ApiConflictResponse({
+    description: 'Preference update could not be completed safely',
+  })
+  updateContextPreference(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: UpdateAuthContextPreferenceDto,
+  ) {
+    return this.authService.updatePreferredOrganization(user, dto);
   }
 }

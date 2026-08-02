@@ -1,6 +1,7 @@
 import {
   ConflictException,
   Injectable,
+  NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
 import {
@@ -25,12 +26,25 @@ import {
 import { TenantObservabilityService } from '../tenant-context/tenant-observability.service';
 import { AuthenticatedUser } from './types/authenticated-user.type';
 import { CreateFreelancerBootstrapDto } from './dto/create-freelancer-bootstrap.dto';
+import { UpdateAuthContextPreferenceDto } from './dto/auth-context-preference.dto';
 import { LoginDto } from './dto/login.dto';
 import { buildFreelancerBootstrapSlugCandidate } from './freelancer-bootstrap.util';
 
 const BCRYPT_HASH_ROUNDS = 10;
 const MAX_BOOTSTRAP_SLUG_ATTEMPTS = 5;
 const REGISTRATION_CONFLICT_MESSAGE = 'Registration could not be completed';
+
+class PreferenceEligibilityError extends Error {
+  constructor(
+    readonly reasonCode:
+      | 'INELIGIBLE_ORGANIZATION'
+      | 'INACTIVE_MEMBERSHIP'
+      | 'INACTIVE_ORGANIZATION',
+  ) {
+    super(reasonCode);
+    this.name = PreferenceEligibilityError.name;
+  }
+}
 
 @Injectable()
 export class AuthService {
@@ -204,35 +218,37 @@ export class AuthService {
     user: AuthenticatedUser,
     tenantContext?: TenantContext,
   ) {
-    if (tenantContext) {
-      return { status: 'RESOLVED' as const, tenantContext };
-    }
-
-    const memberships = await this.prisma.organizationMembership.findMany({
-      where: {
-        userId: user.id,
-        status: {
-          in: [
-            MembershipStatus.INVITED,
-            MembershipStatus.ACTIVE,
-            MembershipStatus.SUSPENDED,
-          ],
+    const [preferenceState, memberships] = await Promise.all([
+      this.prisma.user.findUnique({
+        where: { id: user.id },
+        select: { preferredOrganizationId: true },
+      }),
+      this.prisma.organizationMembership.findMany({
+        where: {
+          userId: user.id,
+          status: {
+            in: [
+              MembershipStatus.INVITED,
+              MembershipStatus.ACTIVE,
+              MembershipStatus.SUSPENDED,
+            ],
+          },
         },
-      },
-      select: {
-        id: true,
-        role: true,
-        status: true,
-        organization: {
-          select: { id: true, displayName: true, status: true },
+        select: {
+          id: true,
+          role: true,
+          status: true,
+          organization: {
+            select: { id: true, displayName: true, status: true },
+          },
         },
-      },
-      orderBy: [
-        { organizationId: 'asc' },
-        { createdAt: 'desc' },
-        { id: 'asc' },
-      ],
-    });
+        orderBy: [
+          { organizationId: 'asc' },
+          { createdAt: 'desc' },
+          { id: 'asc' },
+        ],
+      }),
+    ]);
     const selectableMemberships = memberships
       .filter(
         (membership) =>
@@ -245,15 +261,43 @@ export class AuthService {
         organizationDisplayName: membership.organization.displayName,
         organizationRole: membership.role,
       }));
+    const preferredOrganizationId = this.sanitizePreferredOrganizationId(
+      preferenceState?.preferredOrganizationId,
+      selectableMemberships,
+    );
+
+    if (tenantContext) {
+      return {
+        status: 'RESOLVED' as const,
+        tenantContext,
+        preferredOrganizationId,
+      };
+    }
 
     if (memberships.length === 0) {
       return {
         status: 'LEGACY_COMPATIBILITY' as const,
         selectableMemberships,
+        preferredOrganizationId,
       };
     }
 
-    return { status: 'UNRESOLVED' as const, selectableMemberships };
+    return {
+      status: 'UNRESOLVED' as const,
+      selectableMemberships,
+      preferredOrganizationId,
+    };
+  }
+
+  async updatePreferredOrganization(
+    user: AuthenticatedUser,
+    dto: UpdateAuthContextPreferenceDto,
+  ) {
+    if (dto.organizationId === null) {
+      return this.clearPreferredOrganization(user);
+    }
+
+    return this.setPreferredOrganization(user, dto.organizationId);
   }
 
   private signIdentityOnlyAccessToken(user: {
@@ -282,5 +326,148 @@ export class AuthService {
       email: user.email,
       role: user.role,
     };
+  }
+
+  private sanitizePreferredOrganizationId(
+    preferredOrganizationId: string | null | undefined,
+    selectableMemberships: ReadonlyArray<{ organizationId: string }>,
+  ) {
+    if (!preferredOrganizationId) {
+      return null;
+    }
+
+    return selectableMemberships.some(
+      (membership) => membership.organizationId === preferredOrganizationId,
+    )
+      ? preferredOrganizationId
+      : null;
+  }
+
+  private async clearPreferredOrganization(user: AuthenticatedUser) {
+    const result = await this.prisma.$transaction(async (tx) => {
+      const currentUser = await tx.user.findUnique({
+        where: { id: user.id },
+        select: { preferredOrganizationId: true },
+      });
+
+      if (!currentUser) {
+        throw new UnauthorizedException('Unauthorized');
+      }
+
+      await tx.user.update({
+        where: { id: user.id },
+        data: { preferredOrganizationId: null },
+      });
+
+      return {
+        preferredOrganizationId: null,
+        previousPreferredOrganizationId: currentUser.preferredOrganizationId,
+      };
+    });
+
+    this.observability.activeOrganizationPreferenceChanged(
+      'SUCCESS',
+      'PREFERENCE_CLEARED',
+      {
+        userId: user.id,
+        previousPreferredOrganizationId:
+          result.previousPreferredOrganizationId ?? undefined,
+      },
+    );
+
+    return {
+      preferredOrganizationId: result.preferredOrganizationId,
+    };
+  }
+
+  private async setPreferredOrganization(
+    user: AuthenticatedUser,
+    organizationId: string,
+  ) {
+    try {
+      const result = await serializableTransaction(this.prisma, async (tx) => {
+        const [currentUser, membership] = await Promise.all([
+          tx.user.findUnique({
+            where: { id: user.id },
+            select: { preferredOrganizationId: true },
+          }),
+          tx.organizationMembership.findFirst({
+            where: {
+              userId: user.id,
+              organizationId,
+            },
+            select: {
+              id: true,
+              status: true,
+              organization: {
+                select: {
+                  status: true,
+                },
+              },
+            },
+            orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+          }),
+        ]);
+
+        if (!currentUser) {
+          throw new UnauthorizedException('Unauthorized');
+        }
+
+        if (!membership) {
+          throw new PreferenceEligibilityError('INELIGIBLE_ORGANIZATION');
+        }
+
+        if (membership.status !== MembershipStatus.ACTIVE) {
+          throw new PreferenceEligibilityError('INACTIVE_MEMBERSHIP');
+        }
+
+        if (membership.organization.status !== OrganizationStatus.ACTIVE) {
+          throw new PreferenceEligibilityError('INACTIVE_ORGANIZATION');
+        }
+
+        const updated = await tx.user.updateMany({
+          where: { id: user.id },
+          data: { preferredOrganizationId: organizationId },
+        });
+
+        if (updated.count !== 1) {
+          throw new ConflictException('Concurrent operation conflict');
+        }
+
+        return {
+          preferredOrganizationId: organizationId,
+          previousPreferredOrganizationId: currentUser.preferredOrganizationId,
+        };
+      });
+
+      this.observability.activeOrganizationPreferenceChanged(
+        'SUCCESS',
+        'PREFERENCE_UPDATED',
+        {
+          userId: user.id,
+          preferredOrganizationId: result.preferredOrganizationId,
+          previousPreferredOrganizationId:
+            result.previousPreferredOrganizationId ?? undefined,
+        },
+      );
+
+      return {
+        preferredOrganizationId: result.preferredOrganizationId,
+      };
+    } catch (error) {
+      if (error instanceof PreferenceEligibilityError) {
+        this.observability.activeOrganizationPreferenceChanged(
+          'DENY',
+          error.reasonCode,
+          {
+            userId: user.id,
+            preferredOrganizationId: organizationId,
+          },
+        );
+        throw new NotFoundException('Organization not found');
+      }
+
+      throw error;
+    }
   }
 }

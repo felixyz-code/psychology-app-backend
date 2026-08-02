@@ -44,7 +44,7 @@ describe('OpenAPI document', () => {
   it('documents every certified route and the Bearer security scheme', () => {
     const document = createDocument(app);
 
-    expect(Object.keys(document.paths)).toHaveLength(43);
+    expect(Object.keys(document.paths)).toHaveLength(44);
     expect(document.components?.securitySchemes?.bearer).toEqual({
       type: 'http',
       scheme: 'bearer',
@@ -56,6 +56,9 @@ describe('OpenAPI document', () => {
       document.paths['/auth/freelancer-bootstrap'].post?.security,
     ).toBeUndefined();
     expect(document.paths['/auth/context'].get?.security).toEqual([
+      { bearer: [] },
+    ]);
+    expect(document.paths['/auth/context/preference'].put?.security).toEqual([
       { bearer: [] },
     ]);
     expect(document.paths['/health'].get?.security).toBeUndefined();
@@ -122,6 +125,12 @@ describe('OpenAPI document', () => {
     expect(
       document.paths['/auth/freelancer-bootstrap'].post?.responses,
     ).toHaveProperty('500');
+    expect(
+      document.paths['/auth/context/preference'].put?.responses,
+    ).toHaveProperty('200');
+    expect(
+      document.paths['/auth/context/preference'].put?.responses,
+    ).toHaveProperty('404');
     expect(document.paths['/auth/login'].post?.responses).not.toHaveProperty(
       '200',
     );
@@ -186,6 +195,28 @@ describe('OpenAPI document', () => {
     ).toEqual({
       $ref: '#/components/schemas/FreelancerBootstrapResponseDto',
     });
+    expect(
+      getRequestContent(document, '/auth/context/preference', 'put')[
+        'application/json'
+      ]?.schema,
+    ).toEqual({
+      $ref: '#/components/schemas/UpdateAuthContextPreferenceDto',
+    });
+    expect(
+      getResponseContent(document, '/auth/context/preference', 'put', '200')[
+        'application/json'
+      ]?.schema,
+    ).toEqual({
+      $ref: '#/components/schemas/AuthContextPreferenceResponseDto',
+    });
+    expect(document.components?.schemas?.AuthContextResolvedDto).toMatchObject({
+      properties: {
+        preferredOrganizationId: {
+          type: 'string',
+          nullable: true,
+        },
+      },
+    });
   });
 
   it('documents multipart and binary document operations', () => {
@@ -236,7 +267,7 @@ function createDocument(app: INestApplication) {
 function getRequestContent(
   document: OpenAPIObject,
   path: string,
-  method: 'get' | 'post',
+  method: 'get' | 'post' | 'put',
 ) {
   const requestBody = getOperation(document, path, method).requestBody;
 
@@ -252,7 +283,7 @@ function getRequestContent(
 function getResponseContent(
   document: OpenAPIObject,
   path: string,
-  method: 'get' | 'post',
+  method: 'get' | 'post' | 'put',
   status: string,
 ) {
   const response = getOperation(document, path, method).responses[status];
@@ -269,7 +300,7 @@ function getResponseContent(
 function getQueryParameterNames(
   document: OpenAPIObject,
   path: string,
-  method: 'get' | 'post',
+  method: 'get' | 'post' | 'put',
 ) {
   return (
     getOperation(document, path, method)
@@ -283,7 +314,7 @@ function getQueryParameterNames(
 function getHeaderParameter(
   document: OpenAPIObject,
   path: string,
-  method: 'get' | 'post',
+  method: 'get' | 'post' | 'put',
   name: string,
 ) {
   return getOperation(document, path, method).parameters?.find(
@@ -297,7 +328,7 @@ function getHeaderParameter(
 function getOperation(
   document: OpenAPIObject,
   path: string,
-  method: 'get' | 'post',
+  method: 'get' | 'post' | 'put',
 ) {
   const operation = document.paths[path]?.[method];
 

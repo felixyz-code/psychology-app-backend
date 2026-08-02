@@ -127,6 +127,7 @@ describeCertification('Tenant context runtime guard integration', () => {
       .expect(200);
     expect(single.body).toMatchObject({
       status: 'RESOLVED',
+      preferredOrganizationId: null,
       tenantContext: {
         organizationId: organizationOneId,
         organizationRole: MembershipRole.PSYCHOLOGIST,
@@ -146,6 +147,7 @@ describeCertification('Tenant context runtime guard integration', () => {
       throw new Error('Expected an unresolved tenant context response');
     }
     expect(unresolvedBody.status).toBe('UNRESOLVED');
+    expect(unresolvedBody.preferredOrganizationId).toBeNull();
     expect(unresolvedBody.selectableMemberships).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ organizationId: organizationMultipleOneId }),
@@ -160,6 +162,7 @@ describeCertification('Tenant context runtime guard integration', () => {
       .expect(200);
     expect(selected.body).toMatchObject({
       status: 'RESOLVED',
+      preferredOrganizationId: null,
       tenantContext: { organizationId: organizationMultipleTwoId },
     });
   });
@@ -169,7 +172,10 @@ describeCertification('Tenant context runtime guard integration', () => {
       .get('/auth/context')
       .set('Authorization', bearerToken(userLegacyId, UserRole.PSYCHOLOGIST))
       .expect(200);
-    expect(legacy.body).toMatchObject({ status: 'LEGACY_COMPATIBILITY' });
+    expect(legacy.body).toMatchObject({
+      status: 'LEGACY_COMPATIBILITY',
+      preferredOrganizationId: null,
+    });
     await request(app.getHttpServer())
       .get('/auth/context')
       .set('Authorization', bearerToken(userOneId, UserRole.ADMIN))

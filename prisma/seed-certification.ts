@@ -72,6 +72,12 @@ const seedEmails = [
   'no.membership@example.test',
 ];
 
+const preferenceFixtureEmails = {
+  noPreference: 'no.membership@example.test',
+  validPreference: 'multi.member@example.test',
+  stalePreference: 'suspended.organization@example.test',
+};
+
 const organizationIds = [ids.orgA, ids.orgB, ids.orgSuspended];
 
 async function main() {
@@ -92,6 +98,7 @@ async function main() {
     legacyNullRows,
     tenantASummary,
     tenantBSummary,
+    preferenceFixtures,
   ] = await Promise.all([
     prisma.organization.count({ where: { id: { in: organizationIds } } }),
     prisma.user.count({ where: { email: { in: seedEmails } } }),
@@ -142,6 +149,29 @@ async function main() {
     countLegacyNullRows(),
     summarize(ids.orgA),
     summarize(ids.orgB),
+    prisma.user.findMany({
+      where: {
+        email: {
+          in: Object.values(preferenceFixtureEmails),
+        },
+      },
+      select: {
+        email: true,
+        preferredOrganizationId: true,
+        memberships: {
+          select: {
+            organizationId: true,
+            status: true,
+            organization: {
+              select: {
+                status: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: { email: 'asc' },
+    }),
   ]);
 
   assertEqual('Organizations', organizations, expected.organizations);
@@ -186,6 +216,7 @@ async function main() {
     await countCrossTenantRelationViolations(),
     0,
   );
+  assertPreferenceFixtures(preferenceFixtures);
 
   console.log('Tenant development seed certification passed.');
   console.log(
@@ -207,6 +238,60 @@ async function main() {
       2,
     ),
   );
+}
+
+function assertPreferenceFixtures(
+  fixtures: Array<{
+    email: string;
+    preferredOrganizationId: string | null;
+    memberships: Array<{
+      organizationId: string;
+      status: MembershipStatus;
+      organization: { status: OrganizationStatus };
+    }>;
+  }>,
+) {
+  const byEmail = new Map(fixtures.map((fixture) => [fixture.email, fixture]));
+
+  const noPreference = byEmail.get(preferenceFixtureEmails.noPreference);
+  if (!noPreference) {
+    throw new Error('Missing no-preference fixture user');
+  }
+  if (noPreference.preferredOrganizationId !== null) {
+    throw new Error('No-preference fixture must persist null');
+  }
+
+  const validPreference = byEmail.get(preferenceFixtureEmails.validPreference);
+  if (!validPreference) {
+    throw new Error('Missing valid-preference fixture user');
+  }
+  if (validPreference.preferredOrganizationId !== ids.orgB) {
+    throw new Error(
+      `Valid-preference fixture must persist ${ids.orgB}, received ${validPreference.preferredOrganizationId}`,
+    );
+  }
+  const validMembership = validPreference.memberships.find(
+    (membership) => membership.organizationId === ids.orgB,
+  );
+  if (!validMembership) {
+    throw new Error('Valid-preference fixture must keep a membership in orgB');
+  }
+  if (validMembership.status !== MembershipStatus.ACTIVE) {
+    throw new Error('Valid-preference fixture membership must be ACTIVE');
+  }
+  if (validMembership.organization.status !== OrganizationStatus.ACTIVE) {
+    throw new Error('Valid-preference fixture organization must be ACTIVE');
+  }
+
+  const stalePreference = byEmail.get(preferenceFixtureEmails.stalePreference);
+  if (!stalePreference) {
+    throw new Error('Missing stale-preference fixture user');
+  }
+  if (stalePreference.preferredOrganizationId !== ids.orgSuspended) {
+    throw new Error(
+      `Stale-preference fixture must persist ${ids.orgSuspended}, received ${stalePreference.preferredOrganizationId}`,
+    );
+  }
 }
 
 async function countLegacyNullRows() {
