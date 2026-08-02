@@ -39,16 +39,20 @@ Organization administration checkpoint:
 ```text
 POST-GO-LIVE.3.0 Organization & Membership Administration Contract merged in PR #35
 Merged baseline: 7d897ec8db2c5d372fce0b4dc0eaf3bd3b1d4b13
-POST-GO-LIVE.3.1 Organization Administration Runtime implemented locally and in review
-POST-GO-LIVE.3.2 Membership Administration Runtime closed and integrated
+POST-GO-LIVE.3.1 Organization Administration Runtime closed and integrated
 Runtime baseline: 2373ff046d56f455ecb9b5c4cc075f36f9ab778f
+POST-GO-LIVE.3.2 Membership Administration Runtime closed and integrated
+Runtime baseline: 206371972ee10958f62f01434c9ac2f5631d4ec6
 POST-GO-LIVE.3.3 Invitation Administration Runtime closed and integrated
 Runtime baseline: 5bb75dc4ae8deed67543f745abb23bac88508066
 POST-GO-LIVE.3.4 Organization Ownership Transfer Runtime closed and integrated
 Runtime baseline: 77b4b6e6a70ef133459b84ea71c5d9590bfb6d0a
 POST-GO-LIVE.3.5 Public Freelancer Bootstrap Runtime closed and integrated
 Runtime baseline: 7b456901074807891c0384e214181e2ec8417d37
-POST-GO-LIVE.3.6 Preferred Organization UX Runtime implemented locally and pending review as of Sunday, August 2, 2026
+POST-GO-LIVE.3.6 Preferred Organization UX Runtime closed and integrated
+Runtime baseline: 6c65a4d8956723071514c40ec6942ecc39c0dcd2
+PHASE 3 FUNCTIONAL WORK COMPLETE
+PHASE 3 CLOSEOUT REVIEW PENDING
 ```
 
 Current priorities:
@@ -81,13 +85,14 @@ POST-GO-LIVE.2
 
 POST-GO-LIVE.3
  |- 3.0 Organization & Membership Contract CLOSED
- |- 3.1 Organization Administration Runtime IMPLEMENTED / IN REVIEW
+ |- 3.1 Organization Administration Runtime CLOSED / INTEGRATED
  |- 3.2 Membership Administration Runtime CLOSED / INTEGRATED
  |- 3.3 Invitation Administration Runtime CLOSED / INTEGRATED
  |- 3.4 Organization Ownership Transfer Runtime CLOSED / INTEGRATED
  |- 3.5 Public Freelancer Bootstrap Runtime CLOSED / INTEGRATED
- `- 3.6 Preferred Organization UX Runtime IMPLEMENTED / REVIEW PENDING
-POST-GO-LIVE.4                           PENDING
+ `- 3.6 Preferred Organization UX Runtime CLOSED / INTEGRATED
+POST-GO-LIVE.3-CLOSEOUT                  REVIEW PENDING
+POST-GO-LIVE.4                           NOT STARTED
 POST-GO-LIVE.5                           PENDING
 POST-GO-LIVE.6                           PENDING
 POST-GO-LIVE.7                           PENDING
@@ -535,16 +540,22 @@ The next implementation sequence after closeout is:
 4. optional active-organization preference UX;
 5. organization-domain certification and later frontend work.
 
-POST-GO-LIVE.3.1 is now implemented locally and in review. POST-GO-LIVE.3.2
-and POST-GO-LIVE.3.3 are closed and integrated on `development`.
+POST-GO-LIVE.3.1 organization administration runtime is closed and integrated
+on `development` at merge commit `2373ff046d56f455ecb9b5c4cc075f36f9ab778f`.
+POST-GO-LIVE.3.2 membership administration runtime is closed and integrated on
+`development` at merge commit `206371972ee10958f62f01434c9ac2f5631d4ec6`.
+POST-GO-LIVE.3.3 invitation administration runtime is closed and integrated on
+`development` at merge commit `5bb75dc4ae8deed67543f745abb23bac88508066`.
 POST-GO-LIVE.3.4 ownership transfer runtime is closed and integrated on
-`development` as of Friday, July 31, 2026. POST-GO-LIVE.3.5 public freelancer
-bootstrap runtime is closed and integrated on `development` at merge commit
-`7b456901074807891c0384e214181e2ec8417d37` on Sunday, August 2, 2026.
-POST-GO-LIVE.3.6 preferred organization UX runtime is implemented locally and
-pending review as of Sunday, August 2, 2026. No phase in this sequence is
-authorized for production until the draft PR, CI, and later review controls
-are complete.
+`development` at merge commit `77b4b6e6a70ef133459b84ea71c5d9590bfb6d0a`.
+POST-GO-LIVE.3.5 public freelancer bootstrap runtime is closed and integrated
+on `development` at merge commit `7b456901074807891c0384e214181e2ec8417d37`.
+POST-GO-LIVE.3.6 preferred organization UX runtime is closed and integrated on
+`development` at merge commit `6c65a4d8956723071514c40ec6942ecc39c0dcd2`.
+Phase 3 functional work is complete on the backend scope, while formal
+phase-closeout review remains pending on the dedicated documentation branch and
+Draft PR. No phase in this sequence is authorized for production until a later
+approved rollout and operations gate exists.
 
 ## POST-GO-LIVE.3.1
 

@@ -1,13 +1,54 @@
 # Decision Log
 
+## STATUS-POST-GO-LIVE.3: Functional Platform Complete, Formal Closeout Pending
+
+### Status
+
+Accepted as a documentation-only closeout status update on branch
+`codex/post-go-live-3-closeout` from functional baseline
+`6c65a4d8956723071514c40ec6942ecc39c0dcd2` on Sunday, August 2, 2026.
+
+### Decision
+
+POST-GO-LIVE.3 is now functionally complete on backend scope. The certified
+baseline includes:
+
+- POST-GO-LIVE.3.0 organization and membership contract;
+- POST-GO-LIVE.3.1 organization administration runtime;
+- POST-GO-LIVE.3.2 membership administration and historical re-entry;
+- POST-GO-LIVE.3.3 invitation administration runtime;
+- POST-GO-LIVE.3.4 ownership transfer runtime;
+- POST-GO-LIVE.3.5 canonical identity and public freelancer bootstrap;
+- POST-GO-LIVE.3.6 preferred organization UX runtime.
+
+The Phase 3 closeout preserves these consolidated decisions:
+
+- `X-Organization-Id` remains the authoritative request-time tenant selector;
+- JWT remains identity-only and does not gain tenant or preference authority;
+- preferred organization remains UX-only and never grants tenant access;
+- ownership remains membership-role based without a primary-owner column;
+- public freelancer bootstrap remains the only public owner-creation path;
+- membership re-entry preserves historical rows through the approved partial
+  index posture;
+- invitation resend continues through replacement semantics instead of in-place
+  token mutation.
+
+### Consequences
+
+Phase 3 should now be documented as `PHASE 3 FUNCTIONAL WORK COMPLETE`, while
+the formal baseline remains pending the merge of the documentation-only
+closeout PR. No production rollout, Ready transition, merge, deployment,
+backfill, or next-phase runtime authorization is implied by this status entry.
+
 ## STATUS-POST-GO-LIVE.3.6: Preferred Organization UX Runtime Implemented
 
 ### Status
 
 Accepted as a local runtime status update on branch
 `codex/post-go-live-3-6-preferred-organization-runtime` from integrated
-baseline `7b456901074807891c0384e214181e2ec8417d37`, pending draft PR review
-and CI on Sunday, August 2, 2026.
+baseline `7b456901074807891c0384e214181e2ec8417d37`; later closed and
+integrated into `development` at merge commit
+`6c65a4d8956723071514c40ec6942ecc39c0dcd2` on Sunday, August 2, 2026.
 
 ### Decision
 
@@ -141,7 +182,8 @@ persistence, and production rollout remain deferred.
 
 Accepted as a local runtime status update on branch
 `codex/post-go-live-3-2-membership-administration-runtime` from baseline
-`2373ff046d56f455ecb9b5c4cc075f36f9ab778f`, pending draft PR review and CI.
+`2373ff046d56f455ecb9b5c4cc075f36f9ab778f`; later closed and integrated into
+`development` at merge commit `206371972ee10958f62f01434c9ac2f5631d4ec6`.
 
 ### Decision
 
@@ -176,7 +218,8 @@ billing, and production rollout remain deferred.
 ### Status
 
 Accepted as a local runtime status update on `development` baseline
-`6c8ecbbfb566a1cb8c6b113f5493e04adbf80b12` pending draft PR review.
+`6c8ecbbfb566a1cb8c6b113f5493e04adbf80b12`; later closed and integrated into
+`development` at merge commit `2373ff046d56f455ecb9b5c4cc075f36f9ab778f`.
 
 ### Decision
 

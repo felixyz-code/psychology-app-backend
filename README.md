@@ -46,6 +46,13 @@ docs/DOCKER.md
 docs/ROADMAP.md
 ```
 
+Current Phase 3 closeout references:
+
+* Functional baseline: `6c65a4d8956723071514c40ec6942ecc39c0dcd2`
+* Phase status: `PHASE 3 FUNCTIONAL WORK COMPLETE`
+* Formal closeout status: `PHASE 3 CLOSEOUT - REVIEW PENDING`
+* Closeout document: `docs/POST_GO_LIVE_3_PHASE_CLOSEOUT.md`
+
 ## Local Development
 
 Supported toolchain:
