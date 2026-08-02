@@ -12,6 +12,7 @@ import { randomUUID } from 'node:crypto';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from '../src/app.module';
+import { AuthContextUnresolvedDto } from '../src/auth/dto/auth-context-response.dto';
 import { normalizeEmailIdentity } from '../src/common/identity/email-identity.util';
 import { PrismaService } from '../src/prisma/prisma.service';
 
@@ -232,19 +233,16 @@ function membership(
   };
 }
 
-type UnresolvedTenantContextResponse = {
-  status: 'UNRESOLVED';
-  selectableMemberships: ReadonlyArray<{ organizationId: string }>;
-};
-
 function isUnresolvedTenantContextResponse(
   value: unknown,
-): value is UnresolvedTenantContextResponse {
+): value is AuthContextUnresolvedDto {
   if (!isRecord(value) || value.status !== 'UNRESOLVED') {
     return false;
   }
 
   return (
+    (value.preferredOrganizationId === null ||
+      typeof value.preferredOrganizationId === 'string') &&
     Array.isArray(value.selectableMemberships) &&
     value.selectableMemberships.every(
       (membership) =>
