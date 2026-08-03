@@ -53,6 +53,21 @@ POST-GO-LIVE.3.6 Preferred Organization UX Runtime closed and integrated
 Runtime baseline: 6c65a4d8956723071514c40ec6942ecc39c0dcd2
 PHASE 3 FUNCTIONAL WORK COMPLETE
 PHASE 3 CLOSEOUT REVIEW PENDING
+
+POST-GO-LIVE.4 Documentation status:
+
+STATUS: CONTRACT COMPLETE / IMPLEMENTATION READY
+CONTRACT VERSION: 1
+DATE: 2026-08-02
+DOCUMENTATION BRANCH: codex/post-go-live-4-0-frontend-integration-contract
+CONTRACT COMMIT: 48b48ef56615d382ade0f0616dcb67358faf3dfe
+RELATED PR: #44
+NEXT PHASE: POST-GO-LIVE.4.1 Tenant Context Foundation - NOT STARTED
+
+Documentation-only rollback:
+
+Document-only rollback -> git revert <documentation-commit> -> restore previous documentation baseline.
+No code rollback is included in this phase.
 ```
 
 Current priorities:
@@ -92,7 +107,8 @@ POST-GO-LIVE.3
  |- 3.5 Public Freelancer Bootstrap Runtime CLOSED / INTEGRATED
  `- 3.6 Preferred Organization UX Runtime CLOSED / INTEGRATED
 POST-GO-LIVE.3-CLOSEOUT                  REVIEW PENDING
-POST-GO-LIVE.4                           NOT STARTED
+POST-GO-LIVE.4                           CONTRACT COMPLETE / IMPLEMENTATION READY
+ `- 4.1 Tenant Context Foundation          NOT STARTED
 POST-GO-LIVE.5                           PENDING
 POST-GO-LIVE.6                           PENDING
 POST-GO-LIVE.7                           PENDING
