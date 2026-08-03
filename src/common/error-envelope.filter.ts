@@ -13,6 +13,21 @@ import { RequestContextService } from './request-context/request-context.service
 
 type ErrorDetails = Record<string, unknown> | null;
 
+const CONTRACT_ERROR_CODES = new Set([
+  'VALIDATION_ERROR',
+  'UNAUTHENTICATED',
+  'FORBIDDEN',
+  'TENANT_CONTEXT_REQUIRED',
+  'RESOURCE_NOT_FOUND',
+  'CONFLICT',
+  'CONCURRENT_UPDATE',
+  'CAPABILITY_DENIED',
+  'INVITATION_TERMINAL',
+  'INVITATION_RECIPIENT_MISMATCH',
+  'RATE_LIMITED',
+  'UNEXPECTED_ERROR',
+]);
+
 @Catch()
 @Injectable()
 export class ErrorEnvelopeFilter implements ExceptionFilter {
@@ -96,29 +111,41 @@ export class ErrorEnvelopeFilter implements ExceptionFilter {
   }
 
   private codeForHttpException(exception: unknown, statusCode: number) {
-    if (statusCode === HttpStatus.BAD_REQUEST) {
+    const explicitCode = this.explicitContractCode(exception);
+    if (explicitCode) {
+      return explicitCode;
+    }
+
+    if (statusCode === 400) {
       return 'VALIDATION_ERROR';
     }
 
-    if (statusCode === HttpStatus.UNAUTHORIZED) {
+    if (statusCode === 401) {
       return 'UNAUTHENTICATED';
     }
 
-    if (statusCode === HttpStatus.FORBIDDEN) {
+    if (statusCode === 403) {
       const message = this.exceptionMessage(exception).toLowerCase();
       return message.includes('capability') ? 'CAPABILITY_DENIED' : 'FORBIDDEN';
     }
 
-    if (statusCode === HttpStatus.CONFLICT) {
+    if (statusCode === 409) {
       const message = this.exceptionMessage(exception).toLowerCase();
+      if (message.includes('concurrent') || message.includes('concurrently')) {
+        return 'CONCURRENT_UPDATE';
+      }
       if (message.includes('selection') || message.includes('tenant context')) {
         return 'TENANT_CONTEXT_REQUIRED';
       }
       return 'CONFLICT';
     }
 
-    if (statusCode === HttpStatus.NOT_FOUND) {
+    if (statusCode === 404) {
       return 'RESOURCE_NOT_FOUND';
+    }
+
+    if (statusCode === 429) {
+      return 'RATE_LIMITED';
     }
 
     return 'UNEXPECTED_ERROR';
@@ -147,11 +174,45 @@ export class ErrorEnvelopeFilter implements ExceptionFilter {
       };
     }
 
-    const details =
-      'details' in response && typeof response.details === 'object'
-        ? response.details
-        : null;
-    return details as ErrorDetails;
+    if (code === 'RATE_LIMITED') {
+      const retryAfterSeconds =
+        'retryAfterSeconds' in response &&
+        typeof response.retryAfterSeconds === 'number' &&
+        Number.isInteger(response.retryAfterSeconds) &&
+        response.retryAfterSeconds >= 0
+          ? response.retryAfterSeconds
+          : null;
+      return { retryAfterSeconds };
+    }
+
+    if (code === 'CONCURRENT_UPDATE') {
+      return { retryContext: true };
+    }
+
+    if (code === 'UNEXPECTED_ERROR') {
+      return { category: 'SERVER' };
+    }
+
+    return null;
+  }
+
+  private explicitContractCode(exception: unknown): string | null {
+    if (!(exception instanceof HttpException)) {
+      return null;
+    }
+
+    const response = exception.getResponse();
+    if (
+      !response ||
+      typeof response !== 'object' ||
+      !('code' in response) ||
+      typeof response.code !== 'string' ||
+      !CONTRACT_ERROR_CODES.has(response.code)
+    ) {
+      return null;
+    }
+
+    return response.code;
   }
 
   private messageForException(exception: unknown, statusCode: number) {

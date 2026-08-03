@@ -5,6 +5,7 @@ import {
   OrganizationStatus,
 } from '@prisma/client';
 import { TenantResolutionMode } from '../../common/request-context/request-context.service';
+import { AUTH_CONTEXT_CAPABILITIES } from '../../tenant-context/authorization/capability-projection';
 
 export enum AuthContextStatus {
   ACTIVE_TENANT_READY = 'ACTIVE_TENANT_READY',
@@ -106,7 +107,11 @@ export class AuthContextResponseV1Dto {
   @ApiProperty({ type: AuthContextMembershipResponseDto, nullable: true })
   membership: AuthContextMembershipResponseDto | null;
 
-  @ApiProperty({ type: String, isArray: true, example: ['organization.read'] })
+  @ApiProperty({
+    enum: [...AUTH_CONTEXT_CAPABILITIES],
+    isArray: true,
+    example: ['organization.read'],
+  })
   capabilities: string[];
 
   @ApiProperty({
