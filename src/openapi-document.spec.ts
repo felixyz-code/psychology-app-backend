@@ -209,14 +209,47 @@ describe('OpenAPI document', () => {
     ).toEqual({
       $ref: '#/components/schemas/AuthContextPreferenceResponseDto',
     });
-    expect(document.components?.schemas?.AuthContextResolvedDto).toMatchObject({
+    const authContextSchema = document.components?.schemas
+      ?.AuthContextResponseV1Dto as unknown as {
+      properties?: {
+        schemaVersion?: unknown;
+        status?: unknown;
+        preferredOrganizationId?: unknown;
+        capabilities?: {
+          type?: string;
+          items?: { type?: string; enum?: unknown[] };
+        };
+      };
+    };
+
+    expect(authContextSchema).toMatchObject({
       properties: {
+        schemaVersion: { enum: [1] },
+        status: {
+          enum: [
+            'ACTIVE_TENANT_READY',
+            'AMBIGUOUS_SELECTION',
+            'NO_ACTIVE_TENANT',
+            'ADMIN_SUSPENDED_CONTEXT',
+          ],
+        },
         preferredOrganizationId: {
           type: 'string',
           nullable: true,
         },
+        capabilities: {
+          type: 'array',
+          items: { type: 'string' },
+        },
       },
     });
+    expect(authContextSchema.properties?.capabilities?.items?.enum).toEqual(
+      expect.arrayContaining([
+        'organization.read',
+        'patient.read',
+        'report.read',
+      ]),
+    );
   });
 
   it('documents multipart and binary document operations', () => {

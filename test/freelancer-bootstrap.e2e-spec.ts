@@ -154,14 +154,13 @@ describeCertification('Freelancer bootstrap runtime', () => {
       .set('Authorization', `Bearer ${body.accessToken}`)
       .expect(200);
     expect(context.body).toMatchObject({
-      status: 'RESOLVED',
+      status: 'ACTIVE_TENANT_READY',
       preferredOrganizationId: null,
       tenantContext: {
         userId: body.user.id,
         organizationId: body.organization.id,
         membershipId: body.membership.id,
         organizationRole: MembershipRole.OWNER,
-        legacyUserRole: UserRole.PSYCHOLOGIST,
       },
     });
 

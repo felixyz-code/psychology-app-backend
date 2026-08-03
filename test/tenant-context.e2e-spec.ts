@@ -12,7 +12,7 @@ import { randomUUID } from 'node:crypto';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from '../src/app.module';
-import { AuthContextUnresolvedDto } from '../src/auth/dto/auth-context-response.dto';
+import { AuthContextResponseV1Dto } from '../src/auth/dto/auth-context-response.dto';
 import { normalizeEmailIdentity } from '../src/common/identity/email-identity.util';
 import { PrismaService } from '../src/prisma/prisma.service';
 
@@ -127,29 +127,28 @@ describeCertification('Tenant context runtime guard integration', () => {
       .set('Authorization', bearerToken(userOneId, UserRole.ADMIN))
       .expect(200);
     expect(single.body).toMatchObject({
-      status: 'RESOLVED',
+      status: 'ACTIVE_TENANT_READY',
       preferredOrganizationId: null,
       tenantContext: {
         organizationId: organizationOneId,
         organizationRole: MembershipRole.PSYCHOLOGIST,
-        legacyUserRole: UserRole.ADMIN,
       },
     });
   });
 
   it('makes the auth context route optional to break the multi-membership bootstrap cycle', async () => {
-    const unresolved = await request(app.getHttpServer())
+    const ambiguous = await request(app.getHttpServer())
       .get('/auth/context')
       .set('Authorization', bearerToken(userMultipleId, UserRole.PSYCHOLOGIST))
       .expect(200);
-    const unresolvedBody: unknown = unresolved.body;
-    expect(isUnresolvedTenantContextResponse(unresolvedBody)).toBe(true);
-    if (!isUnresolvedTenantContextResponse(unresolvedBody)) {
-      throw new Error('Expected an unresolved tenant context response');
+    const ambiguousBody: unknown = ambiguous.body;
+    expect(isAmbiguousTenantContextResponse(ambiguousBody)).toBe(true);
+    if (!isAmbiguousTenantContextResponse(ambiguousBody)) {
+      throw new Error('Expected an ambiguous tenant context response');
     }
-    expect(unresolvedBody.status).toBe('UNRESOLVED');
-    expect(unresolvedBody.preferredOrganizationId).toBeNull();
-    expect(unresolvedBody.selectableMemberships).toEqual(
+    expect(ambiguousBody.status).toBe('AMBIGUOUS_SELECTION');
+    expect(ambiguousBody.preferredOrganizationId).toBeNull();
+    expect(ambiguousBody.selectableMemberships).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ organizationId: organizationMultipleOneId }),
         expect.objectContaining({ organizationId: organizationMultipleTwoId }),
@@ -162,7 +161,7 @@ describeCertification('Tenant context runtime guard integration', () => {
       .set('X-Organization-Id', organizationMultipleTwoId)
       .expect(200);
     expect(selected.body).toMatchObject({
-      status: 'RESOLVED',
+      status: 'ACTIVE_TENANT_READY',
       preferredOrganizationId: null,
       tenantContext: { organizationId: organizationMultipleTwoId },
     });
@@ -174,7 +173,7 @@ describeCertification('Tenant context runtime guard integration', () => {
       .set('Authorization', bearerToken(userLegacyId, UserRole.PSYCHOLOGIST))
       .expect(200);
     expect(legacy.body).toMatchObject({
-      status: 'LEGACY_COMPATIBILITY',
+      status: 'NO_ACTIVE_TENANT',
       preferredOrganizationId: null,
     });
     await request(app.getHttpServer())
@@ -233,10 +232,10 @@ function membership(
   };
 }
 
-function isUnresolvedTenantContextResponse(
+function isAmbiguousTenantContextResponse(
   value: unknown,
-): value is AuthContextUnresolvedDto {
-  if (!isRecord(value) || value.status !== 'UNRESOLVED') {
+): value is AuthContextResponseV1Dto {
+  if (!isRecord(value) || value.status !== 'AMBIGUOUS_SELECTION') {
     return false;
   }
 

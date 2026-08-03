@@ -1524,19 +1524,11 @@ accepted through a DTO, body, query, or path parameter.
 
 ### `GET /auth/context`
 
-Bearer Token required; tenant context optional.
+Bearer Token required; tenant context is optional during bootstrap. The V1 response always includes `schemaVersion: 1`, `status`, nullable `tenantContext`, nullable `organization`, nullable `membership`, sorted unique `capabilities`, `selectableMemberships`, and `preferredOrganizationId`.
 
-Returns `RESOLVED` plus the validated request context when resolution succeeds.
-For a multi-membership or otherwise unresolved request it returns `UNRESOLVED`
-and only the caller's selectable active memberships (`organizationId`,
-`membershipId`, organization display name and organization role), allowing the
-frontend to choose `X-Organization-Id` without a bootstrap cycle. A user with
-no memberships receives `LEGACY_COMPATIBILITY` and an empty list. All three
-response variants now include `preferredOrganizationId: uuid | null` as a
-persisted UX hint only. The server returns the persisted value only while the
-caller still has an `ACTIVE` membership in that `ACTIVE` organization; stale
-preferences are sanitized to `null` on read, never resolve tenant context, and
-never override `X-Organization-Id`.
+The status is one of `ACTIVE_TENANT_READY`, `AMBIGUOUS_SELECTION`, `NO_ACTIVE_TENANT`, or `ADMIN_SUSPENDED_CONTEXT`. A resolved response contains the confirmed tenant, organization, membership, and projected capabilities. An ambiguous response contains all selectable active memberships for the authenticated user. A no-active response contains no tenant context and an empty selection list. An administrator with a suspended organization receives the suspended-context status and only the capabilities allowed by the contract.
+
+The endpoint never returns the historical `RESOLVED`, `UNRESOLVED`, or `LEGACY_COMPATIBILITY` statuses. `X-Organization-Id` is an optional UUID selection hint and is never authorization evidence.
 
 ### `PUT /auth/context/preference`
 

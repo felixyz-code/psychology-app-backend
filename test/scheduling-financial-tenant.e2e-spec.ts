@@ -205,7 +205,7 @@ describeCertification(
         .expect(200);
 
       expect(context.body).toMatchObject({
-        status: 'RESOLVED',
+        status: 'ACTIVE_TENANT_READY',
         preferredOrganizationId: null,
         tenantContext: {
           userId: billingAId,
