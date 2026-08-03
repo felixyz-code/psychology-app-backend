@@ -7,7 +7,7 @@ import { AuthModule } from './auth/auth.module';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { RolesGuard } from './auth/guards/roles.guard';
 import { CaseFilesModule } from './case-files/case-files.module';
-import { PrismaExceptionFilter } from './common/prisma-exception.filter';
+import { ErrorEnvelopeFilter } from './common/error-envelope.filter';
 import { HttpLoggingInterceptor } from './common/observability/http-logging.interceptor';
 import { RequestIdMiddleware } from './common/request-context/request-id.middleware';
 import { AppConfigModule } from './config/config.module';
@@ -46,7 +46,7 @@ import { OrganizationsModule } from './organizations/organizations.module';
     },
     {
       provide: APP_FILTER,
-      useClass: PrismaExceptionFilter,
+      useClass: ErrorEnvelopeFilter,
     },
     {
       provide: APP_GUARD,

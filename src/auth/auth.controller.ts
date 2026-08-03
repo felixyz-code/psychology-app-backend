@@ -14,7 +14,6 @@ import {
   ApiTags,
   ApiTooManyRequestsResponse,
   ApiUnauthorizedResponse,
-  getSchemaPath,
 } from '@nestjs/swagger';
 import {
   Body,
@@ -23,9 +22,11 @@ import {
   Post,
   Put,
   Req,
+  UseGuards,
   UsePipes,
   ValidationPipe,
 } from '@nestjs/common';
+import { OrganizationStatus } from '@prisma/client';
 import { Public } from './decorators/public.decorator';
 import { CurrentUser } from './decorators/current-user.decorator';
 import { AuthService } from './auth.service';
@@ -34,9 +35,9 @@ import { FreelancerBootstrapResponseDto } from './dto/freelancer-bootstrap-respo
 import { LoginDto } from './dto/login.dto';
 import { LoginResponseDto } from './dto/login-response.dto';
 import { CurrentTenant } from '../tenant-context/decorators/current-tenant.decorator';
+import { AllowedOrganizationStatuses } from '../tenant-context/decorators/allowed-organization-statuses.decorator';
 import type { TenantContext } from '../tenant-context/tenant-context.types';
 import type { AuthenticatedUser } from './types/authenticated-user.type';
-import { UseGuards } from '@nestjs/common';
 import { FreelancerBootstrapEnabledGuard } from './guards/freelancer-bootstrap-enabled.guard';
 import { FreelancerBootstrapThrottleGuard } from './guards/freelancer-bootstrap-throttle.guard';
 import { SkipTenantContext } from '../tenant-context/decorators/skip-tenant-context.decorator';
@@ -44,19 +45,10 @@ import {
   AuthContextPreferenceResponseDto,
   UpdateAuthContextPreferenceDto,
 } from './dto/auth-context-preference.dto';
-import {
-  AuthContextLegacyCompatibilityDto,
-  AuthContextResolvedDto,
-  AuthContextUnresolvedDto,
-} from './dto/auth-context-response.dto';
+import { AuthContextResponseV1Dto } from './dto/auth-context-response.dto';
 
 @ApiTags('auth')
-@ApiExtraModels(
-  AuthContextResolvedDto,
-  AuthContextUnresolvedDto,
-  AuthContextLegacyCompatibilityDto,
-  AuthContextPreferenceResponseDto,
-)
+@ApiExtraModels(AuthContextResponseV1Dto, AuthContextPreferenceResponseDto)
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
@@ -106,6 +98,10 @@ export class AuthController {
   }
 
   @Get('context')
+  @AllowedOrganizationStatuses(
+    OrganizationStatus.ACTIVE,
+    OrganizationStatus.SUSPENDED,
+  )
   @ApiBearerAuth('bearer')
   @ApiHeader({
     name: 'X-Organization-Id',
@@ -113,21 +109,13 @@ export class AuthController {
     description:
       'Optional UUID selection hint; server validates active membership.',
   })
-  @ApiOperation({ summary: 'Get the validated current organization context' })
+  @ApiOperation({
+    summary: 'Get the authenticated V1 tenant context projection',
+  })
   @ApiBadRequestResponse({
     description: 'Invalid organization selection header',
   })
-  @ApiOkResponse({
-    description:
-      'Validated request tenant context plus the current UX-only preferred organization when still eligible.',
-    schema: {
-      oneOf: [
-        { $ref: getSchemaPath(AuthContextResolvedDto) },
-        { $ref: getSchemaPath(AuthContextUnresolvedDto) },
-        { $ref: getSchemaPath(AuthContextLegacyCompatibilityDto) },
-      ],
-    },
-  })
+  @ApiOkResponse({ type: AuthContextResponseV1Dto })
   @ApiUnauthorizedResponse({ description: 'Authentication is required' })
   @ApiForbiddenResponse({
     description: 'Organization selection is not eligible',

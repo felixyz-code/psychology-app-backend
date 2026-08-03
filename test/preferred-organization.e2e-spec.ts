@@ -246,7 +246,7 @@ describeCertification('Preferred organization UX runtime', () => {
       .expect(200)
       .expect((response) => {
         expect(response.body).toMatchObject({
-          status: 'UNRESOLVED',
+          status: 'AMBIGUOUS_SELECTION',
           preferredOrganizationId: null,
         });
       });
@@ -268,7 +268,7 @@ describeCertification('Preferred organization UX runtime', () => {
       .expect(200)
       .expect((response) => {
         expect(response.body).toMatchObject({
-          status: 'UNRESOLVED',
+          status: 'AMBIGUOUS_SELECTION',
           preferredOrganizationId: organizationAId,
         });
       });
@@ -289,7 +289,7 @@ describeCertification('Preferred organization UX runtime', () => {
       .expect(200)
       .expect((response) => {
         expect(response.body).toMatchObject({
-          status: 'UNRESOLVED',
+          status: 'AMBIGUOUS_SELECTION',
           preferredOrganizationId: organizationAId,
         });
       });
@@ -309,7 +309,7 @@ describeCertification('Preferred organization UX runtime', () => {
       .expect(200)
       .expect((response) => {
         expect(response.body).toMatchObject({
-          status: 'UNRESOLVED',
+          status: 'AMBIGUOUS_SELECTION',
           preferredOrganizationId: organizationBId,
         });
       });
@@ -329,20 +329,20 @@ describeCertification('Preferred organization UX runtime', () => {
       .expect(200)
       .expect((response) => {
         expect(response.body).toMatchObject({
-          status: 'UNRESOLVED',
+          status: 'AMBIGUOUS_SELECTION',
           preferredOrganizationId: null,
         });
       });
   });
 
-  it('returns the three auth-context variants and sanitizes stale persisted preferences to null on read', async () => {
+  it('returns the V1 auth-context states and sanitizes stale persisted preferences to null on read', async () => {
     await request(app.getHttpServer())
       .get('/auth/context')
       .set('Authorization', bearerToken(singleUserId))
       .expect(200)
       .expect((response) => {
         expect(response.body).toMatchObject({
-          status: 'RESOLVED',
+          status: 'ACTIVE_TENANT_READY',
           preferredOrganizationId: organizationAId,
           tenantContext: {
             organizationId: organizationAId,
@@ -357,7 +357,12 @@ describeCertification('Preferred organization UX runtime', () => {
       .expect(200)
       .expect((response) => {
         expect(response.body).toEqual({
-          status: 'LEGACY_COMPATIBILITY',
+          schemaVersion: 1,
+          status: 'NO_ACTIVE_TENANT',
+          tenantContext: null,
+          organization: null,
+          membership: null,
+          capabilities: [],
           selectableMemberships: [],
           preferredOrganizationId: null,
         });
@@ -369,7 +374,7 @@ describeCertification('Preferred organization UX runtime', () => {
       .expect(200)
       .expect((response) => {
         expect(response.body).toMatchObject({
-          status: 'UNRESOLVED',
+          status: 'NO_ACTIVE_TENANT',
           selectableMemberships: [],
           preferredOrganizationId: null,
         });

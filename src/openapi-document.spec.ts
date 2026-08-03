@@ -209,8 +209,19 @@ describe('OpenAPI document', () => {
     ).toEqual({
       $ref: '#/components/schemas/AuthContextPreferenceResponseDto',
     });
-    expect(document.components?.schemas?.AuthContextResolvedDto).toMatchObject({
+    expect(
+      document.components?.schemas?.AuthContextResponseV1Dto,
+    ).toMatchObject({
       properties: {
+        schemaVersion: { enum: [1] },
+        status: {
+          enum: [
+            'ACTIVE_TENANT_READY',
+            'AMBIGUOUS_SELECTION',
+            'NO_ACTIVE_TENANT',
+            'ADMIN_SUSPENDED_CONTEXT',
+          ],
+        },
         preferredOrganizationId: {
           type: 'string',
           nullable: true,

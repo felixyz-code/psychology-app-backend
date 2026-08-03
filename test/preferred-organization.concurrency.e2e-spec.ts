@@ -454,7 +454,7 @@ describeCertification('Preferred organization concurrency runtime', () => {
     };
 
     expect(body).toMatchObject({
-      status: 'UNRESOLVED',
+      status: 'AMBIGUOUS_SELECTION',
       preferredOrganizationId: expectedPreference,
     });
     expect(body.selectableMemberships).toHaveLength(2);

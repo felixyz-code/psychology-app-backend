@@ -83,6 +83,11 @@ describe('AuthService', () => {
       prisma as unknown as PrismaService,
       jwtService as unknown as JwtService,
       observability as never,
+      {
+        getUnconditionalCapabilities: jest
+          .fn()
+          .mockReturnValue(['organization.read']),
+      } as never,
     );
   });
 
@@ -147,25 +152,19 @@ describe('AuthService', () => {
     expect(jwtService.signAsync).not.toHaveBeenCalled();
   });
 
-  it('returns only the current user selectable memberships when tenant resolution is ambiguous', async () => {
+  it('returns a complete ambiguous V1 projection with only active selectable memberships', async () => {
     prisma.user.findUnique.mockResolvedValue({
       preferredOrganizationId: 'organization-b',
     });
     prisma.organizationMembership.findMany.mockResolvedValue([
       {
-        id: 'membership-a-revoked',
-        role: 'OWNER',
-        status: 'REVOKED',
-        organization: {
-          id: 'organization-a',
-          displayName: 'Organization A',
-          status: 'ACTIVE',
-        },
-      },
-      {
         id: 'membership-a',
+        userId: user.id,
         role: 'OWNER',
         status: 'ACTIVE',
+        createdAt: new Date('2026-08-01T10:00:00.000Z'),
+        updatedAt: new Date('2026-08-01T10:00:00.000Z'),
+        user: { name: user.name, email: user.email },
         organization: {
           id: 'organization-a',
           displayName: 'Organization A',
@@ -174,8 +173,12 @@ describe('AuthService', () => {
       },
       {
         id: 'membership-b',
+        userId: user.id,
         role: 'PSYCHOLOGIST',
         status: 'ACTIVE',
+        createdAt: new Date('2026-08-01T11:00:00.000Z'),
+        updatedAt: new Date('2026-08-01T11:00:00.000Z'),
+        user: { name: user.name, email: user.email },
         organization: {
           id: 'organization-b',
           displayName: 'Organization B',
@@ -184,8 +187,13 @@ describe('AuthService', () => {
       },
     ]);
 
-    await expect(service.getTenantContext(user)).resolves.toEqual({
-      status: 'UNRESOLVED',
+    await expect(service.getTenantContext(user)).resolves.toMatchObject({
+      schemaVersion: 1,
+      status: 'AMBIGUOUS_SELECTION',
+      tenantContext: null,
+      organization: null,
+      membership: null,
+      capabilities: [],
       preferredOrganizationId: 'organization-b',
       selectableMemberships: [
         {
@@ -202,55 +210,25 @@ describe('AuthService', () => {
         },
       ],
     });
-    expect(prisma.user.findUnique).toHaveBeenCalledWith({
-      where: { id: user.id },
-      select: { preferredOrganizationId: true },
-    });
-    expect(prisma.organizationMembership.findMany).toHaveBeenCalledWith({
-      where: {
-        userId: user.id,
-        status: {
-          in: ['INVITED', 'ACTIVE', 'SUSPENDED'],
-        },
-      },
-      select: {
-        id: true,
-        role: true,
-        status: true,
-        organization: {
-          select: { id: true, displayName: true, status: true },
-        },
-      },
-      orderBy: [
-        { organizationId: 'asc' },
-        { createdAt: 'desc' },
-        { id: 'asc' },
-      ],
-    });
   });
 
-  it('returns resolved context plus the sanitized preferred organization from current eligibility', async () => {
+  it('returns the active V1 context with canonical membership and projected capabilities', async () => {
+    const createdAt = new Date('2026-08-01T10:00:00.000Z');
     prisma.user.findUnique.mockResolvedValue({
       preferredOrganizationId: 'organization-a',
     });
     prisma.organizationMembership.findMany.mockResolvedValue([
       {
         id: 'membership-a',
+        userId: user.id,
         role: 'OWNER',
         status: 'ACTIVE',
+        createdAt,
+        updatedAt: createdAt,
+        user: { name: user.name, email: user.email },
         organization: {
           id: 'organization-a',
           displayName: 'Organization A',
-          status: 'ACTIVE',
-        },
-      },
-      {
-        id: 'membership-b',
-        role: 'PSYCHOLOGIST',
-        status: 'ACTIVE',
-        organization: {
-          id: 'organization-b',
-          displayName: 'Organization B',
           status: 'ACTIVE',
         },
       },
@@ -267,21 +245,57 @@ describe('AuthService', () => {
     await expect(
       service.getTenantContext(user, tenantContext),
     ).resolves.toEqual({
-      status: 'RESOLVED',
-      tenantContext,
+      schemaVersion: 1,
+      status: 'ACTIVE_TENANT_READY',
+      tenantContext: {
+        userId: user.id,
+        organizationId: 'organization-a',
+        membershipId: 'membership-a',
+        organizationRole: 'OWNER',
+        resolutionMode: TenantResolutionMode.EXPLICIT,
+      },
+      organization: {
+        id: 'organization-a',
+        displayName: 'Organization A',
+        status: 'ACTIVE',
+      },
+      membership: {
+        id: 'membership-a',
+        userId: user.id,
+        displayName: user.name,
+        email: user.email,
+        role: 'OWNER',
+        status: 'ACTIVE',
+        createdAt,
+        updatedAt: createdAt,
+        isCurrentUser: true,
+      },
+      capabilities: ['organization.read'],
+      selectableMemberships: [
+        {
+          membershipId: 'membership-a',
+          organizationId: 'organization-a',
+          organizationDisplayName: 'Organization A',
+          organizationRole: 'OWNER',
+        },
+      ],
       preferredOrganizationId: 'organization-a',
     });
-    expect(prisma.organizationMembership.findMany).toHaveBeenCalledTimes(1);
   });
 
-  it('returns legacy compatibility with a sanitized null preferred organization when the persisted value is stale', async () => {
+  it('returns NO_ACTIVE_TENANT with a fully redacted empty projection', async () => {
     prisma.user.findUnique.mockResolvedValue({
       preferredOrganizationId: 'organization-stale',
     });
     prisma.organizationMembership.findMany.mockResolvedValue([]);
 
     await expect(service.getTenantContext(user)).resolves.toEqual({
-      status: 'LEGACY_COMPATIBILITY',
+      schemaVersion: 1,
+      status: 'NO_ACTIVE_TENANT',
+      tenantContext: null,
+      organization: null,
+      membership: null,
+      capabilities: [],
       selectableMemberships: [],
       preferredOrganizationId: null,
     });

@@ -31,19 +31,25 @@ describe('AuthController', () => {
       legacyUserRole: user.role,
       resolutionMode: TenantResolutionMode.EXPLICIT,
     };
-    authService.getTenantContext.mockResolvedValue({
-      status: 'RESOLVED',
+    const response = {
+      schemaVersion: 1 as const,
+      status: 'ACTIVE_TENANT_READY' as const,
       tenantContext,
+      organization: {
+        id: 'organization-a',
+        displayName: 'Organization A',
+        status: 'ACTIVE' as const,
+      },
+      membership: null,
+      capabilities: ['organization.read'],
+      selectableMemberships: [],
       preferredOrganizationId: 'organization-a',
-    });
+    };
+    authService.getTenantContext.mockResolvedValue(response);
 
-    await expect(
-      controller.currentContext(user, tenantContext),
-    ).resolves.toEqual({
-      status: 'RESOLVED',
-      tenantContext,
-      preferredOrganizationId: 'organization-a',
-    });
+    await expect(controller.currentContext(user, tenantContext)).resolves.toBe(
+      response,
+    );
 
     expect(authService.getTenantContext).toHaveBeenCalledWith(
       user,

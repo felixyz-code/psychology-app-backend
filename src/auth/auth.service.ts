@@ -3,6 +3,7 @@ import {
   Injectable,
   NotFoundException,
   UnauthorizedException,
+  ForbiddenException,
 } from '@nestjs/common';
 import {
   MembershipRole,
@@ -24,9 +25,12 @@ import {
   serializableTransaction,
 } from '../prisma/prisma-transaction.util';
 import { TenantObservabilityService } from '../tenant-context/tenant-observability.service';
+import { CapabilityResolverService } from '../tenant-context/authorization/capability-resolver.service';
+import { projectAuthContextCapabilities } from '../tenant-context/authorization/capability-projection';
 import { AuthenticatedUser } from './types/authenticated-user.type';
 import { CreateFreelancerBootstrapDto } from './dto/create-freelancer-bootstrap.dto';
 import { UpdateAuthContextPreferenceDto } from './dto/auth-context-preference.dto';
+import { AuthContextStatus } from './dto/auth-context-response.dto';
 import { LoginDto } from './dto/login.dto';
 import { buildFreelancerBootstrapSlugCandidate } from './freelancer-bootstrap.util';
 
@@ -52,6 +56,7 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
     private readonly observability: TenantObservabilityService,
+    private readonly capabilityResolver: CapabilityResolverService,
   ) {}
 
   async login(loginDto: LoginDto) {
@@ -227,17 +232,22 @@ export class AuthService {
         where: {
           userId: user.id,
           status: {
-            in: [
-              MembershipStatus.INVITED,
-              MembershipStatus.ACTIVE,
-              MembershipStatus.SUSPENDED,
-            ],
+            in: [MembershipStatus.ACTIVE, MembershipStatus.SUSPENDED],
           },
         },
         select: {
           id: true,
+          userId: true,
           role: true,
           status: true,
+          createdAt: true,
+          updatedAt: true,
+          user: {
+            select: {
+              name: true,
+              email: true,
+            },
+          },
           organization: {
             select: { id: true, displayName: true, status: true },
           },
@@ -249,6 +259,7 @@ export class AuthService {
         ],
       }),
     ]);
+
     const selectableMemberships = memberships
       .filter(
         (membership) =>
@@ -265,27 +276,87 @@ export class AuthService {
       preferenceState?.preferredOrganizationId,
       selectableMemberships,
     );
-
-    if (tenantContext) {
-      return {
-        status: 'RESOLVED' as const,
-        tenantContext,
-        preferredOrganizationId,
-      };
-    }
-
-    if (memberships.length === 0) {
-      return {
-        status: 'LEGACY_COMPATIBILITY' as const,
-        selectableMemberships,
-        preferredOrganizationId,
-      };
-    }
-
-    return {
-      status: 'UNRESOLVED' as const,
+    const baseResponse = {
+      schemaVersion: 1 as const,
+      tenantContext: null,
+      organization: null,
+      membership: null,
+      capabilities: [] as string[],
       selectableMemberships,
       preferredOrganizationId,
+    };
+
+    if (!tenantContext) {
+      return {
+        ...baseResponse,
+        status:
+          selectableMemberships.length > 1
+            ? AuthContextStatus.AMBIGUOUS_SELECTION
+            : AuthContextStatus.NO_ACTIVE_TENANT,
+        selectableMemberships:
+          selectableMemberships.length > 1 ? selectableMemberships : [],
+        preferredOrganizationId:
+          selectableMemberships.length > 1 ? preferredOrganizationId : null,
+      };
+    }
+
+    const currentMembership = memberships.find(
+      (membership) =>
+        membership.id === tenantContext.membershipId &&
+        membership.userId === user.id &&
+        membership.organization.id === tenantContext.organizationId,
+    );
+    if (!currentMembership) {
+      throw new ForbiddenException('Organization access denied');
+    }
+
+    const isSuspended =
+      currentMembership.organization.status === OrganizationStatus.SUSPENDED;
+    const isAdministrativeRole =
+      currentMembership.role === MembershipRole.OWNER ||
+      currentMembership.role === MembershipRole.ADMIN;
+
+    if (isSuspended && !isAdministrativeRole) {
+      return {
+        ...baseResponse,
+        status: AuthContextStatus.NO_ACTIVE_TENANT,
+        selectableMemberships: [],
+        preferredOrganizationId: null,
+      };
+    }
+
+    const status = isSuspended
+      ? AuthContextStatus.ADMIN_SUSPENDED_CONTEXT
+      : AuthContextStatus.ACTIVE_TENANT_READY;
+    const membership = {
+      id: currentMembership.id,
+      userId: currentMembership.userId,
+      displayName: currentMembership.user.name ?? null,
+      email: normalizeEmailIdentity(currentMembership.user.email),
+      role: currentMembership.role,
+      status: currentMembership.status,
+      createdAt: currentMembership.createdAt,
+      updatedAt: currentMembership.updatedAt,
+      isCurrentUser: currentMembership.userId === user.id,
+    };
+
+    return {
+      ...baseResponse,
+      status,
+      tenantContext: {
+        userId: tenantContext.userId,
+        organizationId: tenantContext.organizationId,
+        membershipId: tenantContext.membershipId,
+        organizationRole: tenantContext.organizationRole,
+        resolutionMode: tenantContext.resolutionMode,
+      },
+      organization: currentMembership.organization,
+      membership,
+      capabilities: projectAuthContextCapabilities(
+        currentMembership.role,
+        currentMembership.organization.status,
+        this.capabilityResolver,
+      ),
     };
   }
 
