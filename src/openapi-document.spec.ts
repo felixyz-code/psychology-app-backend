@@ -209,6 +209,101 @@ describe('OpenAPI document', () => {
     ).toEqual({
       $ref: '#/components/schemas/AuthContextPreferenceResponseDto',
     });
+    expect(
+      getResponseContent(
+        document,
+        '/organizations/{organizationId}/memberships',
+        'get',
+        '200',
+      )['application/json']?.schema,
+    ).toEqual({
+      type: 'array',
+      items: { $ref: '#/components/schemas/MembershipListItemDto' },
+    });
+    expect(document.components?.schemas?.MembershipListItemDto).toMatchObject({
+      properties: {
+        updatedAt: { type: 'string', format: 'date-time' },
+        allowedActions: {
+          type: 'array',
+          items: {
+            type: 'string',
+            enum: ['CHANGE_ROLE', 'SUSPEND', 'REACTIVATE', 'REMOVE'],
+          },
+        },
+      },
+    });
+    expect(
+      (
+        document.components?.schemas?.MembershipListItemDto as {
+          required?: string[];
+        }
+      ).required,
+    ).toEqual(expect.arrayContaining(['updatedAt', 'allowedActions']));
+    expect(document.components?.schemas?.ChangeMembershipRoleDto).toMatchObject(
+      {
+        properties: {
+          expectedUpdatedAt: { type: 'string', format: 'date-time' },
+        },
+      },
+    );
+    expect(
+      (
+        document.components?.schemas?.ChangeMembershipRoleDto as {
+          required?: string[];
+        }
+      ).required,
+    ).toEqual(expect.arrayContaining(['role', 'expectedUpdatedAt']));
+    expect(
+      document.components?.schemas?.ChangeMembershipStatusDto,
+    ).toMatchObject({
+      properties: {
+        expectedUpdatedAt: { type: 'string', format: 'date-time' },
+      },
+    });
+    expect(
+      (
+        document.components?.schemas?.ChangeMembershipStatusDto as {
+          required?: string[];
+        }
+      ).required,
+    ).toEqual(expect.arrayContaining(['status', 'expectedUpdatedAt']));
+    expect(
+      getRequestContent(
+        document,
+        '/organizations/{organizationId}/memberships/{membershipId}',
+        'delete',
+      )['application/json']?.schema,
+    ).toEqual({
+      $ref: '#/components/schemas/MembershipMutationPreconditionDto',
+    });
+    expect(
+      getRequestContent(
+        document,
+        '/organizations/{organizationId}/memberships/leave',
+        'post',
+      )['application/json']?.schema,
+    ).toEqual({
+      $ref: '#/components/schemas/MembershipMutationPreconditionDto',
+    });
+    expect(
+      getResponseContent(
+        document,
+        '/organizations/{organizationId}/memberships/{membershipId}/role',
+        'patch',
+        '409',
+      )['application/json']?.schema,
+    ).toEqual({
+      $ref: '#/components/schemas/MembershipConflictResponseDto',
+    });
+    expect(
+      document.components?.schemas?.MembershipConflictResponseDto,
+    ).toMatchObject({
+      properties: {
+        code: {
+          enum: ['CONFLICT', 'CONCURRENT_UPDATE', 'LAST_OWNER_PROTECTED'],
+        },
+      },
+    });
     const authContextSchema = document.components?.schemas
       ?.AuthContextResponseV1Dto as unknown as {
       properties?: {
@@ -297,10 +392,12 @@ function createDocument(app: INestApplication) {
   );
 }
 
+type OpenApiMethod = 'get' | 'post' | 'put' | 'patch' | 'delete';
+
 function getRequestContent(
   document: OpenAPIObject,
   path: string,
-  method: 'get' | 'post' | 'put',
+  method: OpenApiMethod,
 ) {
   const requestBody = getOperation(document, path, method).requestBody;
 
@@ -316,7 +413,7 @@ function getRequestContent(
 function getResponseContent(
   document: OpenAPIObject,
   path: string,
-  method: 'get' | 'post' | 'put',
+  method: OpenApiMethod,
   status: string,
 ) {
   const response = getOperation(document, path, method).responses[status];
@@ -333,7 +430,7 @@ function getResponseContent(
 function getQueryParameterNames(
   document: OpenAPIObject,
   path: string,
-  method: 'get' | 'post' | 'put',
+  method: OpenApiMethod,
 ) {
   return (
     getOperation(document, path, method)
@@ -347,7 +444,7 @@ function getQueryParameterNames(
 function getHeaderParameter(
   document: OpenAPIObject,
   path: string,
-  method: 'get' | 'post' | 'put',
+  method: OpenApiMethod,
   name: string,
 ) {
   return getOperation(document, path, method).parameters?.find(
@@ -361,7 +458,7 @@ function getHeaderParameter(
 function getOperation(
   document: OpenAPIObject,
   path: string,
-  method: 'get' | 'post' | 'put',
+  method: OpenApiMethod,
 ) {
   const operation = document.paths[path]?.[method];
 

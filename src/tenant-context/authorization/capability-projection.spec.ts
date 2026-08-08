@@ -44,6 +44,6 @@ describe('projectAuthContextCapabilities', () => {
         OrganizationStatus.SUSPENDED,
         resolver as never,
       ),
-    ).toEqual(['membership.read', 'organization.manage', 'organization.read']);
+    ).toEqual(['organization.manage', 'organization.read']);
   });
 });

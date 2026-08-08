@@ -39,6 +39,12 @@ import type { TenantContext } from '../tenant-context/tenant-context.types';
 import { ChangeOrganizationStatusDto } from './dto/change-organization-status.dto';
 import { ChangeMembershipRoleDto } from './dto/change-membership-role.dto';
 import { ChangeMembershipStatusDto } from './dto/change-membership-status.dto';
+import { MembershipMutationPreconditionDto } from './dto/membership-mutation-precondition.dto';
+import {
+  MembershipConflictResponseDto,
+  MembershipListItemDto,
+  MembershipMutationResponseDto,
+} from './dto/membership-response.dto';
 import { CreateInvitationDto } from './dto/create-invitation.dto';
 import {
   InvitationIssueResponseDto,
@@ -196,6 +202,7 @@ export class OrganizationsController {
   @UseGuards(CapabilitiesGuard)
   @RequireCapabilities(OrganizationCapability.MEMBERSHIP_READ)
   @ApiOperation({ summary: 'List sanitized organization memberships' })
+  @ApiOkResponse({ type: MembershipListItemDto, isArray: true })
   membershipsList(
     @Param('organizationId', ParseUUIDPipe) organizationId: string,
     @CurrentTenant(true) tenant: TenantContext,
@@ -206,9 +213,13 @@ export class OrganizationsController {
   @Patch(':organizationId/memberships/:membershipId/role')
   @TenantRequired()
   @ApiOperation({ summary: 'Change a non-owner membership role' })
+  @ApiOkResponse({ type: MembershipMutationResponseDto })
+  @ApiBadRequestResponse({ description: 'Invalid role or precondition' })
   @ApiForbiddenResponse({ description: 'Membership action is not permitted' })
   @ApiConflictResponse({
-    description: 'Invalid membership transition or owner invariant',
+    type: MembershipConflictResponseDto,
+    description:
+      'Invalid membership transition, stale precondition, or owner invariant',
   })
   changeRole(
     @Param('organizationId', ParseUUIDPipe) organizationId: string,
@@ -220,6 +231,7 @@ export class OrganizationsController {
       organizationId,
       membershipId,
       dto.role,
+      dto.expectedUpdatedAt,
       tenant,
     );
   }
@@ -227,6 +239,14 @@ export class OrganizationsController {
   @Patch(':organizationId/memberships/:membershipId/status')
   @TenantRequired()
   @ApiOperation({ summary: 'Suspend or reactivate a membership' })
+  @ApiOkResponse({ type: MembershipMutationResponseDto })
+  @ApiBadRequestResponse({ description: 'Invalid status or precondition' })
+  @ApiForbiddenResponse({ description: 'Membership action is not permitted' })
+  @ApiConflictResponse({
+    type: MembershipConflictResponseDto,
+    description:
+      'Invalid membership transition, stale precondition, or owner invariant',
+  })
   changeStatus(
     @Param('organizationId', ParseUUIDPipe) organizationId: string,
     @Param('membershipId', ParseUUIDPipe) membershipId: string,
@@ -237,6 +257,7 @@ export class OrganizationsController {
       organizationId,
       membershipId,
       dto.status,
+      dto.expectedUpdatedAt,
       tenant,
     );
   }
@@ -244,22 +265,48 @@ export class OrganizationsController {
   @Delete(':organizationId/memberships/:membershipId')
   @TenantRequired()
   @ApiOperation({ summary: 'Remove a membership without deleting history' })
+  @ApiOkResponse({ type: MembershipMutationResponseDto })
+  @ApiBadRequestResponse({ description: 'Invalid or missing precondition' })
+  @ApiForbiddenResponse({ description: 'Membership action is not permitted' })
+  @ApiConflictResponse({
+    type: MembershipConflictResponseDto,
+    description:
+      'Invalid membership transition, stale precondition, or owner invariant',
+  })
   remove(
     @Param('organizationId', ParseUUIDPipe) organizationId: string,
     @Param('membershipId', ParseUUIDPipe) membershipId: string,
+    @Body() dto: MembershipMutationPreconditionDto,
     @CurrentTenant(true) tenant: TenantContext,
   ) {
-    return this.memberships.remove(organizationId, membershipId, tenant);
+    return this.memberships.remove(
+      organizationId,
+      membershipId,
+      dto.expectedUpdatedAt,
+      tenant,
+    );
   }
 
   @Post(':organizationId/memberships/leave')
   @TenantRequired()
   @ApiOperation({ summary: 'Leave the current organization' })
+  @ApiCreatedResponse({ type: MembershipMutationResponseDto })
+  @ApiBadRequestResponse({ description: 'Invalid or missing precondition' })
+  @ApiForbiddenResponse({ description: 'Membership action is not permitted' })
+  @ApiConflictResponse({
+    type: MembershipConflictResponseDto,
+    description: 'Stale precondition or last active owner invariant',
+  })
   leave(
     @Param('organizationId', ParseUUIDPipe) organizationId: string,
+    @Body() dto: MembershipMutationPreconditionDto,
     @CurrentTenant(true) tenant: TenantContext,
   ) {
-    return this.memberships.leave(organizationId, tenant);
+    return this.memberships.leave(
+      organizationId,
+      dto.expectedUpdatedAt,
+      tenant,
+    );
   }
 
   @Get(':organizationId/invitations')

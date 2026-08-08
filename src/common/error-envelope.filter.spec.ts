@@ -91,6 +91,27 @@ describe('ErrorEnvelopeFilter', () => {
     });
   });
 
+  it('preserves the stable last-owner protection code', () => {
+    const filter = new ErrorEnvelopeFilter(new RequestContextService());
+    const { host, json } = createHost();
+
+    filter.catch(
+      new ConflictException({
+        code: 'LAST_OWNER_PROTECTED',
+        message: 'Organization must retain an active owner',
+      }),
+      host,
+    );
+
+    expect(json).toHaveBeenCalledWith({
+      statusCode: 409,
+      code: 'LAST_OWNER_PROTECTED',
+      message: 'Organization must retain an active owner',
+      requestId: 'unavailable',
+      details: null,
+    });
+  });
+
   it('maps throttling exceptions to RATE_LIMITED with bounded retry details', () => {
     const filter = new ErrorEnvelopeFilter(new RequestContextService());
     const { host, json } = createHost();

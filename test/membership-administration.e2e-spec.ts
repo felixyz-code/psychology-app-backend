@@ -55,7 +55,11 @@ describeCertification('Membership administration runtime', () => {
   const suspendedMemberMembershipId = randomUUID();
   const reentryRevokedMembershipId = randomUUID();
 
-  type MembershipListItem = { id: string };
+  type MembershipListItem = {
+    id: string;
+    updatedAt: string;
+    allowedActions: string[];
+  };
   type InvitationCreateResponse = { token: string };
   type AcceptedInvitationResponse = {
     id: string;
@@ -326,12 +330,28 @@ describeCertification('Membership administration runtime', () => {
     expect(listedIds).toContain(auditorMembershipId);
     expect(listedIds).toContain(psychologistMembershipId);
     expect(listedIds).not.toContain(reentryRevokedMembershipId);
+    expect(
+      ownerListBody.find(({ id }) => id === ownerAlphaMembershipId)
+        ?.allowedActions,
+    ).toEqual([]);
+    expect(
+      ownerListBody.find(({ id }) => id === adminMembershipId)?.allowedActions,
+    ).toEqual(['CHANGE_ROLE', 'SUSPEND', 'REMOVE']);
+    expect(
+      ownerListBody.find(({ id }) => id === suspendedMemberMembershipId)
+        ?.allowedActions,
+    ).toEqual(['CHANGE_ROLE', 'REACTIVATE', 'REMOVE']);
 
-    await request(app.getHttpServer())
+    const auditorList = await request(app.getHttpServer())
       .get(`/organizations/${organizationAlphaId}/memberships`)
       .set('Authorization', auditorToken)
       .set('X-Organization-Id', organizationAlphaId)
       .expect(200);
+    expect(
+      (auditorList.body as MembershipListItem[]).every(
+        ({ allowedActions }) => allowedActions.length === 0,
+      ),
+    ).toBe(true);
 
     await request(app.getHttpServer())
       .get(`/organizations/${organizationAlphaId}/memberships`)
@@ -356,17 +376,52 @@ describeCertification('Membership administration runtime', () => {
       .set('Authorization', suspendedOrgOwnerToken)
       .set('X-Organization-Id', organizationSuspendedId)
       .expect(403);
+
+    await request(app.getHttpServer())
+      .get('/auth/context')
+      .set('Authorization', suspendedOrgOwnerToken)
+      .set('X-Organization-Id', organizationSuspendedId)
+      .expect(200)
+      .expect((response) => {
+        const body = response.body as {
+          status: string;
+          capabilities: string[];
+        };
+        expect(body.status).toBe('ADMIN_SUSPENDED_CONTEXT');
+        expect(
+          body.capabilities.some((capability) =>
+            capability.startsWith('membership.'),
+          ),
+        ).toBe(false);
+      });
   });
 
   it('keeps ADMIN restrictions and applies a role change on the next request without minting a new JWT', async () => {
     const ownerAlphaToken = bearerToken(ownerAlphaUserId, UserRole.ADMIN);
     const adminToken = bearerToken(adminUserId, UserRole.ADMIN);
+    const ownerUpdatedAt = await membershipUpdatedAt(ownerAlphaMembershipId);
+    const adminUpdatedAt = await membershipUpdatedAt(adminMembershipId);
 
-    await request(app.getHttpServer())
+    const adminList = await request(app.getHttpServer())
       .get(`/organizations/${organizationAlphaId}/memberships`)
       .set('Authorization', adminToken)
       .set('X-Organization-Id', organizationAlphaId)
       .expect(200);
+    expect(
+      (adminList.body as MembershipListItem[]).find(
+        ({ id }) => id === ownerAlphaMembershipId,
+      )?.allowedActions,
+    ).toEqual([]);
+    expect(
+      (adminList.body as MembershipListItem[]).find(
+        ({ id }) => id === adminMembershipId,
+      )?.allowedActions,
+    ).toEqual([]);
+    expect(
+      (adminList.body as MembershipListItem[]).find(
+        ({ id }) => id === psychologistMembershipId,
+      )?.allowedActions,
+    ).toEqual(['CHANGE_ROLE', 'SUSPEND', 'REMOVE']);
 
     await request(app.getHttpServer())
       .patch(
@@ -374,7 +429,10 @@ describeCertification('Membership administration runtime', () => {
       )
       .set('Authorization', adminToken)
       .set('X-Organization-Id', organizationAlphaId)
-      .send({ role: MembershipRole.BILLING })
+      .send({
+        role: MembershipRole.BILLING,
+        expectedUpdatedAt: ownerUpdatedAt,
+      })
       .expect(403);
 
     await request(app.getHttpServer())
@@ -383,7 +441,10 @@ describeCertification('Membership administration runtime', () => {
       )
       .set('Authorization', adminToken)
       .set('X-Organization-Id', organizationAlphaId)
-      .send({ role: MembershipRole.BILLING })
+      .send({
+        role: MembershipRole.BILLING,
+        expectedUpdatedAt: adminUpdatedAt,
+      })
       .expect(403);
 
     await request(app.getHttpServer())
@@ -392,7 +453,10 @@ describeCertification('Membership administration runtime', () => {
       )
       .set('Authorization', ownerAlphaToken)
       .set('X-Organization-Id', organizationAlphaId)
-      .send({ role: MembershipRole.BILLING })
+      .send({
+        role: MembershipRole.BILLING,
+        expectedUpdatedAt: adminUpdatedAt,
+      })
       .expect(200)
       .expect((response) => {
         expect(response.body).toMatchObject({
@@ -414,6 +478,9 @@ describeCertification('Membership administration runtime', () => {
     const psychologistToken = bearerToken(
       psychologistUserId,
       UserRole.PSYCHOLOGIST,
+    );
+    const psychologistUpdatedAt = await membershipUpdatedAt(
+      psychologistMembershipId,
     );
 
     for (const payload of [
@@ -438,7 +505,11 @@ describeCertification('Membership administration runtime', () => {
       )
       .set('Authorization', ownerAlphaToken)
       .set('X-Organization-Id', organizationAlphaId)
-      .send({ status: MembershipStatus.SUSPENDED, ignored: true })
+      .send({
+        status: MembershipStatus.SUSPENDED,
+        expectedUpdatedAt: psychologistUpdatedAt,
+        ignored: true,
+      })
       .expect(200)
       .expect((response) => {
         expect(response.body).toMatchObject({
@@ -456,6 +527,10 @@ describeCertification('Membership administration runtime', () => {
     expect(suspendedMembership.suspendedAt).toBeInstanceOf(Date);
     expect(suspendedMembership.revokedAt).toBeNull();
 
+    const suspendedUpdatedAt = await membershipUpdatedAt(
+      psychologistMembershipId,
+    );
+
     await request(app.getHttpServer())
       .get('/auth/context')
       .set('Authorization', psychologistToken)
@@ -468,7 +543,10 @@ describeCertification('Membership administration runtime', () => {
       )
       .set('Authorization', ownerAlphaToken)
       .set('X-Organization-Id', organizationAlphaId)
-      .send({ status: MembershipStatus.ACTIVE })
+      .send({
+        status: MembershipStatus.ACTIVE,
+        expectedUpdatedAt: suspendedUpdatedAt,
+      })
       .expect(200)
       .expect((response) => {
         expect(response.body).toMatchObject({
@@ -507,6 +585,11 @@ describeCertification('Membership administration runtime', () => {
   it('supports remove and leave while preserving the last active owner invariant', async () => {
     const ownerAlphaToken = bearerToken(ownerAlphaUserId, UserRole.ADMIN);
     const ownerBetaToken = bearerToken(ownerBetaUserId, UserRole.ADMIN);
+    const auditorUpdatedAt = await membershipUpdatedAt(auditorMembershipId);
+    const ownerAlphaBetaUpdatedAt = await membershipUpdatedAt(
+      ownerAlphaBetaMembershipId,
+    );
+    const ownerBetaUpdatedAt = await membershipUpdatedAt(ownerBetaMembershipId);
 
     await request(app.getHttpServer())
       .delete(
@@ -514,12 +597,19 @@ describeCertification('Membership administration runtime', () => {
       )
       .set('Authorization', ownerAlphaToken)
       .set('X-Organization-Id', organizationAlphaId)
+      .send({ expectedUpdatedAt: auditorUpdatedAt })
       .expect(200)
       .expect((response) => {
-        expect(response.body).toEqual({
+        const body = response.body as {
+          id: string;
+          status: MembershipStatus;
+          updatedAt: unknown;
+        };
+        expect(body).toMatchObject({
           id: auditorMembershipId,
           status: MembershipStatus.REVOKED,
         });
+        expect(typeof body.updatedAt).toBe('string');
       });
 
     const removedAuditor =
@@ -534,19 +624,32 @@ describeCertification('Membership administration runtime', () => {
       .post(`/organizations/${organizationBetaId}/memberships/leave`)
       .set('Authorization', ownerAlphaToken)
       .set('X-Organization-Id', organizationBetaId)
+      .send({ expectedUpdatedAt: ownerAlphaBetaUpdatedAt })
       .expect(201)
       .expect((response) => {
-        expect(response.body).toEqual({
+        const body = response.body as {
+          id: string;
+          status: MembershipStatus;
+          updatedAt: unknown;
+        };
+        expect(body).toMatchObject({
           id: ownerAlphaBetaMembershipId,
           status: MembershipStatus.REVOKED,
         });
+        expect(typeof body.updatedAt).toBe('string');
       });
 
     await request(app.getHttpServer())
       .post(`/organizations/${organizationBetaId}/memberships/leave`)
       .set('Authorization', ownerBetaToken)
       .set('X-Organization-Id', organizationBetaId)
-      .expect(409);
+      .send({ expectedUpdatedAt: ownerBetaUpdatedAt })
+      .expect(409)
+      .expect((response) => {
+        expect((response.body as { code: unknown }).code).toBe(
+          'LAST_OWNER_PROTECTED',
+        );
+      });
   });
 
   it('creates a new membership row on invitation acceptance when only revoked history exists', async () => {
@@ -612,6 +715,143 @@ describeCertification('Membership administration runtime', () => {
     expect(currentIds).not.toContain(reentryRevokedMembershipId);
   });
 
+  it('rejects stale role, status, remove, and leave intents with a stable conflict code', async () => {
+    const ownerAlphaToken = bearerToken(ownerAlphaUserId, UserRole.ADMIN);
+    const psychologistToken = bearerToken(
+      psychologistUserId,
+      UserRole.PSYCHOLOGIST,
+    );
+    const listed = await request(app.getHttpServer())
+      .get(`/organizations/${organizationAlphaId}/memberships`)
+      .set('Authorization', ownerAlphaToken)
+      .set('X-Organization-Id', organizationAlphaId)
+      .expect(200);
+    const list = listed.body as MembershipListItem[];
+    const staleRoleVersion = membershipListVersion(
+      list,
+      psychologistMembershipId,
+    );
+    const staleStatusVersion = membershipListVersion(
+      list,
+      suspendedMemberMembershipId,
+    );
+    const staleRemoveVersion = membershipListVersion(list, adminMembershipId);
+
+    const roleVersionB = await advanceMembership(psychologistMembershipId, {
+      role: MembershipRole.BILLING,
+    });
+    await request(app.getHttpServer())
+      .patch(
+        `/organizations/${organizationAlphaId}/memberships/${psychologistMembershipId}/role`,
+      )
+      .set('Authorization', ownerAlphaToken)
+      .set('X-Organization-Id', organizationAlphaId)
+      .send({
+        role: MembershipRole.RECEPTIONIST,
+        expectedUpdatedAt: staleRoleVersion,
+      })
+      .expect(409)
+      .expect((response) =>
+        expect((response.body as { code: unknown }).code).toBe(
+          'CONCURRENT_UPDATE',
+        ),
+      );
+    expect(
+      await prisma.organizationMembership.findUniqueOrThrow({
+        where: { id: psychologistMembershipId },
+        select: { role: true, updatedAt: true },
+      }),
+    ).toEqual({ role: MembershipRole.BILLING, updatedAt: roleVersionB });
+
+    const statusVersionB = await advanceMembership(
+      suspendedMemberMembershipId,
+      { status: MembershipStatus.ACTIVE, suspendedAt: null },
+    );
+    await request(app.getHttpServer())
+      .patch(
+        `/organizations/${organizationAlphaId}/memberships/${suspendedMemberMembershipId}/status`,
+      )
+      .set('Authorization', ownerAlphaToken)
+      .set('X-Organization-Id', organizationAlphaId)
+      .send({
+        status: MembershipStatus.ACTIVE,
+        expectedUpdatedAt: staleStatusVersion,
+      })
+      .expect(409)
+      .expect((response) =>
+        expect((response.body as { code: unknown }).code).toBe(
+          'CONCURRENT_UPDATE',
+        ),
+      );
+    expect(
+      await prisma.organizationMembership.findUniqueOrThrow({
+        where: { id: suspendedMemberMembershipId },
+        select: { status: true, updatedAt: true },
+      }),
+    ).toEqual({ status: MembershipStatus.ACTIVE, updatedAt: statusVersionB });
+
+    const removeVersionB = await advanceMembership(adminMembershipId, {
+      role: MembershipRole.AUDITOR,
+    });
+    await request(app.getHttpServer())
+      .delete(
+        `/organizations/${organizationAlphaId}/memberships/${adminMembershipId}`,
+      )
+      .set('Authorization', ownerAlphaToken)
+      .set('X-Organization-Id', organizationAlphaId)
+      .send({ expectedUpdatedAt: staleRemoveVersion })
+      .expect(409)
+      .expect((response) =>
+        expect((response.body as { code: unknown }).code).toBe(
+          'CONCURRENT_UPDATE',
+        ),
+      );
+    expect(
+      await prisma.organizationMembership.findUniqueOrThrow({
+        where: { id: adminMembershipId },
+        select: { status: true, updatedAt: true },
+      }),
+    ).toEqual({ status: MembershipStatus.ACTIVE, updatedAt: removeVersionB });
+
+    const staleLeaveVersion = roleVersionB.toISOString();
+    const leaveVersionB = await advanceMembership(psychologistMembershipId, {
+      role: MembershipRole.RECEPTIONIST,
+    });
+    await request(app.getHttpServer())
+      .post(`/organizations/${organizationAlphaId}/memberships/leave`)
+      .set('Authorization', psychologistToken)
+      .set('X-Organization-Id', organizationAlphaId)
+      .send({ expectedUpdatedAt: staleLeaveVersion })
+      .expect(409)
+      .expect((response) =>
+        expect((response.body as { code: unknown }).code).toBe(
+          'CONCURRENT_UPDATE',
+        ),
+      );
+    expect(
+      await prisma.organizationMembership.findUniqueOrThrow({
+        where: { id: psychologistMembershipId },
+        select: { status: true, updatedAt: true },
+      }),
+    ).toEqual({ status: MembershipStatus.ACTIVE, updatedAt: leaveVersionB });
+
+    const canonical = await request(app.getHttpServer())
+      .get(`/organizations/${organizationAlphaId}/memberships`)
+      .set('Authorization', ownerAlphaToken)
+      .set('X-Organization-Id', organizationAlphaId)
+      .expect(200);
+    const canonicalList = canonical.body as MembershipListItem[];
+    expect(membershipListVersion(canonicalList, psychologistMembershipId)).toBe(
+      leaveVersionB.toISOString(),
+    );
+    expect(
+      membershipListVersion(canonicalList, suspendedMemberMembershipId),
+    ).toBe(statusVersionB.toISOString());
+    expect(membershipListVersion(canonicalList, adminMembershipId)).toBe(
+      removeVersionB.toISOString(),
+    );
+  });
+
   it('keeps at least one active owner under concurrent owner suspension requests', async () => {
     const ownerConcurrentAToken = bearerToken(
       ownerConcurrentAUserId,
@@ -621,6 +861,12 @@ describeCertification('Membership administration runtime', () => {
       ownerConcurrentBUserId,
       UserRole.ADMIN,
     );
+    const ownerConcurrentAUpdatedAt = await membershipUpdatedAt(
+      ownerConcurrentAMembershipId,
+    );
+    const ownerConcurrentBUpdatedAt = await membershipUpdatedAt(
+      ownerConcurrentBMembershipId,
+    );
 
     const [responseA, responseB] = await Promise.all([
       request(app.getHttpServer())
@@ -629,14 +875,20 @@ describeCertification('Membership administration runtime', () => {
         )
         .set('Authorization', ownerConcurrentAToken)
         .set('X-Organization-Id', organizationConcurrentId)
-        .send({ status: MembershipStatus.SUSPENDED }),
+        .send({
+          status: MembershipStatus.SUSPENDED,
+          expectedUpdatedAt: ownerConcurrentAUpdatedAt,
+        }),
       request(app.getHttpServer())
         .patch(
           `/organizations/${organizationConcurrentId}/memberships/${ownerConcurrentBMembershipId}/status`,
         )
         .set('Authorization', ownerConcurrentBToken)
         .set('X-Organization-Id', organizationConcurrentId)
-        .send({ status: MembershipStatus.SUSPENDED }),
+        .send({
+          status: MembershipStatus.SUSPENDED,
+          expectedUpdatedAt: ownerConcurrentBUpdatedAt,
+        }),
     ]);
 
     expect([responseA.status, responseB.status].sort()).toEqual([200, 409]);
@@ -658,6 +910,45 @@ describeCertification('Membership administration runtime', () => {
       email: 'membership-runtime@example.test',
       role,
     })}`;
+  }
+
+  async function membershipUpdatedAt(membershipId: string) {
+    const membership = await prisma.organizationMembership.findUniqueOrThrow({
+      where: { id: membershipId },
+      select: { updatedAt: true },
+    });
+    return membership.updatedAt.toISOString();
+  }
+
+  function membershipListVersion(
+    memberships: MembershipListItem[],
+    membershipId: string,
+  ) {
+    const membership = memberships.find(({ id }) => id === membershipId);
+    if (!membership) {
+      throw new Error(`Membership ${membershipId} was not listed`);
+    }
+    return membership.updatedAt;
+  }
+
+  async function advanceMembership(
+    membershipId: string,
+    data: {
+      role?: MembershipRole;
+      status?: MembershipStatus;
+      suspendedAt?: Date | null;
+    },
+  ) {
+    const current = await prisma.organizationMembership.findUniqueOrThrow({
+      where: { id: membershipId },
+      select: { updatedAt: true },
+    });
+    const updatedAt = new Date(current.updatedAt.getTime() + 1_000);
+    await prisma.organizationMembership.update({
+      where: { id: membershipId },
+      data: { ...data, updatedAt },
+    });
+    return updatedAt;
   }
 });
 

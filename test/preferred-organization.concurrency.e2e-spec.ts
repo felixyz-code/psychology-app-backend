@@ -222,6 +222,10 @@ describeCertification('Preferred organization concurrency runtime', () => {
   });
 
   it('never grants authority when a set races membership suspension', async () => {
+    const membership = await prisma.organizationMembership.findUniqueOrThrow({
+      where: { id: actorMembershipAId },
+      select: { updatedAt: true },
+    });
     const release = await lockTables(['organization_memberships']);
 
     const setPreference = trackRequest(
@@ -237,7 +241,10 @@ describeCertification('Preferred organization concurrency runtime', () => {
         )
         .set('Authorization', bearerToken(ownerUserId, UserRole.ADMIN))
         .set('X-Organization-Id', organizationAId)
-        .send({ status: MembershipStatus.SUSPENDED }),
+        .send({
+          status: MembershipStatus.SUSPENDED,
+          expectedUpdatedAt: membership.updatedAt.toISOString(),
+        }),
     );
 
     await expectBothPending(setPreference, suspendMembership);
