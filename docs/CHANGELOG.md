@@ -2,13 +2,32 @@
 
 ---
 
+# POST-GO-LIVE.4 Roadmap Continuation
+
+## Status
+
+* `POST-GO-LIVE.4.1`, `.4.2`, and `.4.3` are certified and complete; `.4.3`
+  is frontend-only and does not change the backend baseline.
+* `POST-GO-LIVE.4.4 Organization Administration UX` is authorized and not
+  started. Authorization is roadmap-only and does not start runtime work.
+
+## Scope
+
+* The backend contribution is its already certified organization detail,
+  identity update, and `ACTIVE`/`SUSPENDED` lifecycle API surface.
+* No backend runtime, DTO, schema, migration, test, infrastructure, or
+  deployment change is authorized by this roadmap entry.
+
+---
+
 # POST-GO-LIVE.4 Documentation Closeout
 
 ## Status
 
 * Documentacion contractual cerrada para POST-GO-LIVE.4.
 * Estado: `CONTRACT COMPLETE / IMPLEMENTATION READY`.
-* La siguiente fase es `POST-GO-LIVE.4.1 Tenant Context Foundation`, aun no iniciada.
+* Historical closeout statement: the initial next phase was
+  `POST-GO-LIVE.4.1 Tenant Context Foundation`; it is now certified and merged.
 
 ## Baseline
 
