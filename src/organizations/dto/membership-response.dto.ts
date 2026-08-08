@@ -62,9 +62,18 @@ export class MembershipConflictResponseDto {
   statusCode: number;
 
   @ApiProperty({
-    enum: ['CONFLICT', 'CONCURRENT_UPDATE', 'LAST_OWNER_PROTECTED'],
+    enum: [
+      'CONFLICT',
+      'CONCURRENT_UPDATE',
+      'LAST_OWNER_PROTECTED',
+      'TENANT_CONTEXT_REQUIRED',
+    ],
   })
-  code: 'CONFLICT' | 'CONCURRENT_UPDATE' | 'LAST_OWNER_PROTECTED';
+  code:
+    | 'CONFLICT'
+    | 'CONCURRENT_UPDATE'
+    | 'LAST_OWNER_PROTECTED'
+    | 'TENANT_CONTEXT_REQUIRED';
 
   @ApiProperty()
   message: string;

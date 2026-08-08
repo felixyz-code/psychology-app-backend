@@ -285,22 +285,45 @@ describe('OpenAPI document', () => {
     ).toEqual({
       $ref: '#/components/schemas/MembershipMutationPreconditionDto',
     });
-    expect(
-      getResponseContent(
-        document,
-        '/organizations/{organizationId}/memberships/{membershipId}/role',
-        'patch',
-        '409',
-      )['application/json']?.schema,
-    ).toEqual({
-      $ref: '#/components/schemas/MembershipConflictResponseDto',
-    });
+    const membershipConflictOperations = [
+      {
+        path: '/organizations/{organizationId}/memberships/{membershipId}/role',
+        method: 'patch',
+      },
+      {
+        path: '/organizations/{organizationId}/memberships/{membershipId}/status',
+        method: 'patch',
+      },
+      {
+        path: '/organizations/{organizationId}/memberships/{membershipId}',
+        method: 'delete',
+      },
+      {
+        path: '/organizations/{organizationId}/memberships/leave',
+        method: 'post',
+      },
+    ] as const;
+
+    for (const operation of membershipConflictOperations) {
+      expect(
+        getResponseContent(document, operation.path, operation.method, '409')[
+          'application/json'
+        ]?.schema,
+      ).toEqual({
+        $ref: '#/components/schemas/MembershipConflictResponseDto',
+      });
+    }
     expect(
       document.components?.schemas?.MembershipConflictResponseDto,
     ).toMatchObject({
       properties: {
         code: {
-          enum: ['CONFLICT', 'CONCURRENT_UPDATE', 'LAST_OWNER_PROTECTED'],
+          enum: [
+            'CONFLICT',
+            'CONCURRENT_UPDATE',
+            'LAST_OWNER_PROTECTED',
+            'TENANT_CONTEXT_REQUIRED',
+          ],
         },
       },
     });
