@@ -56,19 +56,48 @@ PHASE 3 CLOSEOUT REVIEW PENDING
 
 POST-GO-LIVE.4 Documentation status:
 
-STATUS: CONTRACT COMPLETE / IMPLEMENTATION READY
+STATUS: ROADMAP CONTINUATION AUTHORIZED
 CONTRACT VERSION: 1
 DATE: 2026-08-02
 DOCUMENTATION BRANCH: codex/post-go-live-4-0-frontend-integration-contract
 CONTRACT COMMIT: 48b48ef56615d382ade0f0616dcb67358faf3dfe
 RELATED PR: #44
-NEXT PHASE: POST-GO-LIVE.4.1 Tenant Context Foundation - NOT STARTED
+POST-GO-LIVE.4.1 Tenant Context Foundation - CERTIFIED / COMPLETE
+POST-GO-LIVE.4.2 Organization Selection & Preferred Organization - CERTIFIED / COMPLETE
+POST-GO-LIVE.4.3 Cross-Tenant State Invalidation - CERTIFIED / COMPLETE (frontend-only)
+NEXT PHASE: POST-GO-LIVE.4.4 Organization Administration UX - AUTHORIZED / NOT STARTED
 
 Documentation-only rollback:
 
 Document-only rollback -> git revert <documentation-commit> -> restore previous documentation baseline.
 No code rollback is included in this phase.
 ```
+
+## POST-GO-LIVE.4.4 - Organization Administration UX
+
+**Status:** `AUTHORIZED / NOT STARTED`. This is a roadmap authorization only;
+no implementation starts from this entry.
+
+**Goal:** consume the certified organization administration API as the first
+organization-domain frontend experience for a confirmed tenant.
+
+**Backend impact:** no backend implementation is required. The phase consumes
+the existing organization read, identity update, and `ACTIVE`/`SUSPENDED`
+lifecycle surface. Backend remains authoritative for tenant validation,
+capabilities, lifecycle transitions, concurrency, and redaction.
+
+**Out of scope:** membership administration, invitations, ownership transfer,
+freelancer signup or organization creation, schema or migration changes, and
+infrastructure work.
+
+**Dependencies:** frontend 4.1, 4.2, and 4.3; backend Phase 3 organization
+administration runtime.
+
+**Acceptance and security boundary:** the frontend must call only the
+confirmed tenant through the documented tenant-required routes; server
+capabilities control every action; lifecycle changes are followed by context
+refresh; cross-tenant 403/404 results remain redacted; and suspended
+organizations expose no operational access.
 
 Current priorities:
 
@@ -107,8 +136,11 @@ POST-GO-LIVE.3
  |- 3.5 Public Freelancer Bootstrap Runtime CLOSED / INTEGRATED
  `- 3.6 Preferred Organization UX Runtime CLOSED / INTEGRATED
 POST-GO-LIVE.3-CLOSEOUT                  REVIEW PENDING
-POST-GO-LIVE.4                           CONTRACT COMPLETE / IMPLEMENTATION READY
- `- 4.1 Tenant Context Foundation          NOT STARTED
+POST-GO-LIVE.4                           ROADMAP CONTINUATION AUTHORIZED
+ |- 4.1 Tenant Context Foundation          CERTIFIED / COMPLETE
+ |- 4.2 Organization Selection & Preferred Organization CERTIFIED / COMPLETE
+ |- 4.3 Cross-Tenant State Invalidation    CERTIFIED / COMPLETE (frontend-only)
+ `- 4.4 Organization Administration UX     AUTHORIZED / NOT STARTED
 POST-GO-LIVE.5                           PENDING
 POST-GO-LIVE.6                           PENDING
 POST-GO-LIVE.7                           PENDING
