@@ -167,6 +167,45 @@ describeCertification('Tenant context runtime guard integration', () => {
     });
   });
 
+  it('persists an eligible preferred organization without changing request-time selection authority', async () => {
+    await request(app.getHttpServer())
+      .put('/auth/context/preference')
+      .set('Authorization', bearerToken(userMultipleId, UserRole.PSYCHOLOGIST))
+      .send({ organizationId: organizationMultipleTwoId })
+      .expect(200, {
+        preferredOrganizationId: organizationMultipleTwoId,
+      });
+
+    const bootstrap = await request(app.getHttpServer())
+      .get('/auth/context')
+      .set('Authorization', bearerToken(userMultipleId, UserRole.PSYCHOLOGIST))
+      .expect(200);
+
+    expect(bootstrap.body).toMatchObject({
+      status: 'AMBIGUOUS_SELECTION',
+      preferredOrganizationId: organizationMultipleTwoId,
+      tenantContext: null,
+    });
+
+    const selected = await request(app.getHttpServer())
+      .get('/auth/context')
+      .set('Authorization', bearerToken(userMultipleId, UserRole.PSYCHOLOGIST))
+      .set('X-Organization-Id', organizationMultipleTwoId)
+      .expect(200);
+
+    expect(selected.body).toMatchObject({
+      status: 'ACTIVE_TENANT_READY',
+      preferredOrganizationId: organizationMultipleTwoId,
+      tenantContext: { organizationId: organizationMultipleTwoId },
+    });
+
+    await request(app.getHttpServer())
+      .put('/auth/context/preference')
+      .set('Authorization', bearerToken(userMultipleId, UserRole.PSYCHOLOGIST))
+      .send({ organizationId: null })
+      .expect(200, { preferredOrganizationId: null });
+  });
+
   it('permits legacy compatibility and rejects a foreign selection with the same redacted policy', async () => {
     const legacy = await request(app.getHttpServer())
       .get('/auth/context')
