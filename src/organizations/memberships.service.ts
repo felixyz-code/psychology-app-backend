@@ -18,6 +18,7 @@ import {
 import { OrganizationPolicyService } from '../tenant-context/authorization/organization-policy.service';
 import { TenantContext } from '../tenant-context/tenant-context.types';
 import { TenantObservabilityService } from '../tenant-context/tenant-observability.service';
+import { MembershipAllowedAction } from './dto/membership-response.dto';
 import { serializableTransaction } from './organization-transaction.util';
 
 const roleRank: Readonly<Record<MembershipRole, number>> = {
@@ -38,30 +39,51 @@ export class MembershipsService {
     private readonly observability: TenantObservabilityService,
   ) {}
 
-  findAll(organizationId: string, tenant: TenantContext) {
+  async findAll(organizationId: string, tenant: TenantContext) {
     this.assertTenantPath(organizationId, tenant);
-    return this.prisma.organizationMembership.findMany({
-      where: {
-        organizationId: tenant.organizationId,
-        status: {
-          in: [
-            MembershipStatus.INVITED,
-            MembershipStatus.ACTIVE,
-            MembershipStatus.SUSPENDED,
-          ],
-        },
-      },
-      select: {
-        id: true,
-        userId: true,
-        role: true,
-        status: true,
-        joinedAt: true,
-        suspendedAt: true,
-        revokedAt: true,
-        createdAt: true,
-      },
-      orderBy: { createdAt: 'asc' },
+    return this.prisma.$transaction(async (tx) => {
+      const [memberships, activeOwnerCount] = await Promise.all([
+        tx.organizationMembership.findMany({
+          where: {
+            organizationId: tenant.organizationId,
+            status: {
+              in: [
+                MembershipStatus.INVITED,
+                MembershipStatus.ACTIVE,
+                MembershipStatus.SUSPENDED,
+              ],
+            },
+          },
+          select: {
+            id: true,
+            userId: true,
+            role: true,
+            status: true,
+            joinedAt: true,
+            suspendedAt: true,
+            revokedAt: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+          orderBy: { createdAt: 'asc' },
+        }),
+        tx.organizationMembership.count({
+          where: {
+            organizationId: tenant.organizationId,
+            role: MembershipRole.OWNER,
+            status: MembershipStatus.ACTIVE,
+          },
+        }),
+      ]);
+
+      return memberships.map((membership) => ({
+        ...membership,
+        allowedActions: this.allowedActionsFor(
+          tenant,
+          membership,
+          activeOwnerCount,
+        ),
+      }));
     });
   }
 
@@ -69,6 +91,7 @@ export class MembershipsService {
     organizationId: string,
     membershipId: string,
     role: MembershipRole,
+    expectedUpdatedAt: string,
     tenant: TenantContext,
   ) {
     this.assertTenantPath(organizationId, tenant);
@@ -83,6 +106,7 @@ export class MembershipsService {
         target,
         role,
       );
+      this.assertExpectedUpdatedAt(target, expectedUpdatedAt);
       if (target.role === MembershipRole.OWNER) {
         throw new ConflictException('Ownership transfer is not supported');
       }
@@ -98,11 +122,12 @@ export class MembershipsService {
           organizationId: tenant.organizationId,
           role: target.role,
           status: target.status,
+          updatedAt: new Date(expectedUpdatedAt),
         },
         data: { role },
       });
       if (updated.count !== 1) {
-        throw new ConflictException('Membership changed concurrently');
+        throw this.concurrentUpdate();
       }
       return {
         membership: await this.findTarget(tx, membershipId, tenant),
@@ -233,8 +258,12 @@ export class MembershipsService {
 
     return {
       organizationId: result.organizationId,
-      sourceMembership: result.sourceMembership,
-      targetMembership: result.targetMembership,
+      sourceMembership: this.ownershipTransferMembership(
+        result.sourceMembership,
+      ),
+      targetMembership: this.ownershipTransferMembership(
+        result.targetMembership,
+      ),
       transferredAt: result.transferredAt,
     };
   }
@@ -243,6 +272,7 @@ export class MembershipsService {
     organizationId: string,
     membershipId: string,
     status: 'ACTIVE' | 'SUSPENDED',
+    expectedUpdatedAt: string,
     tenant: TenantContext,
   ) {
     this.assertTenantPath(organizationId, tenant);
@@ -255,6 +285,7 @@ export class MembershipsService {
           : OrganizationCapability.MEMBERSHIP_REACTIVATE,
         target,
       );
+      this.assertExpectedUpdatedAt(target, expectedUpdatedAt);
       if (target.status === status) {
         throw new ConflictException('Membership status is already set');
       }
@@ -272,6 +303,7 @@ export class MembershipsService {
           id: target.id,
           organizationId: tenant.organizationId,
           status: target.status,
+          updatedAt: new Date(expectedUpdatedAt),
         },
         data:
           status === MembershipStatus.SUSPENDED
@@ -279,7 +311,7 @@ export class MembershipsService {
             : { status, suspendedAt: null },
       });
       if (updated.count !== 1) {
-        throw new ConflictException('Membership changed concurrently');
+        throw this.concurrentUpdate();
       }
       return {
         membership: await this.findTarget(tx, membershipId, tenant),
@@ -308,6 +340,7 @@ export class MembershipsService {
   async remove(
     organizationId: string,
     membershipId: string,
+    expectedUpdatedAt: string,
     tenant: TenantContext,
   ) {
     this.assertTenantPath(organizationId, tenant);
@@ -318,6 +351,7 @@ export class MembershipsService {
         OrganizationCapability.MEMBERSHIP_REMOVE,
         target,
       );
+      this.assertExpectedUpdatedAt(target, expectedUpdatedAt);
       if (
         target.status !== MembershipStatus.ACTIVE &&
         target.status !== MembershipStatus.SUSPENDED
@@ -330,14 +364,15 @@ export class MembershipsService {
           id: target.id,
           organizationId: tenant.organizationId,
           status: target.status,
+          updatedAt: new Date(expectedUpdatedAt),
         },
         data: { status: MembershipStatus.REVOKED, revokedAt: new Date() },
       });
       if (updated.count !== 1) {
-        throw new ConflictException('Membership changed concurrently');
+        throw this.concurrentUpdate();
       }
       return {
-        membership: { id: target.id, status: MembershipStatus.REVOKED },
+        membership: await this.findTarget(tx, membershipId, tenant),
         eventMetadata: {
           targetId: target.id,
           targetUserId: target.userId,
@@ -358,7 +393,11 @@ export class MembershipsService {
     return result.membership;
   }
 
-  async leave(organizationId: string, tenant: TenantContext) {
+  async leave(
+    organizationId: string,
+    expectedUpdatedAt: string,
+    tenant: TenantContext,
+  ) {
     this.assertTenantPath(organizationId, tenant);
     if (
       this.policy.decisionFor(
@@ -370,6 +409,7 @@ export class MembershipsService {
     }
     const result = await serializableTransaction(this.prisma, async (tx) => {
       const target = await this.findTarget(tx, tenant.membershipId, tenant);
+      this.assertExpectedUpdatedAt(target, expectedUpdatedAt);
       if (
         target.userId !== tenant.userId ||
         target.status !== MembershipStatus.ACTIVE
@@ -383,14 +423,15 @@ export class MembershipsService {
           organizationId: tenant.organizationId,
           userId: tenant.userId,
           status: MembershipStatus.ACTIVE,
+          updatedAt: new Date(expectedUpdatedAt),
         },
         data: { status: MembershipStatus.REVOKED, revokedAt: new Date() },
       });
       if (updated.count !== 1) {
-        throw new ConflictException('Membership changed concurrently');
+        throw this.concurrentUpdate();
       }
       return {
-        membership: { id: target.id, status: MembershipStatus.REVOKED },
+        membership: await this.findTarget(tx, target.id, tenant),
         eventMetadata: {
           targetId: target.id,
           targetUserId: target.userId,
@@ -424,7 +465,13 @@ export class MembershipsService {
   ) {
     const target = await tx.organizationMembership.findFirst({
       where: { id, organizationId: tenant.organizationId },
-      select: { id: true, userId: true, role: true, status: true },
+      select: {
+        id: true,
+        userId: true,
+        role: true,
+        status: true,
+        updatedAt: true,
+      },
     });
     if (!target) {
       throw new NotFoundException('Membership not found');
@@ -442,14 +489,116 @@ export class MembershipsService {
     if (decision === CapabilityDecision.DENY) {
       throw new ForbiddenException('Organization capability is required');
     }
-    if (
-      tenant.organizationRole === MembershipRole.ADMIN &&
-      (target.role === MembershipRole.OWNER ||
-        target.userId === tenant.userId ||
-        (newRole && roleRank[newRole] > roleRank[MembershipRole.ADMIN]))
-    ) {
+    if (!this.isTargetActionAllowed(tenant, decision, target, newRole)) {
       throw new ForbiddenException('Membership action is not permitted');
     }
+  }
+
+  private allowedActionsFor(
+    tenant: TenantContext,
+    target: {
+      userId: string;
+      role: MembershipRole;
+      status: MembershipStatus;
+    },
+    activeOwnerCount: number,
+  ): MembershipAllowedAction[] {
+    const actions: MembershipAllowedAction[] = [];
+
+    if (
+      target.role !== MembershipRole.OWNER &&
+      target.status !== MembershipStatus.REVOKED &&
+      this.canManage(
+        tenant,
+        OrganizationCapability.MEMBERSHIP_MANAGE_ROLE,
+        target,
+      )
+    ) {
+      actions.push(MembershipAllowedAction.CHANGE_ROLE);
+    }
+
+    const ownerInvariantAllowsMutation =
+      target.role !== MembershipRole.OWNER ||
+      target.status !== MembershipStatus.ACTIVE ||
+      activeOwnerCount > 1;
+
+    if (
+      target.status === MembershipStatus.ACTIVE &&
+      ownerInvariantAllowsMutation &&
+      this.canManage(tenant, OrganizationCapability.MEMBERSHIP_SUSPEND, target)
+    ) {
+      actions.push(MembershipAllowedAction.SUSPEND);
+    }
+
+    if (
+      target.status === MembershipStatus.SUSPENDED &&
+      this.canManage(
+        tenant,
+        OrganizationCapability.MEMBERSHIP_REACTIVATE,
+        target,
+      )
+    ) {
+      actions.push(MembershipAllowedAction.REACTIVATE);
+    }
+
+    if (
+      (target.status === MembershipStatus.ACTIVE ||
+        target.status === MembershipStatus.SUSPENDED) &&
+      ownerInvariantAllowsMutation &&
+      this.canManage(tenant, OrganizationCapability.MEMBERSHIP_REMOVE, target)
+    ) {
+      actions.push(MembershipAllowedAction.REMOVE);
+    }
+
+    return actions;
+  }
+
+  private canManage(
+    tenant: TenantContext,
+    capability: OrganizationCapability,
+    target: { userId: string; role: MembershipRole },
+    newRole?: MembershipRole,
+  ) {
+    const decision = this.policy.decisionFor(tenant, capability);
+    return this.isTargetActionAllowed(tenant, decision, target, newRole);
+  }
+
+  private isTargetActionAllowed(
+    tenant: TenantContext,
+    decision: CapabilityDecision,
+    target: { userId: string; role: MembershipRole },
+    newRole?: MembershipRole,
+  ) {
+    if (decision === CapabilityDecision.DENY) {
+      return false;
+    }
+
+    if (decision === CapabilityDecision.ALLOW) {
+      return true;
+    }
+
+    return (
+      tenant.organizationRole === MembershipRole.ADMIN &&
+      target.role !== MembershipRole.OWNER &&
+      target.userId !== tenant.userId &&
+      (!newRole || roleRank[newRole] <= roleRank[MembershipRole.ADMIN])
+    );
+  }
+
+  private assertExpectedUpdatedAt(
+    target: { updatedAt: Date },
+    expectedUpdatedAt: string,
+  ) {
+    if (target.updatedAt.getTime() !== new Date(expectedUpdatedAt).getTime()) {
+      throw this.concurrentUpdate();
+    }
+  }
+
+  private concurrentUpdate() {
+    return new ConflictException({
+      code: 'CONCURRENT_UPDATE',
+      message: 'Membership changed concurrently',
+    });
   }
 
   private requireOwnershipTransfer(tenant: TenantContext) {
@@ -461,6 +610,20 @@ export class MembershipsService {
     ) {
       throw new ForbiddenException('Organization capability is required');
     }
+  }
+
+  private ownershipTransferMembership(target: {
+    id: string;
+    userId: string;
+    role: MembershipRole;
+    status: MembershipStatus;
+  }) {
+    return {
+      id: target.id,
+      userId: target.userId,
+      role: target.role,
+      status: target.status,
+    };
   }
 
   private async findTransferActor(
@@ -534,7 +697,10 @@ export class MembershipsService {
           newStatus: target.status,
         },
       );
-      throw new ConflictException('Organization must retain an active owner');
+      throw new ConflictException({
+        code: 'LAST_OWNER_PROTECTED',
+        message: 'Organization must retain an active owner',
+      });
     }
   }
 }

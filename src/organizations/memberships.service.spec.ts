@@ -14,9 +14,12 @@ import {
   TenantResolutionMode,
   type TenantContext,
 } from '../common/request-context/request-context.service';
+import { CapabilityDecision } from '../tenant-context/authorization/organization-capability';
+import { MembershipAllowedAction } from './dto/membership-response.dto';
 import { MembershipsService } from './memberships.service';
 
 describe('MembershipsService policy boundary', () => {
+  const updatedAt = new Date('2026-08-08T12:00:00.000Z');
   const tenant: TenantContext = {
     userId: '00000000-0000-4000-8000-000000000001',
     membershipId: '00000000-0000-4000-8000-000000000002',
@@ -26,6 +29,149 @@ describe('MembershipsService policy boundary', () => {
     resolutionMode: TenantResolutionMode.EXPLICIT,
   };
 
+  it('projects owner actions from the same target policy and protects the last owner', async () => {
+    const targets = [
+      targetMembership(
+        tenant.membershipId,
+        tenant.userId,
+        MembershipRole.OWNER,
+        MembershipStatus.ACTIVE,
+      ),
+      targetMembership(
+        '00000000-0000-4000-8000-000000000004',
+        '00000000-0000-4000-8000-000000000005',
+        MembershipRole.ADMIN,
+        MembershipStatus.ACTIVE,
+      ),
+      targetMembership(
+        '00000000-0000-4000-8000-000000000006',
+        '00000000-0000-4000-8000-000000000007',
+        MembershipRole.PSYCHOLOGIST,
+        MembershipStatus.SUSPENDED,
+      ),
+      targetMembership(
+        '00000000-0000-4000-8000-000000000008',
+        '00000000-0000-4000-8000-000000000009',
+        MembershipRole.RECEPTIONIST,
+        MembershipStatus.INVITED,
+      ),
+    ];
+    const service = membershipListService(targets, 1, CapabilityDecision.ALLOW);
+
+    const result = await service.findAll(tenant.organizationId, {
+      ...tenant,
+      organizationRole: MembershipRole.OWNER,
+    });
+
+    expect(
+      result.map(({ id, allowedActions }) => ({ id, allowedActions })),
+    ).toEqual([
+      { id: tenant.membershipId, allowedActions: [] },
+      {
+        id: targets[1]?.id,
+        allowedActions: [
+          MembershipAllowedAction.CHANGE_ROLE,
+          MembershipAllowedAction.SUSPEND,
+          MembershipAllowedAction.REMOVE,
+        ],
+      },
+      {
+        id: targets[2]?.id,
+        allowedActions: [
+          MembershipAllowedAction.CHANGE_ROLE,
+          MembershipAllowedAction.REACTIVATE,
+          MembershipAllowedAction.REMOVE,
+        ],
+      },
+      {
+        id: targets[3]?.id,
+        allowedActions: [MembershipAllowedAction.CHANGE_ROLE],
+      },
+    ]);
+  });
+
+  it('projects conditional admin actions only for eligible non-self non-owner targets', async () => {
+    const targets = [
+      targetMembership(
+        '00000000-0000-4000-8000-000000000004',
+        '00000000-0000-4000-8000-000000000005',
+        MembershipRole.OWNER,
+        MembershipStatus.ACTIVE,
+      ),
+      targetMembership(
+        tenant.membershipId,
+        tenant.userId,
+        MembershipRole.ADMIN,
+        MembershipStatus.ACTIVE,
+      ),
+      targetMembership(
+        '00000000-0000-4000-8000-000000000006',
+        '00000000-0000-4000-8000-000000000007',
+        MembershipRole.PSYCHOLOGIST,
+        MembershipStatus.ACTIVE,
+      ),
+    ];
+    const service = membershipListService(
+      targets,
+      1,
+      CapabilityDecision.CONDITIONAL,
+    );
+
+    const result = await service.findAll(tenant.organizationId, tenant);
+
+    expect(result.map(({ allowedActions }) => allowedActions)).toEqual([
+      [],
+      [],
+      [
+        MembershipAllowedAction.CHANGE_ROLE,
+        MembershipAllowedAction.SUSPEND,
+        MembershipAllowedAction.REMOVE,
+      ],
+    ]);
+  });
+
+  it('projects no target actions when the actor policy denies membership mutation', async () => {
+    const target = targetMembership(
+      '00000000-0000-4000-8000-000000000004',
+      '00000000-0000-4000-8000-000000000005',
+      MembershipRole.PSYCHOLOGIST,
+      MembershipStatus.ACTIVE,
+    );
+    const service = membershipListService([target], 1, CapabilityDecision.DENY);
+
+    await expect(
+      service.findAll(tenant.organizationId, tenant),
+    ).resolves.toEqual([expect.objectContaining({ allowedActions: [] })]);
+  });
+
+  it('allows a non-last owner to suspend or remove their own membership', async () => {
+    const target = targetMembership(
+      tenant.membershipId,
+      tenant.userId,
+      MembershipRole.OWNER,
+      MembershipStatus.ACTIVE,
+    );
+    const service = membershipListService(
+      [target],
+      2,
+      CapabilityDecision.ALLOW,
+    );
+
+    await expect(
+      service.findAll(tenant.organizationId, {
+        ...tenant,
+        organizationRole: MembershipRole.OWNER,
+      }),
+    ).resolves.toEqual([
+      expect.objectContaining({
+        allowedActions: [
+          MembershipAllowedAction.SUSPEND,
+          MembershipAllowedAction.REMOVE,
+        ],
+      }),
+    ]);
+  });
+
   it('does not allow an admin to mutate an owner', async () => {
     const tx = {
       organizationMembership: {
@@ -34,6 +180,7 @@ describe('MembershipsService policy boundary', () => {
           userId: '00000000-0000-4000-8000-000000000005',
           role: MembershipRole.OWNER,
           status: MembershipStatus.ACTIVE,
+          updatedAt,
         }),
       },
     };
@@ -50,6 +197,7 @@ describe('MembershipsService policy boundary', () => {
       service.remove(
         tenant.organizationId,
         '00000000-0000-4000-8000-000000000004',
+        updatedAt.toISOString(),
         tenant,
       ),
     ).rejects.toBeInstanceOf(ForbiddenException);
@@ -62,7 +210,11 @@ describe('MembershipsService policy boundary', () => {
       {} as never,
     );
     await expect(
-      service.leave('00000000-0000-4000-8000-000000000099', tenant),
+      service.leave(
+        '00000000-0000-4000-8000-000000000099',
+        updatedAt.toISOString(),
+        tenant,
+      ),
     ).rejects.toBeInstanceOf(NotFoundException);
   });
 
@@ -74,6 +226,7 @@ describe('MembershipsService policy boundary', () => {
           userId: '00000000-0000-4000-8000-000000000005',
           role: MembershipRole.PSYCHOLOGIST,
           status: MembershipStatus.REVOKED,
+          updatedAt,
         }),
       },
     };
@@ -91,6 +244,7 @@ describe('MembershipsService policy boundary', () => {
         tenant.organizationId,
         '00000000-0000-4000-8000-000000000004',
         MembershipRole.BILLING,
+        updatedAt.toISOString(),
         { ...tenant, organizationRole: MembershipRole.OWNER },
       ),
     ).rejects.toThrow('Invalid membership transition');
@@ -104,6 +258,7 @@ describe('MembershipsService policy boundary', () => {
           userId: tenant.userId,
           role: MembershipRole.ADMIN,
           status: MembershipStatus.ACTIVE,
+          updatedAt,
         }),
       },
     };
@@ -121,6 +276,7 @@ describe('MembershipsService policy boundary', () => {
         tenant.organizationId,
         tenant.membershipId,
         MembershipRole.BILLING,
+        updatedAt.toISOString(),
         tenant,
       ),
     ).rejects.toBeInstanceOf(ForbiddenException);
@@ -140,6 +296,7 @@ describe('MembershipsService policy boundary', () => {
           findFirstCalls % 2 === 1
             ? MembershipStatus.ACTIVE
             : MembershipStatus.SUSPENDED,
+        updatedAt,
       });
     });
     const tx = {
@@ -173,6 +330,7 @@ describe('MembershipsService policy boundary', () => {
         tenant.organizationId,
         targetId,
         MembershipStatus.SUSPENDED,
+        updatedAt.toISOString(),
         { ...tenant, organizationRole: MembershipRole.OWNER },
       ),
     ).rejects.toBeInstanceOf(ConflictException);
@@ -403,3 +561,45 @@ describe('MembershipsService policy boundary', () => {
     expect(observability.organizationDomainEvent).not.toHaveBeenCalled();
   });
 });
+
+function targetMembership(
+  id: string,
+  userId: string,
+  role: MembershipRole,
+  status: MembershipStatus,
+) {
+  const timestamp = new Date('2026-08-08T12:00:00.000Z');
+  return {
+    id,
+    userId,
+    role,
+    status,
+    joinedAt: status === MembershipStatus.INVITED ? null : timestamp,
+    suspendedAt: status === MembershipStatus.SUSPENDED ? timestamp : null,
+    revokedAt: status === MembershipStatus.REVOKED ? timestamp : null,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  };
+}
+
+function membershipListService(
+  targets: ReturnType<typeof targetMembership>[],
+  activeOwnerCount: number,
+  decision: CapabilityDecision,
+) {
+  const tx = {
+    organizationMembership: {
+      findMany: jest.fn().mockResolvedValue(targets),
+      count: jest.fn().mockResolvedValue(activeOwnerCount),
+    },
+  };
+  const prisma = {
+    $transaction: jest.fn((work: (client: typeof tx) => unknown) => work(tx)),
+  };
+
+  return new MembershipsService(
+    prisma as never,
+    { decisionFor: jest.fn().mockReturnValue(decision) } as never,
+    { organizationDomainEvent: jest.fn() } as never,
+  );
+}

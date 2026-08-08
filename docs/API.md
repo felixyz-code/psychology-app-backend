@@ -1605,11 +1605,11 @@ membership runtime and historical lifecycle without adding direct
 | PATCH | `/organizations/:organizationId` | `organization.manage` (OWNER); editable identity fields only |
 | PATCH | `/organizations/:organizationId/status` | `organization.manage` (OWNER); `ACTIVE <-> SUSPENDED` only |
 | POST | `/organizations/:organizationId/ownership-transfer` | `ownership.transfer` (OWNER); dedicated owner handoff only |
-| GET | `/organizations/:organizationId/memberships` | `membership.read`; sanitized metadata |
-| PATCH | `/organizations/:organizationId/memberships/:membershipId/role` | owner/admin conditional; never OWNER grant |
-| PATCH | `/organizations/:organizationId/memberships/:membershipId/status` | owner/admin conditional |
-| DELETE | `/organizations/:organizationId/memberships/:membershipId` | owner/admin conditional |
-| POST | `/organizations/:organizationId/memberships/leave` | self only; last active OWNER denied |
+| GET | `/organizations/:organizationId/memberships` | `membership.read`; sanitized metadata, canonical `updatedAt`, and backend-owned target `allowedActions` |
+| PATCH | `/organizations/:organizationId/memberships/:membershipId/role` | owner/admin conditional; never OWNER grant; requires `expectedUpdatedAt` |
+| PATCH | `/organizations/:organizationId/memberships/:membershipId/status` | owner/admin conditional; requires `expectedUpdatedAt` |
+| DELETE | `/organizations/:organizationId/memberships/:membershipId` | owner/admin conditional; request body requires `expectedUpdatedAt` |
+| POST | `/organizations/:organizationId/memberships/leave` | self only; last active OWNER denied; requires `expectedUpdatedAt` |
 | GET/POST | `/organizations/:organizationId/invitations` | `invitation.read` / `invitation.create` |
 | POST | `/organizations/:organizationId/invitations/:invitationId/revoke` | `invitation.revoke` (OWNER) |
 | POST | `/organizations/:organizationId/invitations/:invitationId/resend` | `invitation.resend` (OWNER) |
@@ -1683,7 +1683,10 @@ POST-GO-LIVE.3.2 membership runtime rules:
 - `GET /organizations/:organizationId/memberships` keeps the current
   administrative behavior and lists only non-terminal rows. Historical
   `REVOKED` rows remain preserved in the database but are not projected by the
-  current API.
+  current API. Each row includes canonical `updatedAt` plus a closed
+  `allowedActions` projection with `CHANGE_ROLE`, `SUSPEND`, `REACTIVATE`, and
+  `REMOVE` as applicable to the current actor and target. Mutations always
+  re-evaluate authorization independently of this UX projection.
 - `PATCH /organizations/:organizationId/memberships/:membershipId/role` never
   grants `OWNER`, never degrades `OWNER`, rejects `REVOKED` targets, and keeps
   `ADMIN` blocked from mutating themself or any `OWNER`.
@@ -1693,6 +1696,13 @@ POST-GO-LIVE.3.2 membership runtime rules:
 - `DELETE /organizations/:organizationId/memberships/:membershipId` and
   `POST /organizations/:organizationId/memberships/leave` both end in
   historical `REVOKED` rows; neither route deletes the membership record.
+- Role, status, removal, and leave requests require the canonical
+  `expectedUpdatedAt` observed by the client. A mismatch returns `409` with
+  stable code `CONCURRENT_UPDATE`; successful canonical responses contain the
+  new `updatedAt`. Last-active-OWNER protection returns `409` with stable code
+  `LAST_OWNER_PROTECTED`.
+- Suspended organizations remain blocked from membership routes, and
+  `ADMIN_SUSPENDED_CONTEXT` does not project any `membership.*` capability.
 - Invitation acceptance now permits re-entry when the recipient has only
   `REVOKED` history in that organization. If an `INVITED`, `ACTIVE`, or
   `SUSPENDED` membership already exists for that `organizationId + userId`,

@@ -201,6 +201,11 @@ finance.read, finance.manage, finance.summary_read, report.read.
 For every row below, the guard is capability-aware UX only; backend policy and
 assignment checks remain mandatory.
 
+Membership list rows additionally project a closed, target-specific
+`allowedActions` array from backend policy. Suspended organization contexts do
+not project `membership.*` capabilities because membership routes remain
+blocked until reactivation.
+
 | Module actions | Capability | Backend authority | Frontend UX | Guard | Interceptor |
 | --- | --- | --- | --- | --- | --- |
 | Organization read/manage | organization.read / organization.manage | Selected tenant and OWNER/status policy | Show identity/admin controls | Capability guard | TENANT_REQUIRED |
@@ -242,6 +247,7 @@ stack traces, clinical data, cross-tenant existence, or unnecessary PII.
 | RESOURCE_NOT_FOUND | 404 | null | No blind retry | Yes | Redacted not-found |
 | CONFLICT | 409 | resource, transition or null | Refresh then deliberate retry | Safe only | Refresh and explain |
 | CONCURRENT_UPDATE | 409 | resource, retryContext: true or null | Refresh context/resource then deliberate retry | Safe only | Reload and reconfirm |
+| LAST_OWNER_PROTECTED | 409 | null | No automatic retry | Yes | Explain that another active OWNER is required |
 | CAPABILITY_DENIED | 403 | capability or null | No automatic retry | Policy not disclosed | Hide/disable action |
 | INVITATION_TERMINAL | 409 | terminalState | Reload only | No token/recipient data | Show terminal state |
 | INVITATION_RECIPIENT_MISMATCH | 403 | null | Explicit re-authentication | Yes | Safe mismatch UX |
@@ -269,10 +275,10 @@ composition of the source requests below.
 | PATCH | /organizations/:id | TENANT_REQUIRED | organization.manage | TENANT_REQUIRED | VALIDATION_ERROR, FORBIDDEN, CONFLICT, CONCURRENT_UPDATE | OrganizationUpdateRequest/Response | Organization |
 | PATCH | /organizations/:id/status | TENANT_REQUIRED | organization.manage | TENANT_REQUIRED | VALIDATION_ERROR, FORBIDDEN, CONFLICT, CONCURRENT_UPDATE | OrganizationStatusRequest/Response | Organization |
 | GET | /organizations/:id/memberships | TENANT_REQUIRED | membership.read | TENANT_REQUIRED | FORBIDDEN, RESOURCE_NOT_FOUND | MembershipListResponse | Membership |
-| PATCH | /organizations/:id/memberships/:mid/role | TENANT_REQUIRED | membership.manage_role | TENANT_REQUIRED | VALIDATION_ERROR, FORBIDDEN, RESOURCE_NOT_FOUND, CONFLICT, CONCURRENT_UPDATE | MembershipRoleRequest/Response | Membership |
-| PATCH | /organizations/:id/memberships/:mid/status | TENANT_REQUIRED | membership.suspend or membership.reactivate | TENANT_REQUIRED | VALIDATION_ERROR, FORBIDDEN, RESOURCE_NOT_FOUND, CONFLICT, CONCURRENT_UPDATE | MembershipStatusRequest/Response | Membership |
-| DELETE | /organizations/:id/memberships/:mid | TENANT_REQUIRED | membership.remove | TENANT_REQUIRED | FORBIDDEN, RESOURCE_NOT_FOUND, CONFLICT, CONCURRENT_UPDATE | MembershipRevocationResponse | Membership |
-| POST | /organizations/:id/memberships/leave | TENANT_REQUIRED | membership.leave | TENANT_REQUIRED | FORBIDDEN, CONFLICT, CONCURRENT_UPDATE | MembershipRevocationResponse | Membership |
+| PATCH | /organizations/:id/memberships/:mid/role | TENANT_REQUIRED | membership.manage_role | TENANT_REQUIRED | VALIDATION_ERROR, FORBIDDEN, RESOURCE_NOT_FOUND, CONFLICT, CONCURRENT_UPDATE | MembershipRoleRequest (`expectedUpdatedAt` required) / Response | Membership |
+| PATCH | /organizations/:id/memberships/:mid/status | TENANT_REQUIRED | membership.suspend or membership.reactivate | TENANT_REQUIRED | VALIDATION_ERROR, FORBIDDEN, RESOURCE_NOT_FOUND, CONFLICT, CONCURRENT_UPDATE, LAST_OWNER_PROTECTED | MembershipStatusRequest (`expectedUpdatedAt` required) / Response | Membership |
+| DELETE | /organizations/:id/memberships/:mid | TENANT_REQUIRED | membership.remove | TENANT_REQUIRED | VALIDATION_ERROR, FORBIDDEN, RESOURCE_NOT_FOUND, CONFLICT, CONCURRENT_UPDATE, LAST_OWNER_PROTECTED | MembershipRevocationRequest (`expectedUpdatedAt` required) / Response | Membership |
+| POST | /organizations/:id/memberships/leave | TENANT_REQUIRED | membership.leave | TENANT_REQUIRED | VALIDATION_ERROR, FORBIDDEN, CONFLICT, CONCURRENT_UPDATE, LAST_OWNER_PROTECTED | MembershipLeaveRequest (`expectedUpdatedAt` required) / Response | Membership |
 | GET | /organizations/:id/invitations | TENANT_REQUIRED | invitation.read | TENANT_REQUIRED | FORBIDDEN, RESOURCE_NOT_FOUND | InvitationListResponse | Invitations |
 | POST | /organizations/:id/invitations | TENANT_REQUIRED | invitation.create | TENANT_REQUIRED | VALIDATION_ERROR, FORBIDDEN, CONFLICT | InvitationCreateRequest/Response | Invitations |
 | POST | /organizations/:id/invitations/:iid/revoke | TENANT_REQUIRED | invitation.revoke | TENANT_REQUIRED | FORBIDDEN, RESOURCE_NOT_FOUND, INVITATION_TERMINAL | InvitationTerminalResponse | Invitations |
