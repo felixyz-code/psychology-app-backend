@@ -15,6 +15,12 @@ export class MembershipListItemDto {
   @ApiProperty({ format: 'uuid' })
   userId: string;
 
+  @ApiProperty()
+  displayName: string;
+
+  @ApiProperty({ format: 'email' })
+  email: string;
+
   @ApiProperty({ enum: MembershipRole })
   role: MembershipRole;
 

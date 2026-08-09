@@ -222,6 +222,8 @@ describe('OpenAPI document', () => {
     });
     expect(document.components?.schemas?.MembershipListItemDto).toMatchObject({
       properties: {
+        displayName: { type: 'string' },
+        email: { type: 'string', format: 'email' },
         updatedAt: { type: 'string', format: 'date-time' },
         allowedActions: {
           type: 'array',
@@ -238,7 +240,14 @@ describe('OpenAPI document', () => {
           required?: string[];
         }
       ).required,
-    ).toEqual(expect.arrayContaining(['updatedAt', 'allowedActions']));
+    ).toEqual(
+      expect.arrayContaining([
+        'displayName',
+        'email',
+        'updatedAt',
+        'allowedActions',
+      ]),
+    );
     expect(document.components?.schemas?.ChangeMembershipRoleDto).toMatchObject(
       {
         properties: {

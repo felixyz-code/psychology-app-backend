@@ -29,6 +29,72 @@ describe('MembershipsService policy boundary', () => {
     resolutionMode: TenantResolutionMode.EXPLICIT,
   };
 
+  it('projects safe user identity fields without returning the nested user relation', async () => {
+    const target = targetMembership(
+      '00000000-0000-4000-8000-000000000004',
+      '00000000-0000-4000-8000-000000000005',
+      MembershipRole.PSYCHOLOGIST,
+      MembershipStatus.ACTIVE,
+    );
+    const findMany = jest.fn().mockResolvedValue([target]);
+    const tx = {
+      organizationMembership: {
+        findMany,
+        count: jest.fn().mockResolvedValue(1),
+      },
+    };
+    const prisma = {
+      $transaction: jest.fn((work: (client: typeof tx) => unknown) => work(tx)),
+    };
+    const service = new MembershipsService(
+      prisma as never,
+      {
+        decisionFor: jest.fn().mockReturnValue(CapabilityDecision.DENY),
+      } as never,
+      { organizationDomainEvent: jest.fn() } as never,
+    );
+
+    const result = await service.findAll(tenant.organizationId, tenant);
+
+    expect(findMany).toHaveBeenCalledWith({
+      where: {
+        organizationId: tenant.organizationId,
+        status: {
+          in: [
+            MembershipStatus.INVITED,
+            MembershipStatus.ACTIVE,
+            MembershipStatus.SUSPENDED,
+          ],
+        },
+      },
+      select: {
+        id: true,
+        userId: true,
+        role: true,
+        status: true,
+        joinedAt: true,
+        suspendedAt: true,
+        revokedAt: true,
+        createdAt: true,
+        updatedAt: true,
+        user: {
+          select: {
+            name: true,
+            email: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+    expect(result).toEqual([
+      expect.objectContaining({
+        displayName: target.user.name,
+        email: target.user.email,
+      }),
+    ]);
+    expect(result[0]).not.toHaveProperty('user');
+  });
+
   it('projects owner actions from the same target policy and protects the last owner', async () => {
     const targets = [
       targetMembership(
@@ -572,6 +638,10 @@ function targetMembership(
   return {
     id,
     userId,
+    user: {
+      name: 'Test Member',
+      email: 'test.member@example.com',
+    },
     role,
     status,
     joinedAt: status === MembershipStatus.INVITED ? null : timestamp,
