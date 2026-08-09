@@ -64,6 +64,12 @@ export class MembershipsService {
             revokedAt: true,
             createdAt: true,
             updatedAt: true,
+            user: {
+              select: {
+                name: true,
+                email: true,
+              },
+            },
           },
           orderBy: { createdAt: 'asc' },
         }),
@@ -76,8 +82,10 @@ export class MembershipsService {
         }),
       ]);
 
-      return memberships.map((membership) => ({
+      return memberships.map(({ user, ...membership }) => ({
         ...membership,
+        displayName: user.name,
+        email: user.email,
         allowedActions: this.allowedActionsFor(
           tenant,
           membership,
