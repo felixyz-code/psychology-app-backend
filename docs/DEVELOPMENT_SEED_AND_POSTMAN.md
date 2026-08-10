@@ -11,9 +11,9 @@ crean APIs administrativas nuevas y no deben usarse contra produccion.
 
 POST-GO-LIVE.2.2 queda dividido documentalmente:
 
-| Subetapa | Alcance | Estado |
-| -------- | ------- | ------ |
-| POST-GO-LIVE.2.2A | Tenant Development Seed | CERTIFICADO |
+| Subetapa          | Alcance                    | Estado                                |
+| ----------------- | -------------------------- | ------------------------------------- |
+| POST-GO-LIVE.2.2A | Tenant Development Seed    | CERTIFICADO                           |
 | POST-GO-LIVE.2.2B | Postman Collection Refresh | IMPLEMENTADO Y VALIDADO ESTATICAMENTE |
 
 La ejecucion funcional integral de la coleccion mediante runner Postman queda
@@ -103,6 +103,8 @@ El seed:
 - crea usuarios y memberships por rol;
 - crea assignments clinicos activos donde aplica;
 - crea Patients, Case Files, Session Notes, Documents, Appointments y Finance;
+- mantiene los Documents deliberadamente escasos mientras puebla las vistas de
+  agenda, clinica y reportes con datos sinteticos variados;
 - no crea filas con `organizationId = NULL`;
 - limpia y recrea sus propios fixtures para ser repetible.
 
@@ -180,12 +182,24 @@ El seed representa `OWNER`, `ADMIN`, `PSYCHOLOGIST`, `RECEPTIONIST`,
 | Organizations          |      3 |
 | Users                  |     14 |
 | Memberships            |     14 |
-| Patients               |      6 |
-| Case Files             |      6 |
-| Session Notes          |      3 |
+| Patients               |     21 |
+| Case Files             |     16 |
+| Session Notes          |     20 |
 | Documents              |      3 |
-| Appointments           |      4 |
-| Financial Transactions |      7 |
+| Appointments           |     26 |
+| Financial Transactions |     26 |
+
+Inventario clinico-operativo por tenant activo:
+
+| Area                   | Tenant A | Tenant B |
+| ---------------------- | -------: | -------: |
+| Patients               |       15 |        6 |
+| Case Files             |       12 |        4 |
+| Session Notes          |       15 |        5 |
+| Documents              |        2 |        1 |
+| Appointments           |       20 |        6 |
+| Financial Transactions |       20 |        6 |
+| Active Assignments     |       14 |        6 |
 
 ## Certificacion Del Seed
 
@@ -208,12 +222,25 @@ Tenant A sin filtros:
 
 ```json
 {
-  "incomeTotal": 2000,
-  "expenseTotal": 300,
-  "adjustmentTotal": 50,
-  "refundTotal": 100,
-  "netTotal": 1650,
-  "transactionCount": 5
+  "incomeTotal": 7800,
+  "expenseTotal": 2370,
+  "adjustmentTotal": 250,
+  "refundTotal": 450,
+  "netTotal": 5230,
+  "transactionCount": 20
+}
+```
+
+Tenant B sin filtros:
+
+```json
+{
+  "incomeTotal": 2549,
+  "expenseTotal": 271,
+  "adjustmentTotal": 0,
+  "refundTotal": 90,
+  "netTotal": 2188,
+  "transactionCount": 6
 }
 ```
 
@@ -325,18 +352,18 @@ La coleccion se concentra en los endpoints tenant-aware certificados para
 Auth, Tenant Context, Patients, Case Files, Workspace, Session Notes,
 Documents, Appointments, Financial Transactions y Financial Summary.
 
-| Modulo | Cobertura estatica |
-| ------ | ------------------ |
-| Auth | Login por rol, password invalido y reutilizacion de JWT dinamico |
-| Tenant Context | Contexto valido, token ausente/invalido, tenant malformed, membership y organization suspendidas |
-| Patients | Create, list, detail, update, cross-tenant y cleanup |
-| Case Files | Create, list, by patient, detail, workspace y update |
-| Workspace | Workspace tenant-scoped incluido en Case Files |
-| Session Notes | Create, list, by case file, detail, update y cleanup |
-| Documents | Metadata create/list/detail/update, by case file, blob cross-tenant y cleanup |
-| Appointments | Create, list, by patient, detail, update, roles y cleanup |
-| Financial Transactions | Create, list, filters, detail, update, roles, cross-tenant y cleanup |
-| Financial Summary | Summary tenant-scoped y filtro con Patient B excluido |
+| Modulo                 | Cobertura estatica                                                                               |
+| ---------------------- | ------------------------------------------------------------------------------------------------ |
+| Auth                   | Login por rol, password invalido y reutilizacion de JWT dinamico                                 |
+| Tenant Context         | Contexto valido, token ausente/invalido, tenant malformed, membership y organization suspendidas |
+| Patients               | Create, list, detail, update, cross-tenant y cleanup                                             |
+| Case Files             | Create, list, by patient, detail, workspace y update                                             |
+| Workspace              | Workspace tenant-scoped incluido en Case Files                                                   |
+| Session Notes          | Create, list, by case file, detail, update y cleanup                                             |
+| Documents              | Metadata create/list/detail/update, by case file, blob cross-tenant y cleanup                    |
+| Appointments           | Create, list, by patient, detail, update, roles y cleanup                                        |
+| Financial Transactions | Create, list, filters, detail, update, roles, cross-tenant y cleanup                             |
+| Financial Summary      | Summary tenant-scoped y filtro con Patient B excluido                                            |
 
 Los endpoints administrativos de Organizations, Memberships e Invitations no
 forman parte de esta coleccion porque POST-GO-LIVE.2.2 es tooling auxiliar para

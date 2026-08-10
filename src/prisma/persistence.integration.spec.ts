@@ -19,23 +19,22 @@ const seededOrganizationIds = [
   seedUuid(22000000, 3),
 ];
 
-const seededPatientEmails = [
-  'patient.owner.a@example.test',
-  'patient.assigned.a@example.test',
-  'patient.unassigned.a@example.test',
-  'patient.b@example.test',
-  'patient.multi.a@example.test',
-  'patient.multi.b@example.test',
-];
-
 const seededUpdateIds = {
-  patients: [1, 2, 3, 4, 5, 6].map((value) => seedUuid(25000000, value)),
-  caseFiles: [1, 2, 3, 4, 5, 6].map((value) => seedUuid(26000000, value)),
-  sessionNotes: [1, 2, 3].map((value) => seedUuid(27000000, value)),
+  patients: Array.from({ length: 21 }, (_, index) =>
+    seedUuid(25000000, index + 1),
+  ),
+  caseFiles: Array.from({ length: 16 }, (_, index) =>
+    seedUuid(26000000, index + 1),
+  ),
+  sessionNotes: Array.from({ length: 20 }, (_, index) =>
+    seedUuid(27000000, index + 1),
+  ),
   documents: [1, 2, 3].map((value) => seedUuid(28000000, value)),
-  appointments: [1, 2, 3, 4].map((value) => seedUuid(29000000, value)),
-  financialTransactions: [1, 2, 3, 4, 5, 6, 7].map((value) =>
-    seedUuid(30000000, value),
+  appointments: Array.from({ length: 26 }, (_, index) =>
+    seedUuid(29000000, index + 1),
+  ),
+  financialTransactions: Array.from({ length: 26 }, (_, index) =>
+    seedUuid(30000000, index + 1),
   ),
 };
 
@@ -100,12 +99,12 @@ runPersistenceTests('PostgreSQL persistence integration', () => {
       appointments,
       transactions,
     }).toEqual({
-      patients: 6,
-      caseFiles: 6,
-      sessionNotes: 3,
+      patients: 21,
+      caseFiles: 16,
+      sessionNotes: 20,
       documents: 3,
-      appointments: 4,
-      transactions: 7,
+      appointments: 26,
+      transactions: 26,
     });
   });
 
@@ -368,7 +367,7 @@ runPersistenceTests('PostgreSQL persistence integration', () => {
 
     expect(groups).toHaveLength(4);
     expect(groups.reduce((total, group) => total + group._count._all, 0)).toBe(
-      7,
+      26,
     );
     expect(groups.every((group) => group._sum.amount !== null)).toBe(true);
   });
@@ -812,7 +811,7 @@ async function countSeedLegacyNullRows(prisma: PrismaClient) {
   ] = await Promise.all([
     prisma.patient.count({
       where: {
-        email: { in: seededPatientEmails },
+        id: { in: seededUpdateIds.patients },
         organizationId: null,
       },
     }),
