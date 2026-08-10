@@ -17,6 +17,7 @@ import { InvitationsService } from './invitations.service';
 import { InvitationLogicalStatus } from './invitation-runtime';
 
 describe('InvitationsService', () => {
+  const testNow = new Date('2026-08-04T00:00:00.000Z');
   const tenant: TenantContext = {
     userId: '00000000-0000-4000-8000-000000000001',
     membershipId: '00000000-0000-4000-8000-000000000002',
@@ -28,7 +29,12 @@ describe('InvitationsService', () => {
   const observability = { organizationDomainEvent: jest.fn() };
 
   beforeEach(() => {
+    jest.useFakeTimers().setSystemTime(testNow);
     observability.organizationDomainEvent.mockReset();
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
   });
 
   it('rejects malformed tokens before querying persistence', async () => {
@@ -365,8 +371,6 @@ describe('InvitationsService', () => {
       status: 'ACTIVE',
       joinedAt: acceptedAt,
     });
-
-    jest.useRealTimers();
   });
 
   it.each(['INVITED', 'ACTIVE', 'SUSPENDED'])(
