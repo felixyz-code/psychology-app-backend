@@ -1,4 +1,10 @@
 import 'dotenv/config';
+import {
+  BadRequestException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
+import { NestFactory } from '@nestjs/core';
 import { PrismaPg } from '@prisma/adapter-pg';
 import {
   FinancialTransactionType,
@@ -8,6 +14,17 @@ import {
   PatientAssignmentStatus,
   PrismaClient,
 } from '@prisma/client';
+import { AppModule } from '../src/app.module';
+import { AppointmentsService } from '../src/appointments/appointments.service';
+import { CaseFilesService } from '../src/case-files/case-files.service';
+import { DocumentsService } from '../src/documents/documents.service';
+import { FinancialTransactionsService } from '../src/financial-transactions/financial-transactions.service';
+import { PatientsService } from '../src/patients/patients.service';
+import { SessionNotesService } from '../src/session-notes/session-notes.service';
+import {
+  TenantResolutionMode,
+  type TenantContext,
+} from '../src/common/request-context/request-context.service';
 
 const connectionString = process.env.DATABASE_URL;
 
@@ -38,8 +55,11 @@ const ids = {
   ownerMembershipA: seedUuid(24000000, 1),
   multiMembershipA: seedUuid(24000000, 11),
   multiMembershipB: seedUuid(24000000, 12),
+  ownerPatientA: seedUuid(25000000, 1),
   multiPatientA: seedUuid(25000000, 5),
   multiPatientB: seedUuid(25000000, 6),
+  assignedAppointmentA: seedUuid(29000000, 2),
+  appointmentB: seedUuid(29000000, 4),
 };
 
 const expected = {
@@ -121,206 +141,243 @@ const preferenceFixtureEmails = {
 
 const organizationIds = [ids.orgA, ids.orgB, ids.orgSuspended];
 
+type ProductionServices = {
+  appointments: AppointmentsService;
+  caseFiles: CaseFilesService;
+  documents: DocumentsService;
+  financialTransactions: FinancialTransactionsService;
+  patients: PatientsService;
+  sessionNotes: SessionNotesService;
+};
+
 async function main() {
-  const [
-    organizations,
-    users,
-    memberships,
-    patients,
-    caseFiles,
-    sessionNotes,
-    documents,
-    appointments,
-    financialTransactions,
-    roleCounts,
-    suspendedMemberships,
-    suspendedOrganizations,
-    activeAssignments,
-    legacyNullRows,
-    tenantASummary,
-    tenantBSummary,
-    preferenceFixtures,
-    tenantAInventory,
-    tenantBInventory,
-    ownerAVisibility,
-    multiMemberFixtures,
-  ] = await Promise.all([
-    prisma.organization.count({ where: { id: { in: organizationIds } } }),
-    prisma.user.count({ where: { email: { in: seedEmails } } }),
-    prisma.organizationMembership.count({
-      where: { organizationId: { in: organizationIds } },
-    }),
-    prisma.patient.count({
-      where: { organizationId: { in: organizationIds } },
-    }),
-    prisma.caseFile.count({
-      where: { organizationId: { in: organizationIds } },
-    }),
-    prisma.sessionNote.count({
-      where: { organizationId: { in: organizationIds } },
-    }),
-    prisma.document.count({
-      where: { organizationId: { in: organizationIds } },
-    }),
-    prisma.appointment.count({
-      where: { organizationId: { in: organizationIds } },
-    }),
-    prisma.financialTransaction.count({
-      where: { organizationId: { in: organizationIds } },
-    }),
-    prisma.organizationMembership.groupBy({
-      by: ['role'],
-      where: { organizationId: { in: organizationIds } },
-      _count: { _all: true },
-    }),
-    prisma.organizationMembership.count({
-      where: {
-        organizationId: ids.orgA,
-        status: MembershipStatus.SUSPENDED,
-      },
-    }),
-    prisma.organization.count({
-      where: {
-        id: ids.orgSuspended,
-        status: OrganizationStatus.SUSPENDED,
-      },
-    }),
-    prisma.patientAssignment.count({
-      where: {
-        organizationId: { in: [ids.orgA, ids.orgB] },
-        status: PatientAssignmentStatus.ACTIVE,
-      },
-    }),
-    countLegacyNullRows(),
-    summarize(ids.orgA),
-    summarize(ids.orgB),
-    prisma.user.findMany({
-      where: {
-        email: {
-          in: Object.values(preferenceFixtureEmails),
+  const application = await NestFactory.createApplicationContext(AppModule, {
+    logger: false,
+  });
+  const productionServices: ProductionServices = {
+    appointments: application.get(AppointmentsService),
+    caseFiles: application.get(CaseFilesService),
+    documents: application.get(DocumentsService),
+    financialTransactions: application.get(FinancialTransactionsService),
+    patients: application.get(PatientsService),
+    sessionNotes: application.get(SessionNotesService),
+  };
+
+  try {
+    const [
+      organizations,
+      users,
+      memberships,
+      patients,
+      caseFiles,
+      sessionNotes,
+      documents,
+      appointments,
+      financialTransactions,
+      roleCounts,
+      suspendedMemberships,
+      suspendedOrganizations,
+      activeAssignments,
+      legacyNullRows,
+      tenantASummary,
+      tenantBSummary,
+      preferenceFixtures,
+      tenantAInventory,
+      tenantBInventory,
+      ownerAVisibility,
+      multiMemberFixtures,
+    ] = await Promise.all([
+      prisma.organization.count({ where: { id: { in: organizationIds } } }),
+      prisma.user.count({ where: { email: { in: seedEmails } } }),
+      prisma.organizationMembership.count({
+        where: { organizationId: { in: organizationIds } },
+      }),
+      prisma.patient.count({
+        where: { organizationId: { in: organizationIds } },
+      }),
+      prisma.caseFile.count({
+        where: { organizationId: { in: organizationIds } },
+      }),
+      prisma.sessionNote.count({
+        where: { organizationId: { in: organizationIds } },
+      }),
+      prisma.document.count({
+        where: { organizationId: { in: organizationIds } },
+      }),
+      prisma.appointment.count({
+        where: { organizationId: { in: organizationIds } },
+      }),
+      prisma.financialTransaction.count({
+        where: { organizationId: { in: organizationIds } },
+      }),
+      prisma.organizationMembership.groupBy({
+        by: ['role'],
+        where: { organizationId: { in: organizationIds } },
+        _count: { _all: true },
+      }),
+      prisma.organizationMembership.count({
+        where: {
+          organizationId: ids.orgA,
+          status: MembershipStatus.SUSPENDED,
         },
-      },
-      select: {
-        email: true,
-        preferredOrganizationId: true,
-        memberships: {
-          select: {
-            organizationId: true,
-            status: true,
-            organization: {
-              select: {
-                status: true,
+      }),
+      prisma.organization.count({
+        where: {
+          id: ids.orgSuspended,
+          status: OrganizationStatus.SUSPENDED,
+        },
+      }),
+      prisma.patientAssignment.count({
+        where: {
+          organizationId: { in: [ids.orgA, ids.orgB] },
+          status: PatientAssignmentStatus.ACTIVE,
+        },
+      }),
+      countLegacyNullRows(),
+      summarize(ids.orgA),
+      summarize(ids.orgB),
+      prisma.user.findMany({
+        where: {
+          email: {
+            in: Object.values(preferenceFixtureEmails),
+          },
+        },
+        select: {
+          email: true,
+          preferredOrganizationId: true,
+          memberships: {
+            select: {
+              organizationId: true,
+              status: true,
+              organization: {
+                select: {
+                  status: true,
+                },
               },
             },
           },
         },
-      },
-      orderBy: { email: 'asc' },
-    }),
-    inventory(ids.orgA),
-    inventory(ids.orgB),
-    getOwnerAVisibility(),
-    getMultiMemberFixtures(),
-  ]);
+        orderBy: { email: 'asc' },
+      }),
+      inventory(ids.orgA),
+      inventory(ids.orgB),
+      getOwnerAVisibility(productionServices),
+      getMultiMemberFixtures(productionServices),
+    ]);
 
-  assertEqual('Organizations', organizations, expected.organizations);
-  assertEqual('Users', users, expected.users);
-  assertEqual('Memberships', memberships, expected.memberships);
-  assertEqual('Patients', patients, expected.patients);
-  assertEqual('Case Files', caseFiles, expected.caseFiles);
-  assertEqual('Session Notes', sessionNotes, expected.sessionNotes);
-  assertEqual('Documents', documents, expected.documents);
-  assertEqual('Appointments', appointments, expected.appointments);
-  assertEqual(
-    'Financial Transactions',
-    financialTransactions,
-    expected.financialTransactions,
-  );
-  assertEqual('Suspended memberships', suspendedMemberships, 1);
-  assertEqual('Suspended organizations', suspendedOrganizations, 1);
-  assertEqual(
-    'Active assignments',
-    activeAssignments,
-    expected.activeAssignments,
-  );
-  assertEqual('Legacy-null rows created by seed', legacyNullRows, 0);
-  assertObject(
-    'Tenant A inventory',
-    tenantAInventory,
-    expected.tenantAInventory,
-  );
-  assertObject(
-    'Tenant B inventory',
-    tenantBInventory,
-    expected.tenantBInventory,
-  );
-  assertObject(
-    'Owner A visible data',
-    ownerAVisibility,
-    expected.ownerAVisibility,
-  );
-  assertObject(
-    'Tenant A expected summary',
-    tenantASummary,
-    expected.tenantASummary,
-  );
-  assertObject(
-    'Tenant B expected summary',
-    tenantBSummary,
-    expected.tenantBSummary,
-  );
-  assertStringArray('Multi-member Tenant A patients', multiMemberFixtures.a, [
-    ids.multiPatientA,
-  ]);
-  assertStringArray('Multi-member Tenant B patients', multiMemberFixtures.b, [
-    ids.multiPatientB,
-  ]);
+    assertEqual('Organizations', organizations, expected.organizations);
+    assertEqual('Users', users, expected.users);
+    assertEqual('Memberships', memberships, expected.memberships);
+    assertEqual('Patients', patients, expected.patients);
+    assertEqual('Case Files', caseFiles, expected.caseFiles);
+    assertEqual('Session Notes', sessionNotes, expected.sessionNotes);
+    assertEqual('Documents', documents, expected.documents);
+    assertEqual('Appointments', appointments, expected.appointments);
+    assertEqual(
+      'Financial Transactions',
+      financialTransactions,
+      expected.financialTransactions,
+    );
+    assertEqual('Suspended memberships', suspendedMemberships, 1);
+    assertEqual('Suspended organizations', suspendedOrganizations, 1);
+    assertEqual(
+      'Active assignments',
+      activeAssignments,
+      expected.activeAssignments,
+    );
+    assertEqual('Legacy-null rows created by seed', legacyNullRows, 0);
+    assertObject(
+      'Tenant A inventory',
+      tenantAInventory,
+      expected.tenantAInventory,
+    );
+    assertObject(
+      'Tenant B inventory',
+      tenantBInventory,
+      expected.tenantBInventory,
+    );
+    assertObject(
+      'Owner A visible data',
+      ownerAVisibility,
+      expected.ownerAVisibility,
+    );
+    assertObject(
+      'Tenant A expected summary',
+      tenantASummary,
+      expected.tenantASummary,
+    );
+    assertObject(
+      'Tenant B expected summary',
+      tenantBSummary,
+      expected.tenantBSummary,
+    );
+    assertStringArray('Multi-member Tenant A patients', multiMemberFixtures.a, [
+      ids.multiPatientA,
+    ]);
+    assertStringArray('Multi-member Tenant B patients', multiMemberFixtures.b, [
+      ids.multiPatientB,
+    ]);
 
-  const roles = Object.fromEntries(
-    roleCounts.map((entry) => [entry.role, entry._count._all]),
-  );
-  assertObject('Membership roles', roles, {
-    [MembershipRole.OWNER]: 2,
-    [MembershipRole.ADMIN]: 1,
-    [MembershipRole.PSYCHOLOGIST]: 7,
-    [MembershipRole.RECEPTIONIST]: 1,
-    [MembershipRole.BILLING]: 1,
-    [MembershipRole.AUDITOR]: 1,
-    [MembershipRole.READ_ONLY]: 1,
-  });
+    const roles = Object.fromEntries(
+      roleCounts.map((entry) => [entry.role, entry._count._all]),
+    );
+    assertObject('Membership roles', roles, {
+      [MembershipRole.OWNER]: 2,
+      [MembershipRole.ADMIN]: 1,
+      [MembershipRole.PSYCHOLOGIST]: 7,
+      [MembershipRole.RECEPTIONIST]: 1,
+      [MembershipRole.BILLING]: 1,
+      [MembershipRole.AUDITOR]: 1,
+      [MembershipRole.READ_ONLY]: 1,
+    });
 
-  assertEqual(
-    'Cross-tenant relation violations',
-    await countCrossTenantRelationViolations(),
-    0,
-  );
-  assertPreferenceFixtures(preferenceFixtures);
+    const relationViolations = await countCrossTenantRelationViolations();
+    assertEqual(
+      'Cross-tenant relation violations',
+      relationViolations.total,
+      0,
+    );
+    assertEqual(
+      'Actor membership relation violations',
+      relationViolations.actorMembership,
+      0,
+    );
+    assertEqual(
+      'Patient/appointment pairing violations',
+      relationViolations.patientAppointmentPairing,
+      0,
+    );
+    assertPreferenceFixtures(preferenceFixtures);
+    await assertAuthorizationFailurePaths(productionServices);
 
-  console.log('Tenant development seed certification passed.');
-  console.log(
-    JSON.stringify(
-      {
-        organizations,
-        users,
-        memberships,
-        patients,
-        caseFiles,
-        sessionNotes,
-        documents,
-        appointments,
-        financialTransactions,
-        activeAssignments,
-        tenantAInventory,
-        tenantBInventory,
-        ownerAVisibility,
-        tenantASummary,
-        tenantBSummary,
-        multiMemberFixtures,
-      },
-      null,
-      2,
-    ),
-  );
+    console.log('Tenant development seed certification passed.');
+    console.log(
+      JSON.stringify(
+        {
+          organizations,
+          users,
+          memberships,
+          patients,
+          caseFiles,
+          sessionNotes,
+          documents,
+          appointments,
+          financialTransactions,
+          activeAssignments,
+          tenantAInventory,
+          tenantBInventory,
+          ownerAVisibility,
+          tenantASummary,
+          tenantBSummary,
+          multiMemberFixtures,
+        },
+        null,
+        2,
+      ),
+    );
+  } finally {
+    await application.close();
+  }
 }
 
 function assertPreferenceFixtures(
@@ -412,25 +469,8 @@ async function inventory(organizationId: string) {
   };
 }
 
-async function getOwnerAVisibility() {
-  const assignedPatientWhere = {
-    organizationId: ids.orgA,
-    psychologistId: ids.ownerA,
-    assignments: {
-      some: {
-        organizationId: ids.orgA,
-        membershipId: ids.ownerMembershipA,
-        status: PatientAssignmentStatus.ACTIVE,
-        membership: {
-          organizationId: ids.orgA,
-          userId: ids.ownerA,
-          status: MembershipStatus.ACTIVE,
-          organization: { status: OrganizationStatus.ACTIVE },
-        },
-      },
-    },
-  };
-
+async function getOwnerAVisibility(services: ProductionServices) {
+  const scope = await loadCanonicalScope(ids.ownerA, ids.ownerMembershipA);
   const [
     patients,
     caseFiles,
@@ -438,69 +478,130 @@ async function getOwnerAVisibility() {
     appointments,
     financialTransactions,
   ] = await Promise.all([
-    prisma.patient.count({ where: assignedPatientWhere }),
-    prisma.caseFile.count({
-      where: {
-        organizationId: ids.orgA,
-        patient: assignedPatientWhere,
-      },
-    }),
-    prisma.sessionNote.count({
-      where: {
-        organizationId: ids.orgA,
-        caseFile: { patient: assignedPatientWhere },
-      },
-    }),
-    prisma.appointment.count({ where: { organizationId: ids.orgA } }),
-    prisma.financialTransaction.count({
-      where: { organizationId: ids.orgA },
-    }),
+    services.patients.findAll(scope),
+    services.caseFiles.findAll(scope),
+    services.sessionNotes.findAll(scope),
+    services.appointments.findAll(scope),
+    services.financialTransactions.findAll(scope, {}),
   ]);
 
   return {
-    patients,
-    caseFiles,
-    sessionNotes,
-    appointments,
-    financialTransactions,
+    patients: patients.length,
+    caseFiles: caseFiles.length,
+    sessionNotes: sessionNotes.length,
+    appointments: appointments.length,
+    financialTransactions: financialTransactions.length,
   };
 }
 
-async function getMultiMemberFixtures() {
-  const assignedPatientIds = async (
-    organizationId: string,
-    membershipId: string,
-  ) =>
-    prisma.patient
-      .findMany({
-        where: {
-          organizationId,
-          psychologistId: ids.multiMember,
-          assignments: {
-            some: {
-              organizationId,
-              membershipId,
-              status: PatientAssignmentStatus.ACTIVE,
-              membership: {
-                organizationId,
-                userId: ids.multiMember,
-                status: MembershipStatus.ACTIVE,
-                organization: { status: OrganizationStatus.ACTIVE },
-              },
-            },
-          },
-        },
-        select: { id: true },
-        orderBy: { id: 'asc' },
-      })
-      .then((patients) => patients.map((patient) => patient.id));
-
+async function getMultiMemberFixtures(services: ProductionServices) {
+  const [scopeA, scopeB] = await Promise.all([
+    loadCanonicalScope(ids.multiMember, ids.multiMembershipA),
+    loadCanonicalScope(ids.multiMember, ids.multiMembershipB),
+  ]);
   const [a, b] = await Promise.all([
-    assignedPatientIds(ids.orgA, ids.multiMembershipA),
-    assignedPatientIds(ids.orgB, ids.multiMembershipB),
+    services.patients.findAll(scopeA),
+    services.patients.findAll(scopeB),
   ]);
 
-  return { a, b };
+  return {
+    a: a.map((patient) => patient.id).sort(),
+    b: b.map((patient) => patient.id).sort(),
+  };
+}
+
+async function loadCanonicalScope(
+  userId: string,
+  membershipId: string,
+): Promise<TenantContext> {
+  const membership = await prisma.organizationMembership.findUnique({
+    where: { id: membershipId },
+    select: {
+      id: true,
+      userId: true,
+      organizationId: true,
+      role: true,
+      status: true,
+      user: { select: { id: true, role: true } },
+      organization: { select: { id: true, status: true } },
+    },
+  });
+
+  if (
+    !membership ||
+    membership.userId !== userId ||
+    membership.user.id !== userId ||
+    membership.organization.id !== membership.organizationId ||
+    membership.status !== MembershipStatus.ACTIVE ||
+    membership.organization.status !== OrganizationStatus.ACTIVE
+  ) {
+    throw new Error(
+      `Seed certification requires an active membership for ${userId} in ${membershipId}`,
+    );
+  }
+
+  return Object.freeze({
+    userId,
+    organizationId: membership.organizationId,
+    membershipId: membership.id,
+    organizationRole: membership.role,
+    legacyUserRole: membership.user.role,
+    resolutionMode: TenantResolutionMode.EXPLICIT,
+  });
+}
+
+async function assertAuthorizationFailurePaths(services: ProductionServices) {
+  const ownerScope = await loadCanonicalScope(ids.ownerA, ids.ownerMembershipA);
+
+  await assertRejected(
+    'Owner A without an effective clinical role',
+    () =>
+      services.patients.findAll({
+        ...ownerScope,
+        organizationRole: MembershipRole.READ_ONLY,
+      }),
+    ForbiddenException,
+  );
+
+  await assertRejected(
+    'Owner A cross-tenant appointment access',
+    () => services.appointments.findOne(ids.appointmentB, ownerScope),
+    NotFoundException,
+  );
+
+  await assertRejected(
+    'Mismatched financial patient and appointment',
+    () =>
+      services.financialTransactions.create(ownerScope, {
+        type: FinancialTransactionType.INCOME,
+        amount: 1,
+        concept: 'Seed certification negative case',
+        occurredAt: new Date('2026-01-01T00:00:00.000Z'),
+        patientId: ids.ownerPatientA,
+        appointmentId: ids.assignedAppointmentA,
+      }),
+    BadRequestException,
+  );
+}
+
+async function assertRejected<T extends Error>(
+  label: string,
+  operation: () => Promise<unknown>,
+  errorType: new (...args: never[]) => T,
+) {
+  try {
+    await operation();
+  } catch (error) {
+    if (error instanceof errorType) {
+      return;
+    }
+
+    throw new Error(
+      `${label}: expected ${errorType.name}, received ${error instanceof Error ? error.constructor.name : typeof error}`,
+    );
+  }
+
+  throw new Error(`${label}: expected ${errorType.name}`);
 }
 
 async function countLegacyNullRows() {
@@ -626,8 +727,17 @@ async function summarize(organizationId: string) {
   return summary;
 }
 
+type SeedMembershipRecord = {
+  id: string;
+  userId: string;
+  organizationId: string;
+  status: MembershipStatus;
+  organization: { status: OrganizationStatus };
+};
+
 async function countCrossTenantRelationViolations() {
   const [
+    patients,
     assignments,
     caseFiles,
     sessionNotes,
@@ -635,15 +745,41 @@ async function countCrossTenantRelationViolations() {
     appointments,
     transactions,
   ] = await Promise.all([
+    prisma.patient.findMany({
+      where: {
+        organizationId: { in: organizationIds },
+      },
+      select: {
+        organizationId: true,
+        psychologistId: true,
+      },
+    }),
     prisma.patientAssignment.findMany({
       where: {
         organizationId: { in: organizationIds },
       },
       select: {
         organizationId: true,
-        patient: { select: { organizationId: true } },
-        membership: { select: { organizationId: true } },
-        createdByMembership: { select: { organizationId: true } },
+        status: true,
+        patient: { select: { organizationId: true, psychologistId: true } },
+        membership: {
+          select: {
+            id: true,
+            userId: true,
+            organizationId: true,
+            status: true,
+            organization: { select: { status: true } },
+          },
+        },
+        createdByMembership: {
+          select: {
+            id: true,
+            userId: true,
+            organizationId: true,
+            status: true,
+            organization: { select: { status: true } },
+          },
+        },
       },
     }),
     prisma.caseFile.findMany({
@@ -662,6 +798,7 @@ async function countCrossTenantRelationViolations() {
       },
       select: {
         organizationId: true,
+        authorId: true,
         caseFile: { select: { organizationId: true } },
       },
     }),
@@ -671,7 +808,13 @@ async function countCrossTenantRelationViolations() {
       },
       select: {
         organizationId: true,
-        caseFile: { select: { organizationId: true } },
+        uploadedById: true,
+        caseFile: {
+          select: {
+            organizationId: true,
+            patient: { select: { organizationId: true } },
+          },
+        },
       },
     }),
     prisma.appointment.findMany({
@@ -681,7 +824,10 @@ async function countCrossTenantRelationViolations() {
       select: {
         organizationId: true,
         patientId: true,
-        patient: { select: { organizationId: true } },
+        psychologistId: true,
+        patient: {
+          select: { organizationId: true, psychologistId: true },
+        },
       },
     }),
     prisma.financialTransaction.findMany({
@@ -691,6 +837,7 @@ async function countCrossTenantRelationViolations() {
       select: {
         organizationId: true,
         patientId: true,
+        createdById: true,
         patient: { select: { organizationId: true } },
         appointment: {
           select: { organizationId: true, patientId: true },
@@ -699,41 +846,140 @@ async function countCrossTenantRelationViolations() {
     }),
   ]);
 
-  return (
-    assignments.filter(
-      (assignment) =>
-        assignment.organizationId !== assignment.patient.organizationId ||
-        assignment.organizationId !== assignment.membership.organizationId ||
-        (assignment.createdByMembership &&
-          assignment.organizationId !==
-            assignment.createdByMembership.organizationId),
-    ).length +
-    caseFiles.filter(
-      (caseFile) => caseFile.organizationId !== caseFile.patient.organizationId,
-    ).length +
-    sessionNotes.filter(
-      (note) => note.organizationId !== note.caseFile.organizationId,
-    ).length +
-    documents.filter(
-      (document) =>
-        document.organizationId !== document.caseFile.organizationId,
-    ).length +
-    appointments.filter(
-      (appointment) =>
-        appointment.organizationId !== appointment.patient.organizationId,
-    ).length +
-    transactions.filter(
-      (transaction) =>
-        (transaction.patient &&
-          transaction.organizationId !== transaction.patient.organizationId) ||
-        (transaction.appointment &&
-          transaction.organizationId !==
-            transaction.appointment.organizationId) ||
-        (transaction.patientId &&
-          transaction.appointment &&
-          transaction.patientId !== transaction.appointment.patientId),
-    ).length
+  const membershipRecords = await prisma.organizationMembership.findMany({
+    where: { organizationId: { in: organizationIds } },
+    select: {
+      id: true,
+      userId: true,
+      organizationId: true,
+      status: true,
+      organization: { select: { status: true } },
+    },
+  });
+  const membershipById = new Map(
+    membershipRecords.map((membership) => [membership.id, membership]),
   );
+  const hasActiveMembership = (userId: string, organizationId: string | null) =>
+    Boolean(
+      organizationId &&
+      membershipRecords.some(
+        (membership) =>
+          membership.userId === userId &&
+          membership.organizationId === organizationId &&
+          membership.status === MembershipStatus.ACTIVE &&
+          membership.organization.status === OrganizationStatus.ACTIVE,
+      ),
+    );
+  const isActiveRelatedMembership = (
+    membership: SeedMembershipRecord | null,
+    organizationId: string,
+  ) =>
+    Boolean(
+      membership &&
+      membership.organizationId === organizationId &&
+      membership.status === MembershipStatus.ACTIVE &&
+      membership.organization.status === OrganizationStatus.ACTIVE &&
+      membershipById.has(membership.id),
+    );
+
+  const patientActorViolations = patients.filter(
+    (patient) =>
+      !hasActiveMembership(patient.psychologistId, patient.organizationId),
+  ).length;
+  const assignmentActorViolations = assignments.filter(
+    (assignment) =>
+      !isActiveRelatedMembership(
+        assignment.membership,
+        assignment.organizationId,
+      ) ||
+      assignment.membership.userId !== assignment.patient.psychologistId ||
+      (assignment.createdByMembership &&
+        !isActiveRelatedMembership(
+          assignment.createdByMembership,
+          assignment.organizationId,
+        )),
+  ).length;
+  const assignmentRelationViolations = assignments.filter(
+    (assignment) =>
+      assignment.organizationId !== assignment.patient.organizationId ||
+      assignment.membership.organizationId !== assignment.organizationId ||
+      (assignment.createdByMembership &&
+        assignment.createdByMembership.organizationId !==
+          assignment.organizationId),
+  ).length;
+  const caseFileRelationViolations = caseFiles.filter(
+    (caseFile) => caseFile.organizationId !== caseFile.patient.organizationId,
+  ).length;
+  const sessionNoteRelationViolations = sessionNotes.filter(
+    (note) => note.organizationId !== note.caseFile.organizationId,
+  ).length;
+  const sessionNoteActorViolations = sessionNotes.filter(
+    (note) => !hasActiveMembership(note.authorId, note.organizationId),
+  ).length;
+  const documentRelationViolations = documents.filter(
+    (document) =>
+      document.organizationId !== document.caseFile.organizationId ||
+      document.organizationId !== document.caseFile.patient.organizationId,
+  ).length;
+  const documentActorViolations = documents.filter(
+    (document) =>
+      !hasActiveMembership(document.uploadedById, document.organizationId),
+  ).length;
+  const appointmentRelationViolations = appointments.filter(
+    (appointment) =>
+      appointment.organizationId !== appointment.patient.organizationId,
+  ).length;
+  const appointmentActorViolations = appointments.filter(
+    (appointment) =>
+      !hasActiveMembership(
+        appointment.psychologistId,
+        appointment.organizationId,
+      ),
+  ).length;
+  const transactionRelationViolations = transactions.filter(
+    (transaction) =>
+      (transaction.patient &&
+        transaction.organizationId !== transaction.patient.organizationId) ||
+      (transaction.appointment &&
+        transaction.organizationId !== transaction.appointment.organizationId),
+  ).length;
+  const patientAppointmentPairingViolations = transactions.filter(
+    (transaction) =>
+      Boolean(
+        transaction.patientId &&
+        transaction.appointment &&
+        transaction.patientId !== transaction.appointment.patientId,
+      ),
+  ).length;
+  const transactionActorViolations = transactions.filter(
+    (transaction) =>
+      !hasActiveMembership(transaction.createdById, transaction.organizationId),
+  ).length;
+
+  return {
+    total:
+      patientActorViolations +
+      assignmentActorViolations +
+      assignmentRelationViolations +
+      caseFileRelationViolations +
+      sessionNoteRelationViolations +
+      sessionNoteActorViolations +
+      documentRelationViolations +
+      documentActorViolations +
+      appointmentRelationViolations +
+      appointmentActorViolations +
+      transactionRelationViolations +
+      patientAppointmentPairingViolations +
+      transactionActorViolations,
+    actorMembership:
+      patientActorViolations +
+      assignmentActorViolations +
+      sessionNoteActorViolations +
+      documentActorViolations +
+      appointmentActorViolations +
+      transactionActorViolations,
+    patientAppointmentPairing: patientAppointmentPairingViolations,
+  };
 }
 
 function assertEqual(label: string, actual: number, expectedValue: number) {
