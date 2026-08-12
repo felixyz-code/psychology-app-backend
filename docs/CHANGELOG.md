@@ -2,14 +2,29 @@
 
 ---
 
+# POST-GO-LIVE.4 Final Closure Sync
+
+## Status
+
+* The frontend functional sequence is complete through 4.9 at
+  `092eca3a1f9ed236586d9c0bb1b5f1c59f1e2a7c`; the supporting backend baseline
+  remains `ef4c1f7cefa9d5ab5bfc3b27e59ed51c8ea72fee` with Backend CI #127.
+* No backend runtime change was introduced by 4.9-R1B/R1B2. Backend
+  authorization remained authoritative throughout Phase 4.
+* This sync is documentation-only and does not include runtime, dependency,
+  schema/migration, deployment, or production action.
+* `PHASE 4 FUNCTIONAL COMPLETE / FORMAL CLOSEOUT REVIEW PENDING`.
+
+---
+
 # POST-GO-LIVE.4 Roadmap Continuation
 
 ## Status
 
 * `POST-GO-LIVE.4.1`, `.4.2`, and `.4.3` are certified and complete; `.4.3`
   is frontend-only and does not change the backend baseline.
-* `POST-GO-LIVE.4.4 Organization Administration UX` is authorized and not
-  started. Authorization is roadmap-only and does not start runtime work.
+* Historical checkpoint: this entry recorded the pre-implementation roadmap
+  state; the frontend sequence is now functionally complete through 4.9.
 
 ## Scope
 
