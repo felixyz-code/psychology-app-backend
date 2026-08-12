@@ -56,16 +56,14 @@ PHASE 3 CLOSEOUT REVIEW PENDING
 
 POST-GO-LIVE.4 Documentation status:
 
-STATUS: ROADMAP CONTINUATION AUTHORIZED
-CONTRACT VERSION: 1
-DATE: 2026-08-02
-DOCUMENTATION BRANCH: codex/post-go-live-4-0-frontend-integration-contract
-CONTRACT COMMIT: 48b48ef56615d382ade0f0616dcb67358faf3dfe
-RELATED PR: #44
-POST-GO-LIVE.4.1 Tenant Context Foundation - CERTIFIED / COMPLETE
-POST-GO-LIVE.4.2 Organization Selection & Preferred Organization - CERTIFIED / COMPLETE
-POST-GO-LIVE.4.3 Cross-Tenant State Invalidation - CERTIFIED / COMPLETE (frontend-only)
-NEXT PHASE: POST-GO-LIVE.4.4 Organization Administration UX - AUTHORIZED / NOT STARTED
+POST-GO-LIVE.4 frontend functional sequence: COMPLETE THROUGH 4.9
+Frontend final integrated baseline: 092eca3a1f9ed236586d9c0bb1b5f1c59f1e2a7c
+Backend supporting baseline: ef4c1f7cefa9d5ab5bfc3b27e59ed51c8ea72fee
+Backend CI #127 is the certified backend CI.
+No backend runtime change was introduced by 4.9-R1B/R1B2.
+Backend authorization remained authoritative throughout Phase 4.
+FORMAL CLOSEOUT REVIEW PENDING DOCUMENTATION PR MERGE
+NEXT PHASE REQUIRES ROADMAP DECISION
 
 Documentation-only rollback:
 
@@ -73,10 +71,10 @@ Document-only rollback -> git revert <documentation-commit> -> restore previous 
 No code rollback is included in this phase.
 ```
 
-## POST-GO-LIVE.4.4 - Organization Administration UX
+## POST-GO-LIVE.4.4 - Organization Administration UX (Historical capability record)
 
-**Status:** `AUTHORIZED / NOT STARTED`. This is a roadmap authorization only;
-no implementation starts from this entry.
+**Status:** `COMPLETE / INTEGRATED`. This historical capability record is
+superseded by the completed frontend sequence through 4.9.
 
 **Goal:** consume the certified organization administration API as the first
 organization-domain frontend experience for a confirmed tenant.
@@ -136,11 +134,11 @@ POST-GO-LIVE.3
  |- 3.5 Public Freelancer Bootstrap Runtime CLOSED / INTEGRATED
  `- 3.6 Preferred Organization UX Runtime CLOSED / INTEGRATED
 POST-GO-LIVE.3-CLOSEOUT                  REVIEW PENDING
-POST-GO-LIVE.4                           ROADMAP CONTINUATION AUTHORIZED
+POST-GO-LIVE.4                           FUNCTIONAL COMPLETE / CLOSEOUT REVIEW PENDING
  |- 4.1 Tenant Context Foundation          CERTIFIED / COMPLETE
  |- 4.2 Organization Selection & Preferred Organization CERTIFIED / COMPLETE
  |- 4.3 Cross-Tenant State Invalidation    CERTIFIED / COMPLETE (frontend-only)
- `- 4.4 Organization Administration UX     AUTHORIZED / NOT STARTED
+ `- 4.4 through 4.9 Frontend Integration   FUNCTIONAL COMPLETE / CLOSEOUT REVIEW PENDING
 POST-GO-LIVE.5                           PENDING
 POST-GO-LIVE.6                           PENDING
 POST-GO-LIVE.7                           PENDING
