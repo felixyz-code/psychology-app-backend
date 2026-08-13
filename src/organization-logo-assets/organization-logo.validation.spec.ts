@@ -23,6 +23,15 @@ describe('validateOrganizationLogo', () => {
     ).toMatchObject({ mimeType: 'image/jpeg', width: 64, height: 64 });
   });
 
+  it('accepts the inclusive 2048 pixel dimension boundary', () => {
+    expect(validateOrganizationLogo(file(createPng(2048, 2048)))).toMatchObject(
+      {
+        width: 2048,
+        height: 2048,
+      },
+    );
+  });
+
   it.each([
     ['logo.jpg', 'image/jpeg', createPng(64, 64)],
     ['logo.png', 'image/png', minimalJpeg(64, 64)],
@@ -31,6 +40,12 @@ describe('validateOrganizationLogo', () => {
     ['logo.gif', 'image/gif', Buffer.from('GIF89a')],
     ['logo.webp', 'image/webp', Buffer.from('RIFFxxxxWEBP')],
     ['logo.png', 'image/png', Buffer.from('not an image')],
+    [
+      'malformed.png',
+      'image/png',
+      Buffer.from([137, 80, 78, 71, 13, 10, 26, 10, 0]),
+    ],
+    ['malformed.jpg', 'image/jpeg', Buffer.from([0xff, 0xd8, 0xff, 0x00])],
   ])('rejects mismatched or unsupported upload %s', (name, type, buffer) => {
     expect(() => validateOrganizationLogo(file(buffer, name, type))).toThrow();
   });

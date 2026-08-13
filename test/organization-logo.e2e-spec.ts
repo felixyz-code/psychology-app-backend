@@ -95,6 +95,9 @@ describeCertification('Organization logo protected lifecycle', () => {
     const ownerToken = bearer(ownerUserId);
     await request(app.getHttpServer())
       .get(`/organizations/${organizationAId}/logo`)
+      .expect(401);
+    await request(app.getHttpServer())
+      .get(`/organizations/${organizationAId}/logo`)
       .set('Authorization', ownerToken)
       .set('X-Organization-Id', organizationAId)
       .expect(200)
@@ -131,6 +134,20 @@ describeCertification('Organization logo protected lifecycle', () => {
     await upload(ownerToken, organizationAId, Buffer.alloc(1024 * 1024 + 1), {
       expectedRowState: 'ABSENT',
     }).expect(413);
+    await request(app.getHttpServer())
+      .put(`/organizations/${organizationAId}/logo`)
+      .set('Authorization', ownerToken)
+      .set('X-Organization-Id', organizationAId)
+      .field('expectedRowState', 'ABSENT')
+      .attach('file', png(64, 64), {
+        filename: 'first.png',
+        contentType: 'image/png',
+      })
+      .attach('file', png(64, 64), {
+        filename: 'second.png',
+        contentType: 'image/png',
+      })
+      .expect(400);
   });
 
   it('creates, streams, replaces, and removes only canonical private content', async () => {
