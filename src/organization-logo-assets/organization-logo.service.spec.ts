@@ -144,6 +144,132 @@ describe('OrganizationLogoService', () => {
     );
   });
 
+  it('preserves conflict semantics and canonical state when loser cleanup also fails', async () => {
+    const rawPath = 'C:\\private-host\\uploads\\loser-logo';
+    const storage = {
+      writeNew: jest
+        .fn()
+        .mockResolvedValue({ storageKey: existing.storageKey, byteSize: 100 }),
+      deleteIfExists: jest.fn().mockRejectedValue(new Error(rawPath)),
+    };
+    const canonical = { ...existing };
+    const tx = {
+      organization: {
+        findFirst: jest.fn().mockResolvedValue({ id: tenant.organizationId }),
+      },
+      organizationLogoAsset: {
+        findUnique: jest.fn().mockImplementation(() => canonical),
+      },
+    };
+    const service = new OrganizationLogoService(
+      {
+        $transaction: jest.fn((work: (client: typeof tx) => Promise<unknown>) =>
+          work(tx),
+        ),
+      } as never,
+      storage as never,
+    );
+    const warn = jest
+      .spyOn(
+        (service as unknown as { logger: { warn: (message: string) => void } })
+          .logger,
+        'warn',
+      )
+      .mockImplementation();
+
+    await expect(
+      service.upload(
+        tenant.organizationId,
+        {} as Express.Multer.File,
+        { expectedRowState: 'ABSENT' },
+        tenant,
+      ),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(tx.organizationLogoAsset.findUnique()).toEqual(canonical);
+    expect(warn).toHaveBeenCalledWith(
+      JSON.stringify({
+        event: 'organization_logo_cleanup_failed',
+        category: 'new_logo',
+        errorType: 'Error',
+      }),
+    );
+    expect(warn.mock.calls.flat().join(' ')).not.toContain(rawPath);
+  });
+
+  it('keeps replacement canonical when previous-blob cleanup fails', async () => {
+    const replacement = {
+      ...existing,
+      storageKey: `organizations/${tenant.organizationId}/00000000-0000-4000-8000-000000000006`,
+      width: 80,
+      height: 80,
+      updatedAt: new Date('2026-08-13T00:01:00.000Z'),
+    };
+    const rawPath = 'C:\\private-host\\uploads\\previous-logo';
+    let canonical = existing;
+    const storage = {
+      writeNew: jest.fn().mockResolvedValue({
+        storageKey: replacement.storageKey,
+        byteSize: replacement.byteSize,
+      }),
+      deleteIfExists: jest.fn().mockRejectedValue(new Error(rawPath)),
+    };
+    const tx = {
+      organization: {
+        findFirst: jest.fn().mockResolvedValue({ id: tenant.organizationId }),
+      },
+      organizationLogoAsset: {
+        findUnique: jest.fn().mockImplementation(() => canonical),
+        updateMany: jest.fn().mockImplementation(() => {
+          canonical = replacement;
+          return { count: 1 };
+        }),
+        findUniqueOrThrow: jest.fn().mockImplementation(() => canonical),
+      },
+    };
+    const service = new OrganizationLogoService(
+      {
+        $transaction: jest.fn((work: (client: typeof tx) => Promise<unknown>) =>
+          work(tx),
+        ),
+      } as never,
+      storage as never,
+    );
+    const warn = jest
+      .spyOn(
+        (service as unknown as { logger: { warn: (message: string) => void } })
+          .logger,
+        'warn',
+      )
+      .mockImplementation();
+
+    await expect(
+      service.upload(
+        tenant.organizationId,
+        {} as Express.Multer.File,
+        { expectedUpdatedAt: existing.updatedAt.toISOString() },
+        tenant,
+      ),
+    ).resolves.toMatchObject({
+      rowState: 'PRESENT',
+      updatedAt: replacement.updatedAt,
+      width: 80,
+      height: 80,
+    });
+    expect(canonical).toBe(replacement);
+    expect(storage.deleteIfExists).toHaveBeenCalledWith(
+      tenant.organizationId,
+      existing.storageKey,
+    );
+    expect(warn).toHaveBeenCalledWith(
+      JSON.stringify({
+        event: 'organization_logo_cleanup_failed',
+        category: 'old_logo',
+        errorType: 'Error',
+      }),
+    );
+    expect(warn.mock.calls.flat().join(' ')).not.toContain(rawPath);
+  });
+
   it('keeps committed metadata when old-blob cleanup fails after removal', async () => {
     const storage = {
       deleteIfExists: jest.fn().mockRejectedValue(new Error('disk error')),

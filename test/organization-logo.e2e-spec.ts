@@ -31,6 +31,7 @@ describeCertification('Organization logo protected lifecycle', () => {
   const suffix = randomUUID();
   const ownerUserId = randomUUID();
   const adminUserId = randomUUID();
+  const revokedUserId = randomUUID();
   const organizationAId = randomUUID();
   const organizationBId = randomUUID();
 
@@ -53,6 +54,7 @@ describeCertification('Organization logo protected lifecycle', () => {
       data: [
         user(ownerUserId, `logo-owner-${suffix}@example.test`),
         user(adminUserId, `logo-admin-${suffix}@example.test`),
+        user(revokedUserId, `logo-revoked-${suffix}@example.test`),
       ],
     });
     await prisma.organization.createMany({
@@ -66,6 +68,12 @@ describeCertification('Organization logo protected lifecycle', () => {
         membership(ownerUserId, organizationAId, MembershipRole.OWNER),
         membership(ownerUserId, organizationBId, MembershipRole.OWNER),
         membership(adminUserId, organizationAId, MembershipRole.ADMIN),
+        membership(
+          revokedUserId,
+          organizationAId,
+          MembershipRole.OWNER,
+          MembershipStatus.REVOKED,
+        ),
       ],
     });
     const moduleRef = await Test.createTestingModule({
@@ -79,13 +87,13 @@ describeCertification('Organization logo protected lifecycle', () => {
   afterAll(async () => {
     await app?.close();
     await prisma?.organizationMembership.deleteMany({
-      where: { userId: { in: [ownerUserId, adminUserId] } },
+      where: { userId: { in: [ownerUserId, adminUserId, revokedUserId] } },
     });
     await prisma?.organization.deleteMany({
       where: { id: { in: [organizationAId, organizationBId] } },
     });
     await prisma?.user.deleteMany({
-      where: { id: { in: [ownerUserId, adminUserId] } },
+      where: { id: { in: [ownerUserId, adminUserId, revokedUserId] } },
     });
     await prisma?.$disconnect();
     await rm(uploadsPath, { recursive: true, force: true });
@@ -199,6 +207,37 @@ describeCertification('Organization logo protected lifecycle', () => {
     ).resolves.toBeNull();
   });
 
+  it('denies every logo runtime path to a revoked membership', async () => {
+    const revokedToken = bearer(revokedUserId);
+    const headers = {
+      Authorization: revokedToken,
+      'X-Organization-Id': organizationAId,
+    };
+
+    await request(app.getHttpServer())
+      .get(`/organizations/${organizationAId}/logo`)
+      .set(headers)
+      .expect(403);
+    await request(app.getHttpServer())
+      .get(`/organizations/${organizationAId}/logo/content`)
+      .set(headers)
+      .expect(403);
+    await request(app.getHttpServer())
+      .put(`/organizations/${organizationAId}/logo`)
+      .set(headers)
+      .field('expectedRowState', 'ABSENT')
+      .attach('file', png(64, 64), {
+        filename: 'revoked.png',
+        contentType: 'image/png',
+      })
+      .expect(403);
+    await request(app.getHttpServer())
+      .delete(`/organizations/${organizationAId}/logo`)
+      .set(headers)
+      .send({ expectedUpdatedAt: new Date().toISOString() })
+      .expect(403);
+  });
+
   it('has one canonical first-write winner and one conflict', async () => {
     const ownerToken = bearer(ownerUserId);
     const [first, second] = await Promise.all([
@@ -261,6 +300,7 @@ describeCertification('Organization logo protected lifecycle', () => {
         .send({ expectedUpdatedAt: current.updatedAt.toISOString() }),
     ]);
     expect([replace.status, remove.status].sort()).toEqual([200, 409]);
+    await assertCanonicalFilesystemState(organizationBId);
     await prisma.organization.update({
       where: { id: organizationBId },
       data: { status: OrganizationStatus.SUSPENDED },
@@ -305,6 +345,21 @@ describeCertification('Organization logo protected lifecycle', () => {
   function bearer(userId: string) {
     return `Bearer ${jwtService.sign({ sub: userId, name: 'Logo E2E User', email: 'logo-e2e@example.test', role: UserRole.ADMIN })}`;
   }
+
+  async function assertCanonicalFilesystemState(organizationId: string) {
+    const canonical = await prisma.organizationLogoAsset.findUnique({
+      where: { organizationId },
+    });
+    const files = await readdir(
+      join(uploadsPath, 'organizations', organizationId),
+    );
+
+    if (canonical) {
+      expect(files).toEqual([canonical.storageKey.split('/').at(-1)]);
+    } else {
+      expect(files).toEqual([]);
+    }
+  }
 });
 
 function user(id: string, email: string) {
@@ -332,12 +387,13 @@ function membership(
   userId: string,
   organizationId: string,
   role: MembershipRole,
+  status: MembershipStatus = MembershipStatus.ACTIVE,
 ) {
   return {
     userId,
     organizationId,
     role,
-    status: MembershipStatus.ACTIVE,
+    status,
     joinedAt: new Date(),
   };
 }
@@ -362,7 +418,21 @@ function png(width: number, height: number) {
 function chunk(type: string, data: Buffer) {
   const length = Buffer.alloc(4);
   length.writeUInt32BE(data.length);
-  return Buffer.concat([length, Buffer.from(type), data, Buffer.alloc(4)]);
+  const typeBytes = Buffer.from(type);
+  const crc = Buffer.alloc(4);
+  crc.writeUInt32BE(crc32(Buffer.concat([typeBytes, data])));
+  return Buffer.concat([length, typeBytes, data, crc]);
+}
+
+function crc32(bytes: Buffer) {
+  let crc = 0xffffffff;
+  for (const byte of bytes) {
+    crc ^= byte;
+    for (let bit = 0; bit < 8; bit += 1) {
+      crc = (crc >>> 1) ^ (crc & 1 ? 0xedb88320 : 0);
+    }
+  }
+  return (crc ^ 0xffffffff) >>> 0;
 }
 
 type LogoResponse = {

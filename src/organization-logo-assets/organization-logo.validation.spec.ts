@@ -1,5 +1,8 @@
 import { deflateSync } from 'node:zlib';
-import { validateOrganizationLogo } from './organization-logo.validation';
+import {
+  MAX_ORGANIZATION_LOGO_BYTES,
+  validateOrganizationLogo,
+} from './organization-logo.validation';
 
 describe('validateOrganizationLogo', () => {
   it.each([
@@ -67,23 +70,106 @@ describe('validateOrganizationLogo', () => {
     ).toThrow('Animated PNG');
     expect(() =>
       validateOrganizationLogo(
-        file(Buffer.alloc(1024 * 1024 + 1), 'logo.png', 'image/png'),
+        file(
+          Buffer.alloc(MAX_ORGANIZATION_LOGO_BYTES + 1),
+          'logo.png',
+          'image/png',
+        ),
       ),
     ).toThrow('1 MiB');
   });
 
-  it('accepts a file exactly at the 1 MiB byte limit', () => {
-    const validPng = createPng(64, 64);
-    const exactlyOneMiB = Buffer.concat([
-      validPng,
-      Buffer.alloc(1024 * 1024 - validPng.byteLength),
-    ]);
+  it('accepts a structurally valid PNG exactly at the 1 MiB byte limit', () => {
+    const exactlyOneMiB = createPngAtSize(64, 64, MAX_ORGANIZATION_LOGO_BYTES);
 
     expect(validateOrganizationLogo(file(exactlyOneMiB))).toMatchObject({
-      byteSize: 1024 * 1024,
+      byteSize: MAX_ORGANIZATION_LOGO_BYTES,
       width: 64,
       height: 64,
     });
+  });
+
+  it.each([
+    ['bad IHDR ordering', pngWithChunks([chunk('IDAT', Buffer.alloc(0))])],
+    [
+      'wrong IHDR length',
+      pngWithChunks([
+        chunk('IHDR', Buffer.alloc(12)),
+        chunk('IDAT', deflateSync(Buffer.alloc(64 * 64 * 4 + 64))),
+        chunk('IEND', Buffer.alloc(0)),
+      ]),
+    ],
+    ['truncated chunk', createPng(64, 64).subarray(0, -2)],
+    [
+      'bad chunk length',
+      mutate(createPng(64, 64), (bytes) => bytes.writeUInt32BE(0xffffffff, 33)),
+    ],
+    [
+      'invalid CRC',
+      mutate(createPng(64, 64), (bytes) => {
+        bytes[29] ^= 0xff;
+      }),
+    ],
+    [
+      'invalid IHDR encoding fields',
+      pngWithChunks([
+        chunk(
+          'IHDR',
+          mutate(pngHeader(64, 64), (header) => {
+            header[10] = 1;
+          }),
+        ),
+        chunk('IDAT', deflateSync(Buffer.alloc(64 * 64 * 4 + 64))),
+        chunk('IEND', Buffer.alloc(0)),
+      ]),
+    ],
+    ['missing IEND', withoutLastChunk(createPng(64, 64))],
+    [
+      'non-zero IEND',
+      replaceLastChunk(createPng(64, 64), chunk('IEND', Buffer.from([0]))),
+    ],
+    [
+      'bytes after IEND',
+      Buffer.concat([createPng(64, 64), Buffer.from('trailing garbage')]),
+    ],
+    ['APNG acTL', createPng(64, 64, true)],
+    [
+      'malformed structure before acTL',
+      pngWithChunks([
+        chunk('IHDR', pngHeader(64, 64)),
+        mutate(chunk('vpAg', Buffer.alloc(1)), (bytes) =>
+          bytes.writeUInt32BE(0xffffffff, 0),
+        ),
+        chunk('acTL', Buffer.alloc(8)),
+        chunk('IDAT', deflateSync(Buffer.alloc(64 * 64 * 4 + 64))),
+        chunk('IEND', Buffer.alloc(0)),
+      ]),
+    ],
+  ])('rejects PNG structural failure: %s', (_description, bytes) => {
+    expect(() => validateOrganizationLogo(file(bytes))).toThrow();
+  });
+
+  it.each([
+    [
+      'truncated after dimensional metadata',
+      truncateAfterFrame(minimalJpeg(64, 64)),
+    ],
+    ['missing terminal marker', minimalJpeg(64, 64).subarray(0, -2)],
+    [
+      'invalid terminal marker',
+      mutate(minimalJpeg(64, 64), (bytes) => {
+        bytes[bytes.length - 1] = 0xd8;
+      }),
+    ],
+    [
+      'malformed marker segment boundary',
+      Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x00, 0xff, 0xd9]),
+    ],
+    ['signature/type mismatch', createPng(64, 64)],
+  ])('rejects JPEG structural failure: %s', (_description, bytes) => {
+    expect(() =>
+      validateOrganizationLogo(file(bytes, 'logo.jpg', 'image/jpeg')),
+    ).toThrow();
   });
 });
 
@@ -101,16 +187,10 @@ function file(
 }
 
 function createPng(width: number, height: number, animated = false) {
-  const signature = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
-  const ihdr = Buffer.alloc(13);
-  ihdr.writeUInt32BE(width, 0);
-  ihdr.writeUInt32BE(height, 4);
-  ihdr[8] = 8;
-  ihdr[9] = 6;
+  const ihdr = pngHeader(width, height);
   const row = Buffer.concat([Buffer.from([0]), Buffer.alloc(width * 4)]);
   const pixels = Buffer.concat(Array.from({ length: height }, () => row));
-  return Buffer.concat([
-    signature,
+  return pngWithChunks([
     chunk('IHDR', ihdr),
     ...(animated ? [chunk('acTL', Buffer.from([0, 0, 0, 1, 0, 0, 0, 0]))] : []),
     chunk('IDAT', deflateSync(pixels)),
@@ -118,10 +198,72 @@ function createPng(width: number, height: number, animated = false) {
   ]);
 }
 
+function createPngAtSize(width: number, height: number, byteSize: number) {
+  const base = createPng(width, height);
+  const paddingLength = byteSize - base.length - 12;
+  if (paddingLength < 0) throw new Error('Requested PNG size is too small');
+  const ihdrEnd = 8 + 12 + 13;
+  return Buffer.concat([
+    base.subarray(0, ihdrEnd),
+    chunk('vpAg', Buffer.alloc(paddingLength)),
+    base.subarray(ihdrEnd),
+  ]);
+}
+
+function pngHeader(width: number, height: number) {
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(width, 0);
+  ihdr.writeUInt32BE(height, 4);
+  ihdr[8] = 8;
+  ihdr[9] = 6;
+  return ihdr;
+}
+
+function pngWithChunks(chunks: Buffer[]) {
+  return Buffer.concat([
+    Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
+    ...chunks,
+  ]);
+}
+
 function chunk(type: string, data: Buffer) {
   const length = Buffer.alloc(4);
   length.writeUInt32BE(data.length);
-  return Buffer.concat([length, Buffer.from(type), data, Buffer.alloc(4)]);
+  const typeBytes = Buffer.from(type);
+  const crc = Buffer.alloc(4);
+  crc.writeUInt32BE(crc32(Buffer.concat([typeBytes, data])));
+  return Buffer.concat([length, typeBytes, data, crc]);
+}
+
+function crc32(bytes: Buffer) {
+  let crc = 0xffffffff;
+  for (const byte of bytes) {
+    crc ^= byte;
+    for (let bit = 0; bit < 8; bit += 1) {
+      crc = (crc >>> 1) ^ (crc & 1 ? 0xedb88320 : 0);
+    }
+  }
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
+function mutate(bytes: Buffer, mutation: (copy: Buffer) => void) {
+  const copy = Buffer.from(bytes);
+  mutation(copy);
+  return copy;
+}
+
+function withoutLastChunk(bytes: Buffer) {
+  return bytes.subarray(0, -12);
+}
+
+function replaceLastChunk(bytes: Buffer, replacement: Buffer) {
+  return Buffer.concat([withoutLastChunk(bytes), replacement]);
+}
+
+function truncateAfterFrame(bytes: Buffer) {
+  const frame = bytes.indexOf(Buffer.from([0xff, 0xc0]));
+  const frameLength = bytes.readUInt16BE(frame + 2);
+  return bytes.subarray(0, frame + 2 + frameLength);
 }
 
 function minimalJpeg(width: number, height: number) {
