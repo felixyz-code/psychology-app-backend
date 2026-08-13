@@ -1,4 +1,6 @@
 import { deflateSync } from 'node:zlib';
+import { encode as encodeJpeg } from 'jpeg-js';
+import * as logoDecoder from './organization-logo.decoder';
 import {
   MAX_ORGANIZATION_LOGO_BYTES,
   validateOrganizationLogo,
@@ -64,6 +66,16 @@ describe('validateOrganizationLogo', () => {
     ).toThrow();
   });
 
+  it('does not expose the decoder to dimensions outside the accepted bound', () => {
+    const decode = jest.spyOn(logoDecoder, 'decodeOrganizationLogo');
+
+    expect(() => validateOrganizationLogo(file(createPng(2049, 64)))).toThrow(
+      'between 64 and 2048',
+    );
+    expect(decode).not.toHaveBeenCalled();
+    decode.mockRestore();
+  });
+
   it('rejects APNG animation control chunks and files larger than 1 MiB', () => {
     expect(() =>
       validateOrganizationLogo(file(createPng(64, 64, true))),
@@ -87,6 +99,48 @@ describe('validateOrganizationLogo', () => {
       width: 64,
       height: 64,
     });
+  });
+
+  it('rejects a valid PNG container whose compressed image payload cannot decode', () => {
+    const invalidPayload = pngWithChunks([
+      chunk('IHDR', pngHeader(64, 64)),
+      chunk('IDAT', Buffer.from('not a zlib image payload')),
+      chunk('IEND', Buffer.alloc(0)),
+    ]);
+
+    expect(() => validateOrganizationLogo(file(invalidPayload))).toThrow(
+      'cannot be decoded',
+    );
+  });
+
+  it('bounds PNG inflation from the certified dimensions before full decode', () => {
+    const oversizedPixels = pngWithChunks([
+      chunk('IHDR', pngHeader(64, 64)),
+      chunk('IDAT', deflateSync(Buffer.alloc(1024 * 1024))),
+      chunk('IEND', Buffer.alloc(0)),
+    ]);
+
+    expect(() => validateOrganizationLogo(file(oversizedPixels))).toThrow(
+      'cannot be decoded',
+    );
+  });
+
+  it('rejects plausible JPEG markers whose entropy-coded scan cannot decode', () => {
+    expect(() =>
+      validateOrganizationLogo(
+        file(jpegWithInvalidEntropy(64, 64), 'logo.jpg', 'image/jpeg'),
+      ),
+    ).toThrow('cannot be decoded');
+  });
+
+  it('rejects decoded dimensions that contradict certified metadata', () => {
+    jest
+      .spyOn(logoDecoder, 'decodeOrganizationLogo')
+      .mockReturnValueOnce({ width: 65, height: 64 });
+
+    expect(() => validateOrganizationLogo(file(createPng(64, 64)))).toThrow(
+      'do not match',
+    );
   });
 
   it.each([
@@ -267,12 +321,23 @@ function truncateAfterFrame(bytes: Buffer) {
 }
 
 function minimalJpeg(width: number, height: number) {
-  const jpeg = Buffer.from(
-    '/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////2wBDAf//////////////////////////////////////////////////////////////////////////////////////wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAX/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIQAxAAAAH/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/9oACAEBAAEFAqf/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oACAEDAQE/Aaf/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oACAECAQE/Aaf/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/9oACAEBAAY/Aqf/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/9oACAEBAAE/IX//2gAMAwEAAgADAAAAEP/EABQRAQAAAAAAAAAAAAAAAAAAABD/2gAIAQMBAT8QH//EABQRAQAAAAAAAAAAAAAAAAAAABD/2gAIAQIBAT8QH//EABQQAQAAAAAAAAAAAAAAAAAAABD/2gAIAQEAAT8QH//Z',
-    'base64',
-  );
-  const sof = jpeg.indexOf(Buffer.from([0xff, 0xc0]));
-  jpeg.writeUInt16BE(height, sof + 5);
-  jpeg.writeUInt16BE(width, sof + 7);
-  return jpeg;
+  const rgba = Buffer.alloc(width * height * 4);
+  for (let offset = 0; offset < rgba.length; offset += 4) {
+    rgba[offset] = 24;
+    rgba[offset + 1] = 96;
+    rgba[offset + 2] = 168;
+    rgba[offset + 3] = 255;
+  }
+  return encodeJpeg({ data: rgba, width, height }, 80).data;
+}
+
+function jpegWithInvalidEntropy(width: number, height: number) {
+  const jpeg = minimalJpeg(width, height);
+  const scan = jpeg.indexOf(Buffer.from([0xff, 0xda]));
+  const scanLength = jpeg.readUInt16BE(scan + 2);
+  return Buffer.concat([
+    jpeg.subarray(0, scan + 2 + scanLength),
+    Buffer.from([0]),
+    Buffer.from([0xff, 0xd9]),
+  ]);
 }

@@ -156,6 +156,20 @@ describeCertification('Organization logo protected lifecycle', () => {
         contentType: 'image/png',
       })
       .expect(400);
+
+    const filesBeforeMalformedUpload =
+      await organizationLogoFiles(organizationAId);
+    await upload(ownerToken, organizationAId, pngWithInvalidPayload(64, 64), {
+      expectedRowState: 'ABSENT',
+    }).expect(400);
+    await expect(
+      prisma.organizationLogoAsset.findUnique({
+        where: { organizationId: organizationAId },
+      }),
+    ).resolves.toBeNull();
+    await expect(organizationLogoFiles(organizationAId)).resolves.toEqual(
+      filesBeforeMalformedUpload,
+    );
   });
 
   it('creates, streams, replaces, and removes only canonical private content', async () => {
@@ -360,6 +374,22 @@ describeCertification('Organization logo protected lifecycle', () => {
       expect(files).toEqual([]);
     }
   }
+
+  async function organizationLogoFiles(organizationId: string) {
+    try {
+      return await readdir(join(uploadsPath, 'organizations', organizationId));
+    } catch (error: unknown) {
+      if (
+        error &&
+        typeof error === 'object' &&
+        'code' in error &&
+        error.code === 'ENOENT'
+      ) {
+        return [];
+      }
+      throw error;
+    }
+  }
 });
 
 function user(id: string, email: string) {
@@ -411,6 +441,21 @@ function png(width: number, height: number) {
     signature,
     chunk('IHDR', ihdr),
     chunk('IDAT', deflateSync(pixels)),
+    chunk('IEND', Buffer.alloc(0)),
+  ]);
+}
+
+function pngWithInvalidPayload(width: number, height: number) {
+  const signature = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(width, 0);
+  ihdr.writeUInt32BE(height, 4);
+  ihdr[8] = 8;
+  ihdr[9] = 6;
+  return Buffer.concat([
+    signature,
+    chunk('IHDR', ihdr),
+    chunk('IDAT', Buffer.from('not a zlib image payload')),
     chunk('IEND', Buffer.alloc(0)),
   ]);
 }

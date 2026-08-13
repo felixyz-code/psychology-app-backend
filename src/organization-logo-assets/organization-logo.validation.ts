@@ -1,6 +1,7 @@
 import { BadRequestException, PayloadTooLargeException } from '@nestjs/common';
 import { imageSize } from 'image-size';
 import { extname } from 'node:path';
+import { decodeOrganizationLogo } from './organization-logo.decoder';
 
 export const MAX_ORGANIZATION_LOGO_BYTES = 1024 * 1024;
 const MIN_DIMENSION = 64;
@@ -66,6 +67,24 @@ export function validateOrganizationLogo(
   ) {
     throw new BadRequestException(
       'Logo dimensions must be between 64 and 2048 pixels',
+    );
+  }
+
+  let decoded: { width: number; height: number };
+  try {
+    decoded = decodeOrganizationLogo(file.buffer, signatureType, {
+      width: dimensions.width,
+      height: dimensions.height,
+    });
+  } catch {
+    throw new BadRequestException('Logo image payload cannot be decoded');
+  }
+  if (
+    decoded.width !== dimensions.width ||
+    decoded.height !== dimensions.height
+  ) {
+    throw new BadRequestException(
+      'Logo decoded dimensions do not match image metadata',
     );
   }
 
