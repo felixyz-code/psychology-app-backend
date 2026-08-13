@@ -5,6 +5,7 @@ import {
   ForbiddenException,
   HttpException,
 } from '@nestjs/common';
+import { MulterError } from 'multer';
 
 import { ErrorEnvelopeFilter } from './error-envelope.filter';
 import { RequestContextService } from './request-context/request-context.service';
@@ -136,4 +137,25 @@ describe('ErrorEnvelopeFilter', () => {
       details: { retryAfterSeconds: 30 },
     });
   });
+
+  it.each([
+    ['LIMIT_FILE_SIZE', 413, 'Uploaded file exceeds configured size limit'],
+    ['LIMIT_UNEXPECTED_FILE', 400, 'Invalid multipart upload'],
+  ])(
+    'maps Multer %s to the bounded upload response',
+    (reason, expectedStatus, expectedMessage) => {
+      const filter = new ErrorEnvelopeFilter(new RequestContextService());
+      const { host, json } = createHost();
+
+      filter.catch(new MulterError(reason as 'LIMIT_FILE_SIZE'), host);
+
+      expect(json).toHaveBeenCalledWith({
+        statusCode: expectedStatus,
+        code: 'VALIDATION_ERROR',
+        message: expectedMessage,
+        requestId: 'unavailable',
+        details: null,
+      });
+    },
+  );
 });

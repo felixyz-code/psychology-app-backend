@@ -9,6 +9,7 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { Response } from 'express';
+import { MulterError } from 'multer';
 import { RequestContextService } from './request-context/request-context.service';
 
 type ErrorDetails = Record<string, unknown> | null;
@@ -39,8 +40,15 @@ export class ErrorEnvelopeFilter implements ExceptionFilter {
   catch(exception: unknown, host: ArgumentsHost) {
     const response = host.switchToHttp().getResponse<Response>();
     const mappedPrisma = this.mapPrismaError(exception);
+    const multerStatus =
+      exception instanceof MulterError
+        ? exception.code === 'LIMIT_FILE_SIZE'
+          ? HttpStatus.PAYLOAD_TOO_LARGE
+          : HttpStatus.BAD_REQUEST
+        : null;
     const statusCode =
       mappedPrisma?.statusCode ??
+      multerStatus ??
       (exception instanceof HttpException
         ? exception.getStatus()
         : HttpStatus.INTERNAL_SERVER_ERROR);
@@ -117,7 +125,7 @@ export class ErrorEnvelopeFilter implements ExceptionFilter {
       return explicitCode;
     }
 
-    if (statusCode === 400) {
+    if (statusCode === 400 || statusCode === 413) {
       return 'VALIDATION_ERROR';
     }
 
@@ -217,6 +225,12 @@ export class ErrorEnvelopeFilter implements ExceptionFilter {
   }
 
   private messageForException(exception: unknown, statusCode: number) {
+    if (exception instanceof MulterError) {
+      return exception.code === 'LIMIT_FILE_SIZE'
+        ? 'Uploaded file exceeds configured size limit'
+        : 'Invalid multipart upload';
+    }
+
     if (exception instanceof HttpException) {
       const message = this.exceptionMessage(exception);
       return message || HttpStatus[statusCode] || 'Request failed';
