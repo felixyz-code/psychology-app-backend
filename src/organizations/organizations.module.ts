@@ -6,10 +6,16 @@ import { MembershipsService } from './memberships.service';
 import { OrganizationInvitationsController } from './organization-invitations.controller';
 import { OrganizationsController } from './organizations.controller';
 import { OrganizationsService } from './organizations.service';
+import { OrganizationConfigurationService } from './organization-configuration.service';
 
 @Module({
   imports: [PrismaModule, TenantContextModule],
   controllers: [OrganizationsController, OrganizationInvitationsController],
-  providers: [OrganizationsService, MembershipsService, InvitationsService],
+  providers: [
+    OrganizationsService,
+    MembershipsService,
+    InvitationsService,
+    OrganizationConfigurationService,
+  ],
 })
 export class OrganizationsModule {}

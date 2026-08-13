@@ -238,6 +238,12 @@ POST-GO-LIVE.3.5 public freelancer bootstrap creates exactly one initial
 organization with `status = ACTIVE`, a server-generated `slug`, and default
 timezone/locale/currency when no later administration change has been applied.
 
+`OrganizationSettings` and `OrganizationBranding` are reserved one-to-one rows
+and are not created automatically. POST-GO-LIVE.5.2 exposes only
+`defaultAppointmentDuration` and `primaryColor` through explicit runtime
+resources. Other reserved fields remain server-owned and are not part of those
+request or response contracts.
+
 ---
 
 ## OrganizationMembership
