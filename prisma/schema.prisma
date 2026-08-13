@@ -131,6 +131,7 @@ model Organization {
   invitations  OrganizationInvitation[]
   settings     OrganizationSettings?
   branding     OrganizationBranding?
+  logoAsset    OrganizationLogoAsset?
   preferredByUsers User[]               @relation("UserPreferredOrganization")
   patients     Patient[]
   caseFiles    CaseFile[]
@@ -204,6 +205,20 @@ model OrganizationBranding {
   updatedAt      DateTime     @updatedAt @db.Timestamptz(3)
 
   @@map("organization_branding")
+}
+
+model OrganizationLogoAsset {
+  organizationId String       @id @db.Uuid
+  storageKey     String       @unique @db.Text
+  mimeType       String       @db.VarChar(100)
+  byteSize       Int          @db.Integer
+  width          Int          @db.Integer
+  height         Int          @db.Integer
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  createdAt      DateTime     @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime     @updatedAt @db.Timestamptz(3)
+
+  @@map("organization_logo_assets")
 }
 
 model OrganizationInvitation {

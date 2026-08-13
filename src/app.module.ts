@@ -20,6 +20,7 @@ import { SessionNotesModule } from './session-notes/session-notes.module';
 import { TenantContextGuard } from './tenant-context/guards/tenant-context.guard';
 import { TenantContextModule } from './tenant-context/tenant-context.module';
 import { OrganizationsModule } from './organizations/organizations.module';
+import { OrganizationLogoAssetsModule } from './organization-logo-assets/organization-logo-assets.module';
 
 @Module({
   imports: [
@@ -35,6 +36,7 @@ import { OrganizationsModule } from './organizations/organizations.module';
     HealthModule,
     TenantContextModule,
     OrganizationsModule,
+    OrganizationLogoAssetsModule,
   ],
   controllers: [AppController],
   providers: [
