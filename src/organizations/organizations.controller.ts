@@ -56,6 +56,13 @@ import {
   TransferOwnershipDto,
 } from './dto/transfer-ownership.dto';
 import { UpdateOrganizationDto } from './dto/update-organization.dto';
+import {
+  OrganizationBrandingResponseDto,
+  OrganizationSettingsResponseDto,
+} from './dto/organization-configuration-response.dto';
+import { UpdateOrganizationBrandingDto } from './dto/update-organization-branding.dto';
+import { UpdateOrganizationSettingsDto } from './dto/update-organization-settings.dto';
+import { OrganizationConfigurationService } from './organization-configuration.service';
 import { InvitationsService } from './invitations.service';
 import { MembershipsService } from './memberships.service';
 import { OrganizationsService } from './organizations.service';
@@ -76,6 +83,7 @@ export class OrganizationsController {
     private readonly organizations: OrganizationsService,
     private readonly memberships: MembershipsService,
     private readonly invitations: InvitationsService,
+    private readonly configuration: OrganizationConfigurationService,
   ) {}
 
   @Get()
@@ -119,6 +127,107 @@ export class OrganizationsController {
     @CurrentTenant(true) tenant: TenantContext,
   ) {
     return this.organizations.findOne(organizationId, tenant);
+  }
+
+  @Get(':organizationId/settings')
+  @TenantRequired()
+  @AllowedOrganizationStatuses(
+    OrganizationStatus.ACTIVE,
+    OrganizationStatus.SUSPENDED,
+  )
+  @UseGuards(CapabilitiesGuard)
+  @RequireCapabilities(OrganizationCapability.ORGANIZATION_READ)
+  @ApiOperation({
+    summary: 'Get effective organization appointment-duration settings',
+    description:
+      'Returns rowState and updatedAt for concurrency. The effective duration is 60 when the row is absent or its persisted value is null.',
+  })
+  @ApiOkResponse({ type: OrganizationSettingsResponseDto })
+  @ApiNotFoundResponse({ description: 'Organization not found' })
+  getSettings(
+    @Param('organizationId', ParseUUIDPipe) organizationId: string,
+    @CurrentTenant(true) tenant: TenantContext,
+  ) {
+    return this.configuration.getSettings(organizationId, tenant);
+  }
+
+  @Patch(':organizationId/settings')
+  @TenantRequired()
+  @AllowedOrganizationStatuses(
+    OrganizationStatus.ACTIVE,
+    OrganizationStatus.SUSPENDED,
+  )
+  @UseGuards(CapabilitiesGuard)
+  @RequireCapabilities(OrganizationCapability.ORGANIZATION_MANAGE)
+  @ApiOperation({
+    summary:
+      'Update organization appointment-duration settings with compare-and-swap',
+    description:
+      'Supply exactly one precondition: expectedRowState ABSENT for a first write, or expectedUpdatedAt for a present row. Null resets the effective duration to 60.',
+  })
+  @ApiOkResponse({ type: OrganizationSettingsResponseDto })
+  @ApiBadRequestResponse({
+    description: 'Invalid duration or concurrency precondition',
+  })
+  @ApiConflictResponse({
+    description: 'Stale or concurrent configuration mutation',
+  })
+  updateSettings(
+    @Param('organizationId', ParseUUIDPipe) organizationId: string,
+    @Body() dto: UpdateOrganizationSettingsDto,
+    @CurrentTenant(true) tenant: TenantContext,
+  ) {
+    return this.configuration.updateSettings(organizationId, dto, tenant);
+  }
+
+  @Get(':organizationId/branding')
+  @TenantRequired()
+  @AllowedOrganizationStatuses(
+    OrganizationStatus.ACTIVE,
+    OrganizationStatus.SUSPENDED,
+  )
+  @UseGuards(CapabilitiesGuard)
+  @RequireCapabilities(OrganizationCapability.ORGANIZATION_READ)
+  @ApiOperation({
+    summary: 'Get organization brand accent configuration',
+    description:
+      'Returns rowState and updatedAt for concurrency. A null primaryColor means the platform accent fallback.',
+  })
+  @ApiOkResponse({ type: OrganizationBrandingResponseDto })
+  @ApiNotFoundResponse({ description: 'Organization not found' })
+  getBranding(
+    @Param('organizationId', ParseUUIDPipe) organizationId: string,
+    @CurrentTenant(true) tenant: TenantContext,
+  ) {
+    return this.configuration.getBranding(organizationId, tenant);
+  }
+
+  @Patch(':organizationId/branding')
+  @TenantRequired()
+  @AllowedOrganizationStatuses(
+    OrganizationStatus.ACTIVE,
+    OrganizationStatus.SUSPENDED,
+  )
+  @UseGuards(CapabilitiesGuard)
+  @RequireCapabilities(OrganizationCapability.ORGANIZATION_MANAGE)
+  @ApiOperation({
+    summary: 'Update organization brand accent with compare-and-swap',
+    description:
+      'Accepts only #RRGGBB or null and requires at least 3:1 WCAG contrast against approved #FFFFFF and #121212 surfaces. Supply exactly one concurrency precondition.',
+  })
+  @ApiOkResponse({ type: OrganizationBrandingResponseDto })
+  @ApiBadRequestResponse({
+    description: 'Invalid color, contrast, or concurrency precondition',
+  })
+  @ApiConflictResponse({
+    description: 'Stale or concurrent configuration mutation',
+  })
+  updateBranding(
+    @Param('organizationId', ParseUUIDPipe) organizationId: string,
+    @Body() dto: UpdateOrganizationBrandingDto,
+    @CurrentTenant(true) tenant: TenantContext,
+  ) {
+    return this.configuration.updateBranding(organizationId, dto, tenant);
   }
 
   @Patch(':organizationId')

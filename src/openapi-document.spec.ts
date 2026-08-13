@@ -44,7 +44,7 @@ describe('OpenAPI document', () => {
   it('documents every certified route and the Bearer security scheme', () => {
     const document = createDocument(app);
 
-    expect(Object.keys(document.paths)).toHaveLength(44);
+    expect(Object.keys(document.paths)).toHaveLength(46);
     expect(document.components?.securitySchemes?.bearer).toEqual({
       type: 'http',
       scheme: 'bearer',
@@ -72,6 +72,18 @@ describe('OpenAPI document', () => {
     ]);
     expect(
       document.paths['/organizations/{organizationId}/status'].patch,
+    ).toBeDefined();
+    expect(
+      document.paths['/organizations/{organizationId}/settings'].get,
+    ).toBeDefined();
+    expect(
+      document.paths['/organizations/{organizationId}/settings'].patch,
+    ).toBeDefined();
+    expect(
+      document.paths['/organizations/{organizationId}/branding'].get,
+    ).toBeDefined();
+    expect(
+      document.paths['/organizations/{organizationId}/branding'].patch,
     ).toBeDefined();
     expect(
       document.paths['/organizations/{organizationId}/ownership-transfer'].post,
@@ -232,6 +244,66 @@ describe('OpenAPI document', () => {
             enum: ['CHANGE_ROLE', 'SUSPEND', 'REACTIVATE', 'REMOVE'],
           },
         },
+      },
+    });
+    expect(
+      getRequestContent(
+        document,
+        '/organizations/{organizationId}/settings',
+        'patch',
+      )['application/json']?.schema,
+    ).toEqual({ $ref: '#/components/schemas/UpdateOrganizationSettingsDto' });
+    expect(
+      getResponseContent(
+        document,
+        '/organizations/{organizationId}/settings',
+        'get',
+        '200',
+      )['application/json']?.schema,
+    ).toEqual({ $ref: '#/components/schemas/OrganizationSettingsResponseDto' });
+    expect(
+      getRequestContent(
+        document,
+        '/organizations/{organizationId}/branding',
+        'patch',
+      )['application/json']?.schema,
+    ).toEqual({ $ref: '#/components/schemas/UpdateOrganizationBrandingDto' });
+    expect(
+      getResponseContent(
+        document,
+        '/organizations/{organizationId}/branding',
+        'get',
+        '200',
+      )['application/json']?.schema,
+    ).toEqual({ $ref: '#/components/schemas/OrganizationBrandingResponseDto' });
+    expect(
+      document.components?.schemas?.UpdateOrganizationSettingsDto,
+    ).toMatchObject({
+      properties: {
+        defaultAppointmentDuration: {
+          minimum: 1,
+          maximum: 1440,
+          nullable: true,
+        },
+        expectedRowState: { enum: ['ABSENT'] },
+        expectedUpdatedAt: { type: 'string', format: 'date-time' },
+      },
+    });
+    expect(
+      document.components?.schemas?.OrganizationSettingsResponseDto,
+    ).toMatchObject({
+      properties: {
+        rowState: { enum: ['ABSENT', 'PRESENT'] },
+        updatedAt: { nullable: true },
+        defaultAppointmentDuration: { minimum: 1, maximum: 1440 },
+        persistedDefaultAppointmentDuration: { nullable: true },
+      },
+    });
+    expect(
+      document.components?.schemas?.UpdateOrganizationBrandingDto,
+    ).toMatchObject({
+      properties: {
+        primaryColor: { pattern: '^#[0-9A-F]{6}$', nullable: true },
       },
     });
     expect(

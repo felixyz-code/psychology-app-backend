@@ -1604,6 +1604,10 @@ membership runtime and historical lifecycle without adding direct
 | GET | `/organizations/:organizationId` | `organization.read`; path must match selected tenant and route allows `ACTIVE` or `SUSPENDED` organization state |
 | PATCH | `/organizations/:organizationId` | `organization.manage` (OWNER); editable identity fields only |
 | PATCH | `/organizations/:organizationId/status` | `organization.manage` (OWNER); `ACTIVE <-> SUSPENDED` only |
+| GET | `/organizations/:organizationId/settings` | `organization.read`; `ACTIVE` and `SUSPENDED` selected organization state; returns `rowState`, nullable `updatedAt`, effective `defaultAppointmentDuration`, and nullable persisted duration |
+| PATCH | `/organizations/:organizationId/settings` | `organization.manage` (OWNER); requires exactly one of `expectedRowState: "ABSENT"` or canonical `expectedUpdatedAt`; duration is `null` or integer `1..1440`; `null` has an effective fallback of `60`, and an absent-row reset intentionally leaves the row absent |
+| GET | `/organizations/:organizationId/branding` | `organization.read`; `ACTIVE` and `SUSPENDED` selected organization state; returns `rowState`, nullable `updatedAt`, and nullable persisted `primaryColor` |
+| PATCH | `/organizations/:organizationId/branding` | `organization.manage` (OWNER); requires exactly one of `expectedRowState: "ABSENT"` or canonical `expectedUpdatedAt`; accepts only nullable `#RRGGBB` with bounded WCAG contrast validation; `null` selects the platform fallback |
 | POST | `/organizations/:organizationId/ownership-transfer` | `ownership.transfer` (OWNER); dedicated owner handoff only |
 | GET | `/organizations/:organizationId/memberships` | `membership.read`; sanitized metadata, canonical `updatedAt`, and backend-owned target `allowedActions` |
 | PATCH | `/organizations/:organizationId/memberships/:membershipId/role` | owner/admin conditional; never OWNER grant; requires `expectedUpdatedAt` |
