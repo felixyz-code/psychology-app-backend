@@ -44,7 +44,7 @@ describe('OpenAPI document', () => {
   it('documents every certified route and the Bearer security scheme', () => {
     const document = createDocument(app);
 
-    expect(Object.keys(document.paths)).toHaveLength(46);
+    expect(Object.keys(document.paths)).toHaveLength(48);
     expect(document.components?.securitySchemes?.bearer).toEqual({
       type: 'http',
       scheme: 'bearer',
@@ -84,6 +84,18 @@ describe('OpenAPI document', () => {
     ).toBeDefined();
     expect(
       document.paths['/organizations/{organizationId}/branding'].patch,
+    ).toBeDefined();
+    expect(
+      document.paths['/organizations/{organizationId}/logo'].get,
+    ).toBeDefined();
+    expect(
+      document.paths['/organizations/{organizationId}/logo'].put,
+    ).toBeDefined();
+    expect(
+      document.paths['/organizations/{organizationId}/logo'].delete,
+    ).toBeDefined();
+    expect(
+      document.paths['/organizations/{organizationId}/logo/content'].get,
     ).toBeDefined();
     expect(
       document.paths['/organizations/{organizationId}/ownership-transfer'].post,
@@ -304,6 +316,42 @@ describe('OpenAPI document', () => {
     ).toMatchObject({
       properties: {
         primaryColor: { pattern: '^#[0-9A-F]{6}$', nullable: true },
+      },
+    });
+    expect(
+      getResponseContent(
+        document,
+        '/organizations/{organizationId}/logo',
+        'get',
+        '200',
+      )['application/json']?.schema,
+    ).toEqual({ $ref: '#/components/schemas/OrganizationLogoResponseDto' });
+    expect(
+      getResponseContent(
+        document,
+        '/organizations/{organizationId}/logo',
+        'put',
+        '200',
+      )['application/json']?.schema,
+    ).toEqual({ $ref: '#/components/schemas/OrganizationLogoResponseDto' });
+    expect(
+      getResponseContent(
+        document,
+        '/organizations/{organizationId}/logo/content',
+        'get',
+        '200',
+      )['image/png']?.schema,
+    ).toEqual({ type: 'string', format: 'binary' });
+    expect(
+      document.paths['/organizations/{organizationId}/logo'].put?.responses,
+    ).toHaveProperty('413');
+    expect(
+      document.components?.schemas?.OrganizationLogoResponseDto,
+    ).toMatchObject({
+      properties: {
+        rowState: { enum: ['ABSENT', 'PRESENT'] },
+        updatedAt: { nullable: true },
+        mimeType: { nullable: true },
       },
     });
     expect(

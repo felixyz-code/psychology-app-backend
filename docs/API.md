@@ -1608,6 +1608,10 @@ membership runtime and historical lifecycle without adding direct
 | PATCH | `/organizations/:organizationId/settings` | `organization.manage` (OWNER); requires exactly one of `expectedRowState: "ABSENT"` or canonical `expectedUpdatedAt`; duration is `null` or integer `1..1440`; `null` has an effective fallback of `60`, and an absent-row reset intentionally leaves the row absent |
 | GET | `/organizations/:organizationId/branding` | `organization.read`; `ACTIVE` and `SUSPENDED` selected organization state; returns `rowState`, nullable `updatedAt`, and nullable persisted `primaryColor` |
 | PATCH | `/organizations/:organizationId/branding` | `organization.manage` (OWNER); requires exactly one of `expectedRowState: "ABSENT"` or canonical `expectedUpdatedAt`; accepts only nullable `#RRGGBB` with bounded WCAG contrast validation; `null` selects the platform fallback |
+| GET | `/organizations/:organizationId/logo` | `organization.read`; `ACTIVE` and `SUSPENDED` selected organization state; returns explicit `ABSENT`/`PRESENT` metadata without storage identity |
+| GET | `/organizations/:organizationId/logo/content` | `organization.read`; protected PNG/JPEG stream only; private revalidated cache headers and opaque ETag; no public URL |
+| PUT | `/organizations/:organizationId/logo` | `organization.manage` (OWNER); multipart `file` plus exactly one of `expectedRowState: "ABSENT"` or `expectedUpdatedAt`; only validated PNG/JPEG up to 1 MiB and 64..2048 intrinsic pixels |
+| DELETE | `/organizations/:organizationId/logo` | `organization.manage` (OWNER); requires canonical `expectedUpdatedAt`; removes metadata before best-effort blob cleanup |
 | POST | `/organizations/:organizationId/ownership-transfer` | `ownership.transfer` (OWNER); dedicated owner handoff only |
 | GET | `/organizations/:organizationId/memberships` | `membership.read`; sanitized metadata, canonical `updatedAt`, and backend-owned target `allowedActions` |
 | PATCH | `/organizations/:organizationId/memberships/:membershipId/role` | owner/admin conditional; never OWNER grant; requires `expectedUpdatedAt` |

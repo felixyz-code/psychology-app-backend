@@ -244,6 +244,11 @@ and are not created automatically. POST-GO-LIVE.5.2 exposes only
 resources. Other reserved fields remain server-owned and are not part of those
 request or response contracts.
 
+`OrganizationLogoAsset` is also a reserved one-to-one row. POST-GO-LIVE.5.3
+uses it as the sole canonical current-logo metadata: storage keys stay internal,
+validated bytes live in the confined organization namespace, and protected
+reads always pass tenant authorization rather than a public/static route.
+
 ---
 
 ## OrganizationMembership
