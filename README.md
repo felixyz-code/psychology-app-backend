@@ -194,6 +194,29 @@ Demo password:
 ChangeMe123!
 ```
 
+## Observability & Structured Logging
+
+The backend adopts high-performance asynchronous structured JSON logging powered by `nestjs-pino` and `pino-http`.
+
+Key characteristics:
+- **JSON Formatting**: Emits machine-parseable JSON logs to stdout in production, compatible with modern log collectors and Docker `json-file` log rotation.
+- **Trace & Request ID Correlation**: Assigns or propagates the `x-request-id` header across all incoming requests and child loggers (`req.id` / `requestId`).
+- **Health Probes**: Integrates `@nestjs/terminus` health checks for liveness (`/health`, `/health/live`) and readiness (`/health/ready`), verifying PostgreSQL database connectivity, heap/RSS memory limits, and `/app/uploads` disk space.
+
+### Privacy & Sensitive Field Redaction
+
+To prevent sensitive patient data, credentials, and tokens from leaking into logs:
+- **HTTP Header Redaction**: `authorization`, `cookie`, and `set-cookie` headers are automatically stripped.
+- **Payload Redaction**: Sensitive property keys (e.g., `password`, `currentPassword`, `newPassword`, `token`, `secret`, `creditCard`, `credentials`) are scrubbed before logging.
+
+## Administrative Audit & Traceability
+
+Administrative and multi-tenant lifecycle mutations are tracked via a dedicated audit architecture:
+
+- **Entity `AuditLog`**: Stores persistent immutable audit records in PostgreSQL (`timestamp`, `organizationId`, `userId`, `action`, `resourceType`, `resourceId`, `ipAddress`, `userAgent`, `details`).
+- **Decorator `@AuditLog({ action, resourceType })`**: Declaratively annotates controller mutation methods (organization creation, status transitions, role adjustments, invitation acceptance, and asset updates).
+- **Interceptor `AuditInterceptor`**: Automatically extracts the authenticated user ID, resolved organization context, client IP address, and sanitized payload details without blocking primary business logic execution.
+
 ## Project Notes
 
 This backend handles sensitive clinical information.
@@ -201,3 +224,4 @@ This backend handles sensitive clinical information.
 Do not expose passwords, JWTs, clinical notes or personal patient data in logs or error messages.
 
 End of document.
+
