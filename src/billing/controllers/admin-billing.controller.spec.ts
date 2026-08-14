@@ -14,6 +14,7 @@ import { AuditLogMetadataOptions } from '../../audit-logs/audit-logs.types';
 import { ROLES_KEY } from '../../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../auth/guards/roles.guard';
+import type { AuthenticatedUser } from '../../auth/types/authenticated-user.type';
 import { SKIP_TENANT_CONTEXT_KEY } from '../../tenant-context/tenant-context.constants';
 import { BillingService } from '../billing.service';
 import { AdminBillingController } from './admin-billing.controller';
@@ -25,10 +26,15 @@ describe('AdminBillingController', () => {
     extendTrial: jest.Mock;
     planOverride: jest.Mock;
   };
-  let currentUser: { id: string; role?: UserRole } | null = null;
+  let currentUser: AuthenticatedUser | null = null;
 
   beforeEach(async () => {
-    currentUser = { id: 'admin-1', role: UserRole.ADMIN };
+    currentUser = {
+      id: 'admin-1',
+      name: 'Admin User',
+      email: 'admin@example.com',
+      role: UserRole.ADMIN,
+    };
 
     billingService = {
       manualTransition: jest.fn(),
@@ -91,7 +97,12 @@ describe('AdminBillingController', () => {
     });
 
     it('rejects non-ADMIN requests (e.g. PSYCHOLOGIST) with 403 Forbidden', async () => {
-      currentUser = { id: 'psychologist-1', role: UserRole.PSYCHOLOGIST };
+      currentUser = {
+        id: 'psychologist-1',
+        name: 'Psychologist User',
+        email: 'psychologist@example.com',
+        role: UserRole.PSYCHOLOGIST,
+      };
 
       await request(app.getHttpServer())
         .post('/admin/billing/manual-transition')
@@ -105,7 +116,12 @@ describe('AdminBillingController', () => {
     });
 
     it('rejects non-ADMIN requests for trial extensions with 403 Forbidden', async () => {
-      currentUser = { id: 'psychologist-1', role: UserRole.PSYCHOLOGIST };
+      currentUser = {
+        id: 'psychologist-1',
+        name: 'Psychologist User',
+        email: 'psychologist@example.com',
+        role: UserRole.PSYCHOLOGIST,
+      };
 
       await request(app.getHttpServer())
         .post('/admin/billing/extend-trial')
@@ -119,7 +135,12 @@ describe('AdminBillingController', () => {
     });
 
     it('rejects non-ADMIN requests for plan overrides with 403 Forbidden', async () => {
-      currentUser = { id: 'psychologist-1', role: UserRole.PSYCHOLOGIST };
+      currentUser = {
+        id: 'psychologist-1',
+        name: 'Psychologist User',
+        email: 'psychologist@example.com',
+        role: UserRole.PSYCHOLOGIST,
+      };
 
       await request(app.getHttpServer())
         .patch('/admin/billing/plan-override')

@@ -8,6 +8,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { MembershipRole, UserRole } from '@prisma/client';
 import { PrismaService } from '../../../../prisma/prisma.service';
 import { TenantResolutionMode } from '../../../../common/request-context/request-context.service';
+import type { TenantContext } from '../../../../tenant-context/tenant-context.types';
 import { BranchContextGuard } from './branch-context.guard';
 
 type TestRequest = {
