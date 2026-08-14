@@ -158,4 +158,68 @@ describe('ErrorEnvelopeFilter', () => {
       });
     },
   );
+
+  it('preserves PLAN_LIMIT_EXCEEDED contract code and quota details', () => {
+    const filter = new ErrorEnvelopeFilter(new RequestContextService());
+    const { host, json } = createHost();
+
+    filter.catch(
+      new HttpException(
+        {
+          code: 'PLAN_LIMIT_EXCEEDED',
+          message: 'Patient limit reached for current plan',
+          details: {
+            quotaKey: 'MAX_PATIENTS',
+            limit: 25,
+            currentUsage: 25,
+          },
+        },
+        403,
+      ),
+      host,
+    );
+
+    expect(json).toHaveBeenCalledWith({
+      statusCode: 403,
+      code: 'PLAN_LIMIT_EXCEEDED',
+      message: 'Patient limit reached for current plan',
+      requestId: 'unavailable',
+      details: {
+        quotaKey: 'MAX_PATIENTS',
+        limit: 25,
+        currentUsage: 25,
+      },
+    });
+  });
+
+  it('preserves FEATURE_NOT_AVAILABLE contract code and feature details', () => {
+    const filter = new ErrorEnvelopeFilter(new RequestContextService());
+    const { host, json } = createHost();
+
+    filter.catch(
+      new HttpException(
+        {
+          code: 'FEATURE_NOT_AVAILABLE',
+          message: 'PDF export is not available on your current plan',
+          details: {
+            featureKey: 'CAN_EXPORT_PDF',
+            requiredTier: 'PROFESSIONAL',
+          },
+        },
+        403,
+      ),
+      host,
+    );
+
+    expect(json).toHaveBeenCalledWith({
+      statusCode: 403,
+      code: 'FEATURE_NOT_AVAILABLE',
+      message: 'PDF export is not available on your current plan',
+      requestId: 'unavailable',
+      details: {
+        featureKey: 'CAN_EXPORT_PDF',
+        requiredTier: 'PROFESSIONAL',
+      },
+    });
+  });
 });

@@ -27,6 +27,8 @@ import { OrganizationLogoAssetsModule } from './organization-logo-assets/organiz
 import { AuditLogsModule } from './audit-logs/audit-logs.module';
 import { AuditInterceptor } from './audit-logs/interceptors/audit.interceptor';
 import { OpsModule } from './ops/ops.module';
+import { EntitlementsModule } from './entitlements/entitlements.module';
+import { BillingModule } from './billing/billing.module';
 
 @Module({
   imports: [
@@ -50,6 +52,8 @@ import { OpsModule } from './ops/ops.module';
     OrganizationLogoAssetsModule,
     AuditLogsModule,
     OpsModule,
+    EntitlementsModule,
+    BillingModule,
   ],
   controllers: [AppController],
   providers: [

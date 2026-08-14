@@ -21,6 +21,7 @@ import {
   PsychologistProfileStatus,
   UserRole,
 } from '@prisma/client';
+import { seedCommercialCoreData } from './seed-commercial';
 
 const connectionString = process.env.DATABASE_URL;
 
@@ -1695,6 +1696,9 @@ async function resetTenantDevelopmentSeed() {
     prisma.organizationBranding.deleteMany({
       where: { organizationId: { in: organizationIds } },
     }),
+    prisma.subscription.deleteMany({
+      where: { organizationId: { in: organizationIds } },
+    }),
     prisma.organization.deleteMany({
       where: {
         OR: [
@@ -1753,6 +1757,11 @@ async function createSeedDocumentFiles() {
 
 async function seedTenantDevelopmentData(passwordHash: string) {
   await prisma.organization.createMany({ data: organizations });
+  await seedCommercialCoreData(prisma, {
+    orgA: ids.orgA,
+    orgB: ids.orgB,
+    orgSuspended: ids.orgSuspended,
+  });
   await prisma.user.createMany({
     data: users.map((seedUser) => ({
       ...seedUser,

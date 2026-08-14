@@ -93,20 +93,60 @@ enum PatientAssignmentStatus {
   REVOKED
 }
 
+enum PlanTier {
+  FREE
+  PROFESSIONAL
+  ENTERPRISE
+  CUSTOM
+}
+
+enum BillingInterval {
+  MONTHLY
+  ANNUAL
+  LIFETIME
+}
+
+enum SubscriptionStatus {
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  EXPIRED
+}
+
+enum PaymentProvider {
+  MANUAL
+  INTERNAL
+  STRIPE
+  MERCADOPAGO
+}
+
+enum EntitlementType {
+  NUMERIC
+  BOOLEAN
+}
+
+enum EntitlementCategory {
+  CAPACITY
+  FEATURE_FLAG
+  INTEGRATION
+  SUPPORT
+}
+
 model User {
-  id                    String                   @id @default(uuid()) @db.Uuid
-  name                  String                   @db.VarChar(150)
+  id                              String                   @id @default(uuid()) @db.Uuid
+  name                            String                   @db.VarChar(150)
   email                 String                   @unique @db.VarChar(255)
   normalizedEmail       String                   @unique @db.VarChar(255)
-  passwordHash          String                   @map("password") @db.VarChar(255)
-  role                  UserRole
-  preferredOrganizationId        String?                  @db.Uuid
-  patients              Patient[]
-  sessionNotes          SessionNote[]
-  uploadedDocuments     Document[]
-  appointments          Appointment[]
-  financialTransactions FinancialTransaction[]
-  preferredOrganization          Organization?            @relation("UserPreferredOrganization", fields: [preferredOrganizationId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  passwordHash                    String                   @map("password") @db.VarChar(255)
+  role                            UserRole
+  preferredOrganizationId         String?                  @db.Uuid
+  patients                        Patient[]
+  sessionNotes                    SessionNote[]
+  uploadedDocuments               Document[]
+  appointments                    Appointment[]
+  financialTransactions           FinancialTransaction[]
+  preferredOrganization           Organization?            @relation("UserPreferredOrganization", fields: [preferredOrganizationId], references: [id], onDelete: SetNull, onUpdate: Cascade)
   memberships                     OrganizationMembership[]
   invitedOrganizationInvitations  OrganizationInvitation[] @relation("OrganizationInvitationInvitedUser")
   acceptedOrganizationInvitations OrganizationInvitation[] @relation("OrganizationInvitationAcceptedByUser")
@@ -120,30 +160,31 @@ model User {
 }
 
 model Organization {
-  id           String                   @id @default(uuid()) @db.Uuid
-  slug         String                   @unique @db.VarChar(100)
-  legalName    String                   @db.VarChar(255)
-  displayName  String                   @db.VarChar(150)
-  status       OrganizationStatus       @default(PROVISIONING)
-  timezone     String                   @default("UTC") @db.VarChar(100)
-  locale       String                   @default("es-MX") @db.VarChar(20)
-  currency     String                   @default("MXN") @db.Char(3)
-  memberships  OrganizationMembership[]
-  invitations  OrganizationInvitation[]
-  settings     OrganizationSettings?
-  branding     OrganizationBranding?
-  logoAsset    OrganizationLogoAsset?
-  preferredByUsers User[]               @relation("UserPreferredOrganization")
-  patients     Patient[]
-  caseFiles    CaseFile[]
-  sessionNotes SessionNote[]
-  documents    Document[]
-  appointments Appointment[]
-  transactions FinancialTransaction[]
-  assignments  PatientAssignment[]
-  auditLogs    AuditLog[]
-  createdAt    DateTime                 @default(now()) @db.Timestamptz(3)
-  updatedAt    DateTime                 @updatedAt @db.Timestamptz(3)
+  id               String                   @id @default(uuid()) @db.Uuid
+  slug             String                   @unique @db.VarChar(100)
+  legalName        String                   @db.VarChar(255)
+  displayName      String                   @db.VarChar(150)
+  status           OrganizationStatus       @default(PROVISIONING)
+  timezone         String                   @default("UTC") @db.VarChar(100)
+  locale           String                   @default("es-MX") @db.VarChar(20)
+  currency         String                   @default("MXN") @db.Char(3)
+  memberships      OrganizationMembership[]
+  invitations      OrganizationInvitation[]
+  settings         OrganizationSettings?
+  branding         OrganizationBranding?
+  logoAsset        OrganizationLogoAsset?
+  preferredByUsers User[]                   @relation("UserPreferredOrganization")
+  patients         Patient[]
+  caseFiles        CaseFile[]
+  sessionNotes     SessionNote[]
+  documents        Document[]
+  appointments     Appointment[]
+  transactions     FinancialTransaction[]
+  assignments      PatientAssignment[]
+  auditLogs        AuditLog[]
+  subscriptions    Subscription[]
+  createdAt        DateTime                 @default(now()) @db.Timestamptz(3)
+  updatedAt        DateTime                 @updatedAt @db.Timestamptz(3)
 
   @@map("organizations")
 }
@@ -433,3 +474,89 @@ model AuditLog {
   @@map("audit_logs")
 }
 
+model Plan {
+  id              String            @id @default(uuid()) @db.Uuid
+  tier            PlanTier
+  code            String            @unique @db.VarChar(50)
+  name            String            @db.VarChar(100)
+  description     String?           @db.Text
+  billingInterval BillingInterval   @default(MONTHLY)
+  basePrice       Decimal           @default(0.00) @db.Decimal(10, 2)
+  currency        String            @default("MXN") @db.Char(3)
+  trialDays       Int               @default(0) @db.Integer
+  isActive        Boolean           @default(true)
+  isPublic        Boolean           @default(true)
+  sortOrder       Int               @default(0) @db.Integer
+  metadata        Json?
+  subscriptions   Subscription[]
+  entitlements    PlanEntitlement[]
+  createdAt       DateTime          @default(now()) @db.Timestamptz(3)
+  updatedAt       DateTime          @updatedAt @db.Timestamptz(3)
+
+  @@index([tier, isActive])
+  @@index([isPublic, sortOrder])
+  @@map("plans")
+}
+
+model Subscription {
+  id                     String             @id @default(uuid()) @db.Uuid
+  organizationId         String             @db.Uuid
+  planId                 String             @db.Uuid
+  status                 SubscriptionStatus @default(TRIALING)
+  externalProvider       PaymentProvider    @default(MANUAL)
+  externalSubscriptionId String?            @db.VarChar(255)
+  externalCustomerId     String?            @db.VarChar(255)
+  trialStartedAt         DateTime?          @db.Timestamptz(3)
+  trialEndsAt            DateTime?          @db.Timestamptz(3)
+  currentPeriodStartedAt DateTime           @default(now()) @db.Timestamptz(3)
+  currentPeriodEndsAt    DateTime           @db.Timestamptz(3)
+  gracePeriodEndsAt      DateTime?          @db.Timestamptz(3)
+  canceledAt             DateTime?          @db.Timestamptz(3)
+  endedAt                DateTime?          @db.Timestamptz(3)
+  seatQuantity           Int                @default(1) @db.Integer
+  cancelReason           String?            @db.VarChar(500)
+  metadata               Json?
+  organization           Organization       @relation(fields: [organizationId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  plan                   Plan               @relation(fields: [planId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  createdAt              DateTime           @default(now()) @db.Timestamptz(3)
+  updatedAt              DateTime           @updatedAt @db.Timestamptz(3)
+
+  @@index([organizationId, status])
+  @@index([status, currentPeriodEndsAt])
+  @@index([externalProvider, externalSubscriptionId])
+  @@index([externalCustomerId])
+  @@map("subscriptions")
+}
+
+model EntitlementDefinition {
+  id               String              @id @default(uuid()) @db.Uuid
+  key              String              @unique @db.VarChar(100)
+  name             String              @db.VarChar(150)
+  description      String?             @db.Text
+  type             EntitlementType
+  category         EntitlementCategory @default(FEATURE_FLAG)
+  defaultValue     Json
+  planEntitlements PlanEntitlement[]
+  createdAt        DateTime            @default(now()) @db.Timestamptz(3)
+  updatedAt        DateTime            @updatedAt @db.Timestamptz(3)
+
+  @@index([category])
+  @@map("entitlement_definitions")
+}
+
+model PlanEntitlement {
+  id                      String                @id @default(uuid()) @db.Uuid
+  planId                  String                @db.Uuid
+  entitlementDefinitionId String                @db.Uuid
+  numericValue            Int?                  @db.Integer
+  booleanValue            Boolean?
+  metadata                Json?
+  plan                    Plan                  @relation(fields: [planId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  definition              EntitlementDefinition @relation(fields: [entitlementDefinitionId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  createdAt               DateTime              @default(now()) @db.Timestamptz(3)
+  updatedAt               DateTime              @updatedAt @db.Timestamptz(3)
+
+  @@unique([planId, entitlementDefinitionId])
+  @@index([entitlementDefinitionId])
+  @@map("plan_entitlements")
+}

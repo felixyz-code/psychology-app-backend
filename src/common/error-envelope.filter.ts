@@ -27,6 +27,8 @@ const CONTRACT_ERROR_CODES = new Set([
   'INVITATION_TERMINAL',
   'INVITATION_RECIPIENT_MISMATCH',
   'RATE_LIMITED',
+  'PLAN_LIMIT_EXCEEDED',
+  'FEATURE_NOT_AVAILABLE',
   'UNEXPECTED_ERROR',
 ]);
 
@@ -196,6 +198,14 @@ export class ErrorEnvelopeFilter implements ExceptionFilter {
 
     if (code === 'CONCURRENT_UPDATE') {
       return { retryContext: true };
+    }
+
+    if (code === 'PLAN_LIMIT_EXCEEDED' || code === 'FEATURE_NOT_AVAILABLE') {
+      return 'details' in response &&
+        response.details &&
+        typeof response.details === 'object'
+        ? (response.details as Record<string, unknown>)
+        : null;
     }
 
     if (code === 'UNEXPECTED_ERROR') {
