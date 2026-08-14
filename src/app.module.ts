@@ -26,6 +26,7 @@ import { OrganizationsModule } from './organizations/organizations.module';
 import { OrganizationLogoAssetsModule } from './organization-logo-assets/organization-logo-assets.module';
 import { AuditLogsModule } from './audit-logs/audit-logs.module';
 import { AuditInterceptor } from './audit-logs/interceptors/audit.interceptor';
+import { PaefGovernanceModule } from './common/paef-governance';
 import { OpsModule } from './ops/ops.module';
 import { EntitlementsModule } from './entitlements/entitlements.module';
 import { BillingModule } from './billing/billing.module';
@@ -54,6 +55,7 @@ import { BillingModule } from './billing/billing.module';
     OpsModule,
     EntitlementsModule,
     BillingModule,
+    PaefGovernanceModule,
   ],
   controllers: [AppController],
   providers: [
