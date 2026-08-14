@@ -183,6 +183,14 @@ export class EntitlementsService {
         return Math.ceil(totalBytes / (1024 * 1024));
       }
 
+      case EntitlementKey.MAX_BRANCHES:
+        return this.prisma.branch.count({
+          where: {
+            organizationId,
+            deletedAt: null,
+          },
+        });
+
       default:
         return 0;
     }

@@ -12,9 +12,13 @@ export const PAEF_TARGET_SCOPE_KEY = 'paef_target_scope';
  */
 export const RequireAuthority = (
   effectClass: EffectClass,
-  targetScope: string
+  targetScope: string,
 ) => {
-  return (target: object, key?: string | symbol, descriptor?: TypedPropertyDescriptor<any>) => {
+  return (
+    target: object,
+    key?: string | symbol,
+    descriptor?: TypedPropertyDescriptor<any>,
+  ) => {
     SetMetadata(PAEF_EFFECT_CLASS_KEY, effectClass)(target, key!, descriptor!);
     SetMetadata(PAEF_TARGET_SCOPE_KEY, targetScope)(target, key!, descriptor!);
   };

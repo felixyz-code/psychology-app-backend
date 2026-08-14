@@ -116,10 +116,12 @@ describe('ManualBillingAdapter', () => {
       prismaMock.plan.findFirst.mockResolvedValue(mockProPlan);
       prismaMock.subscription.updateMany.mockResolvedValue({ count: 0 });
 
-      prismaMock.subscription.create.mockImplementation(({ data }) => ({
-        id: 'sub-created-uuid',
-        ...data,
-      }));
+      prismaMock.subscription.create.mockImplementation(
+        ({ data }: { data: Record<string, unknown> }) => ({
+          id: 'sub-created-uuid',
+          ...data,
+        }),
+      );
 
       const result = await adapter.createSubscription(mockOrgId, 'pro-monthly');
 
@@ -136,7 +138,7 @@ describe('ManualBillingAdapter', () => {
         },
         data: expect.objectContaining({
           status: SubscriptionStatus.CANCELED,
-        }),
+        }) as Record<string, unknown>,
       });
 
       expect(prismaMock.subscription.create).toHaveBeenCalledWith({
@@ -147,7 +149,7 @@ describe('ManualBillingAdapter', () => {
           externalProvider: PaymentProvider.MANUAL,
           externalCustomerId: `manual_cus_${mockOrgId}`,
           seatQuantity: 1,
-        }),
+        }) as Record<string, unknown>,
       });
 
       expect(result.status).toBe(SubscriptionStatus.TRIALING);
@@ -160,10 +162,12 @@ describe('ManualBillingAdapter', () => {
       prismaMock.plan.findFirst.mockResolvedValue(mockFreePlan);
       prismaMock.subscription.updateMany.mockResolvedValue({ count: 0 });
 
-      prismaMock.subscription.create.mockImplementation(({ data }) => ({
-        id: 'sub-free-uuid',
-        ...data,
-      }));
+      prismaMock.subscription.create.mockImplementation(
+        ({ data }: { data: Record<string, unknown> }) => ({
+          id: 'sub-free-uuid',
+          ...data,
+        }),
+      );
 
       const result = await adapter.createSubscription(
         mockOrgId,
@@ -179,7 +183,7 @@ describe('ManualBillingAdapter', () => {
           externalCustomerId: 'custom_cus_123',
           trialStartedAt: null,
           trialEndsAt: null,
-        }),
+        }) as Record<string, unknown>,
       });
 
       expect(result.status).toBe(SubscriptionStatus.ACTIVE);
@@ -216,10 +220,12 @@ describe('ManualBillingAdapter', () => {
 
       prismaMock.subscription.findFirst.mockResolvedValue(existingSub);
       prismaMock.plan.findFirst.mockResolvedValue(mockEnterprisePlan);
-      prismaMock.subscription.update.mockImplementation(({ data }) => ({
-        ...existingSub,
-        ...data,
-      }));
+      prismaMock.subscription.update.mockImplementation(
+        ({ data }: { data: Record<string, unknown> }) => ({
+          ...existingSub,
+          ...data,
+        }),
+      );
 
       const result = await adapter.changePlan(
         'manual_sub_abc123',
@@ -236,7 +242,7 @@ describe('ManualBillingAdapter', () => {
           canceledAt: null,
           endedAt: null,
           cancelReason: null,
-        }),
+        }) as Record<string, unknown>,
       });
 
       expect(result.status).toBe(SubscriptionStatus.ACTIVE);
@@ -274,10 +280,12 @@ describe('ManualBillingAdapter', () => {
       };
 
       prismaMock.subscription.findFirst.mockResolvedValue(existingSub);
-      prismaMock.subscription.update.mockImplementation(({ data }) => ({
-        ...existingSub,
-        ...data,
-      }));
+      prismaMock.subscription.update.mockImplementation(
+        ({ data }: { data: Record<string, unknown> }) => ({
+          ...existingSub,
+          ...data,
+        }),
+      );
 
       const result = await adapter.cancelSubscription(
         'manual_sub_cancel_1',
@@ -289,7 +297,7 @@ describe('ManualBillingAdapter', () => {
         data: expect.objectContaining({
           status: SubscriptionStatus.CANCELED,
           cancelReason: 'Customer requested cancellation via help desk',
-        }),
+        }) as Record<string, unknown>,
       });
 
       expect(result.status).toBe(SubscriptionStatus.CANCELED);
@@ -304,10 +312,12 @@ describe('ManualBillingAdapter', () => {
       };
 
       prismaMock.subscription.findFirst.mockResolvedValue(existingSub);
-      prismaMock.subscription.update.mockImplementation(({ data }) => ({
-        ...existingSub,
-        ...data,
-      }));
+      prismaMock.subscription.update.mockImplementation(
+        ({ data }: { data: Record<string, unknown> }) => ({
+          ...existingSub,
+          ...data,
+        }),
+      );
 
       const result = await adapter.cancelSubscription('manual_sub_cancel_2');
 
@@ -316,7 +326,7 @@ describe('ManualBillingAdapter', () => {
         data: expect.objectContaining({
           status: SubscriptionStatus.CANCELED,
           cancelReason: 'Manually canceled by administrator/user',
-        }),
+        }) as Record<string, unknown>,
       });
 
       expect(result.status).toBe(SubscriptionStatus.CANCELED);

@@ -68,10 +68,7 @@ export class BillingService {
       externalSubscriptionId,
       newPlanCode,
     });
-    return this.billingProvider.changePlan(
-      externalSubscriptionId,
-      newPlanCode,
-    );
+    return this.billingProvider.changePlan(externalSubscriptionId, newPlanCode);
   }
 
   /**
@@ -100,9 +97,8 @@ export class BillingService {
     status: SubscriptionStatus,
     reason?: string,
   ) {
-    const subscription = await this.findSubscriptionByIdOrExternal(
-      subscriptionId,
-    );
+    const subscription =
+      await this.findSubscriptionByIdOrExternal(subscriptionId);
 
     if (!subscription) {
       throw new NotFoundException(
@@ -134,8 +130,7 @@ export class BillingService {
         break;
       case SubscriptionStatus.EXPIRED:
         updateData.endedAt = now;
-        updateData.cancelReason =
-          reason ?? 'Administrative manual expiration';
+        updateData.cancelReason = reason ?? 'Administrative manual expiration';
         break;
       case SubscriptionStatus.ACTIVE:
         updateData.canceledAt = null;
@@ -147,7 +142,7 @@ export class BillingService {
           updateData.currentPeriodEndsAt = newEnd;
         }
         break;
-      case SubscriptionStatus.TRIALING:
+      case SubscriptionStatus.TRIALING: {
         updateData.canceledAt = null;
         updateData.endedAt = null;
         updateData.trialStartedAt = subscription.trialStartedAt ?? now;
@@ -156,11 +151,13 @@ export class BillingService {
         updateData.trialEndsAt = trialEnd;
         updateData.currentPeriodEndsAt = trialEnd;
         break;
-      case SubscriptionStatus.PAST_DUE:
+      }
+      case SubscriptionStatus.PAST_DUE: {
         const graceEnd = new Date(now);
         graceEnd.setDate(graceEnd.getDate() + 7);
         updateData.gracePeriodEndsAt = graceEnd;
         break;
+      }
     }
 
     const updated = await this.prisma.subscription.update({
@@ -184,9 +181,8 @@ export class BillingService {
    * Administrative override to extend a trial subscription's end date.
    */
   async extendTrial(subscriptionId: string, daysToAdd: number) {
-    const subscription = await this.findSubscriptionByIdOrExternal(
-      subscriptionId,
-    );
+    const subscription =
+      await this.findSubscriptionByIdOrExternal(subscriptionId);
 
     if (!subscription) {
       throw new NotFoundException(
@@ -228,9 +224,8 @@ export class BillingService {
    * Administrative override to force a subscription plan change.
    */
   async planOverride(subscriptionId: string, newPlanCode: string) {
-    const subscription = await this.findSubscriptionByIdOrExternal(
-      subscriptionId,
-    );
+    const subscription =
+      await this.findSubscriptionByIdOrExternal(subscriptionId);
 
     if (!subscription) {
       throw new NotFoundException(
@@ -350,10 +345,7 @@ export class BillingService {
   /**
    * Helper to calculate period end date from interval.
    */
-  private calculatePeriodEnd(
-    startDate: Date,
-    interval: BillingInterval,
-  ): Date {
+  private calculatePeriodEnd(startDate: Date, interval: BillingInterval): Date {
     const end = new Date(startDate);
     switch (interval) {
       case BillingInterval.MONTHLY:

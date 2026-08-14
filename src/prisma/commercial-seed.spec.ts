@@ -7,7 +7,7 @@ import {
 import { PlanTier } from '@prisma/client';
 
 describe('Commercial Seed Data & Catalog Integrity', () => {
-  it('defines the required 7 baseline entitlement keys', () => {
+  it('defines the required 9 baseline entitlement keys', () => {
     const keys = entitlementDefinitions.map((d) => d.key);
     expect(keys).toContain('MAX_PATIENTS');
     expect(keys).toContain('MAX_STAFF_SEATS');
@@ -16,7 +16,9 @@ describe('Commercial Seed Data & Catalog Integrity', () => {
     expect(keys).toContain('CAN_CUSTOM_BRAND');
     expect(keys).toContain('MAX_STORAGE_MB');
     expect(keys).toContain('API_ACCESS_ENABLED');
-    expect(keys).toHaveLength(7);
+    expect(keys).toContain('MULTI_BRANCH');
+    expect(keys).toContain('MAX_BRANCHES');
+    expect(keys).toHaveLength(9);
   });
 
   it('defines the 3 baseline commercial tiers: FREE, PROFESSIONAL, ENTERPRISE', () => {
@@ -26,9 +28,9 @@ describe('Commercial Seed Data & Catalog Integrity', () => {
     expect(tiers).toContain(PlanTier.ENTERPRISE);
   });
 
-  it('maps all 7 entitlements on each commercial plan', () => {
+  it('maps all 9 entitlements on each commercial plan', () => {
     for (const plan of plans) {
-      expect(plan.entitlements).toHaveLength(7);
+      expect(plan.entitlements).toHaveLength(9);
     }
   });
 
@@ -46,9 +48,19 @@ describe('Commercial Seed Data & Catalog Integrity', () => {
       (e) => e.definitionId === commercialIds.entCanExportPdf,
     );
     expect(pdfEnt?.booleanValue).toBe(false);
+
+    const multiBranchEnt = freePlan?.entitlements.find(
+      (e) => e.definitionId === commercialIds.entMultiBranch,
+    );
+    expect(multiBranchEnt?.booleanValue).toBe(false);
+
+    const maxBranchesEnt = freePlan?.entitlements.find(
+      (e) => e.definitionId === commercialIds.entMaxBranches,
+    );
+    expect(maxBranchesEnt?.numericValue).toBe(1);
   });
 
-  it('configures Enterprise plan with uncapped limits (-1) and all features', () => {
+  it('configures Enterprise plan with uncapped limits and all features', () => {
     const entPlan = plans.find((p) => p.tier === PlanTier.ENTERPRISE);
     expect(entPlan).toBeDefined();
 
@@ -66,6 +78,11 @@ describe('Commercial Seed Data & Catalog Integrity', () => {
       (e) => e.definitionId === commercialIds.entCanCustomBrand,
     );
     expect(brandEnt?.booleanValue).toBe(true);
+
+    const maxBranchesEnt = entPlan?.entitlements.find(
+      (e) => e.definitionId === commercialIds.entMaxBranches,
+    );
+    expect(maxBranchesEnt?.numericValue).toBe(999);
   });
 
   it('executes seedCommercialCoreData upserts against prisma client', async () => {
@@ -82,9 +99,9 @@ describe('Commercial Seed Data & Catalog Integrity', () => {
       orgSuspended: 'org-suspended-uuid',
     });
 
-    expect(prisma.entitlementDefinition.upsert).toHaveBeenCalledTimes(7);
+    expect(prisma.entitlementDefinition.upsert).toHaveBeenCalledTimes(9);
     expect(prisma.plan.upsert).toHaveBeenCalledTimes(3);
-    expect(prisma.planEntitlement.upsert).toHaveBeenCalledTimes(21);
+    expect(prisma.planEntitlement.upsert).toHaveBeenCalledTimes(27);
     expect(prisma.subscription.upsert).toHaveBeenCalledTimes(3);
   });
 });

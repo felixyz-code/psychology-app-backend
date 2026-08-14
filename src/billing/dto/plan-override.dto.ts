@@ -11,7 +11,8 @@ export class PlanOverrideDto {
   subscriptionId: string;
 
   @ApiProperty({
-    description: 'Target plan code to assign (e.g. enterprise-custom, pro-monthly)',
+    description:
+      'Target plan code to assign (e.g. enterprise-custom, pro-monthly)',
     example: 'enterprise-custom',
   })
   @IsNotEmpty()

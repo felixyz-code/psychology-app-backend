@@ -29,6 +29,8 @@ const CONTRACT_ERROR_CODES = new Set([
   'RATE_LIMITED',
   'PLAN_LIMIT_EXCEEDED',
   'FEATURE_NOT_AVAILABLE',
+  'BRANCH_CODE_EXISTS',
+  'CANNOT_DELETE_ONLY_BRANCH',
   'UNEXPECTED_ERROR',
 ]);
 
@@ -69,6 +71,8 @@ export class ErrorEnvelopeFilter implements ExceptionFilter {
           requestId,
           statusCode,
           code,
+          error: exception instanceof Error ? exception.message : exception,
+          stack: exception instanceof Error ? exception.stack : undefined,
         }),
       );
     }

@@ -13,8 +13,8 @@ describe('PaefAuthorityGuard', () => {
   });
 
   const createMockContext = (
-    headers: Record<string, any> = {},
-    user?: any
+    headers: Record<string, string | undefined> = {},
+    user?: { id?: string; email?: string; username?: string; role?: string },
   ): ExecutionContext => {
     return {
       getHandler: () => ({}),
@@ -29,7 +29,9 @@ describe('PaefAuthorityGuard', () => {
   };
 
   it('should allow routes not marked as AUTHORITY_SENSITIVE', () => {
-    jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(EffectClass.READ_ONLY);
+    jest
+      .spyOn(reflector, 'getAllAndOverride')
+      .mockReturnValue(EffectClass.READ_ONLY);
     const context = createMockContext();
 
     expect(guard.canActivate(context)).toBe(true);
@@ -46,33 +48,52 @@ describe('PaefAuthorityGuard', () => {
     try {
       guard.canActivate(context);
       fail('Expected guard to throw HttpException');
-    } catch (err: any) {
+    } catch (err) {
       expect(err).toBeInstanceOf(HttpException);
-      expect(err.getStatus()).toBe(HttpStatus.PRECONDITION_REQUIRED);
-      const response = err.getResponse();
+      const httpErr = err as HttpException;
+      expect(httpErr.getStatus()).toBe(HttpStatus.PRECONDITION_REQUIRED);
+      const response = httpErr.getResponse() as {
+        paefAuthorityRequest: { requiredSubject: string };
+      };
       expect(response.paefAuthorityRequest).toBeDefined();
-      expect(response.paefAuthorityRequest.requiredSubject).toBe('clinical:diagnostic-ai');
+      expect(response.paefAuthorityRequest.requiredSubject).toBe(
+        'clinical:diagnostic-ai',
+      );
     }
   });
 
-  it('should allow AUTHORITY_SENSITIVE route when valid HumanAuthorityDecision header is provided', () => {
+  it('should allow AUTHORITY_SENSITIVE route when valid human authority header is present', () => {
     jest.spyOn(reflector, 'getAllAndOverride').mockImplementation((key) => {
       if (key === 'paef_effect_class') return EffectClass.AUTHORITY_SENSITIVE;
       return 'clinical:diagnostic-ai';
     });
 
-    const validDecision: HumanAuthorityDecision = {
-      decisionId: 'DEC-001',
-      authorityIdentity: 'lead.psychologist@clinic.org',
-      governanceBasis: 'DSM-5 Clinical Protocol Approval',
+    const decision: HumanAuthorityDecision = {
+      decisionId: 'AUTH-12345',
+      authorityIdentity: 'dr.martinez@psychclinic.mx',
+      governanceBasis: 'NOM-024 Clinical Verification Protocol Section 4.2',
       targetScope: 'clinical:diagnostic-ai',
-      timestampUtc: new Date().toISOString(),
+      timestampUtc: '2026-08-14T08:00:00.000Z',
       isValid: true,
     };
 
     const context = createMockContext({
-      'x-paef-authority-decision': JSON.stringify(validDecision),
+      'x-paef-authority-decision': JSON.stringify(decision),
     });
+
+    expect(guard.canActivate(context)).toBe(true);
+  });
+
+  it('should allow direct clinical authority session from user role (CLINICAL_LEAD)', () => {
+    jest.spyOn(reflector, 'getAllAndOverride').mockImplementation((key) => {
+      if (key === 'paef_effect_class') return EffectClass.AUTHORITY_SENSITIVE;
+      return 'clinical:treatment-modification';
+    });
+
+    const context = createMockContext(
+      {},
+      { id: 'usr-1', email: 'lead@clinic.test', role: 'CLINICAL_LEAD' },
+    );
 
     expect(guard.canActivate(context)).toBe(true);
   });
@@ -99,10 +120,11 @@ describe('PaefAuthorityGuard', () => {
 
     try {
       guard.canActivate(context);
-      fail('Expected guard to throw HttpException');
-    } catch (err: any) {
+      fail('Expected guard to throw HttpException on invalid decision');
+    } catch (err) {
       expect(err).toBeInstanceOf(HttpException);
-      expect(err.getStatus()).toBe(HttpStatus.FORBIDDEN);
+      const httpErr = err as HttpException;
+      expect(httpErr.getStatus()).toBe(HttpStatus.FORBIDDEN);
     }
   });
 });

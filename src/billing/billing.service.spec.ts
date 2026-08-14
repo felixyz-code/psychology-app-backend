@@ -4,11 +4,15 @@ import { BillingInterval, PlanTier, SubscriptionStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { BILLING_PROVIDER } from './billing.constants';
 import { BillingService } from './billing.service';
-import type { BillingProvider } from './interfaces/billing-provider.interface';
 
 describe('BillingService', () => {
   let service: BillingService;
-  let providerMock: jest.Mocked<BillingProvider>;
+  let providerMock: {
+    createCustomer: jest.Mock;
+    createSubscription: jest.Mock;
+    changePlan: jest.Mock;
+    cancelSubscription: jest.Mock;
+  };
   let prismaMock: {
     subscription: {
       findFirst: jest.Mock;
@@ -165,10 +169,12 @@ describe('BillingService', () => {
         currentPeriodEndsAt: new Date('2026-09-01'),
       };
       prismaMock.subscription.findFirst.mockResolvedValue(existing);
-      prismaMock.subscription.update.mockImplementation(({ data }) => ({
-        ...existing,
-        ...data,
-      }));
+      prismaMock.subscription.update.mockImplementation(
+        ({ data }: { data: Record<string, unknown> }) => ({
+          ...existing,
+          ...data,
+        }),
+      );
 
       const result = await service.manualTransition(
         'sub-1',
@@ -181,7 +187,7 @@ describe('BillingService', () => {
         data: expect.objectContaining({
           status: SubscriptionStatus.CANCELED,
           cancelReason: 'Fraud investigation',
-        }),
+        }) as Record<string, unknown>,
         include: { plan: true },
       });
       expect(result.status).toBe(SubscriptionStatus.CANCELED);
@@ -195,10 +201,12 @@ describe('BillingService', () => {
         currentPeriodEndsAt: past,
       };
       prismaMock.subscription.findFirst.mockResolvedValue(existing);
-      prismaMock.subscription.update.mockImplementation(({ data }) => ({
-        ...existing,
-        ...data,
-      }));
+      prismaMock.subscription.update.mockImplementation(
+        ({ data }: { data: Record<string, unknown> }) => ({
+          ...existing,
+          ...data,
+        }),
+      );
 
       const result = await service.manualTransition(
         'sub-2',
@@ -212,7 +220,7 @@ describe('BillingService', () => {
           canceledAt: null,
           endedAt: null,
           cancelReason: null,
-        }),
+        }) as Record<string, unknown>,
         include: { plan: true },
       });
       expect(result.status).toBe(SubscriptionStatus.ACTIVE);
@@ -236,10 +244,12 @@ describe('BillingService', () => {
         trialEndsAt: future,
       };
       prismaMock.subscription.findFirst.mockResolvedValue(existing);
-      prismaMock.subscription.update.mockImplementation(({ data }) => ({
-        ...existing,
-        ...data,
-      }));
+      prismaMock.subscription.update.mockImplementation(
+        ({ data }: { data: Record<string, unknown> }) => ({
+          ...existing,
+          ...data,
+        }),
+      );
 
       const result = await service.extendTrial('sub-trial', 7);
 
@@ -247,7 +257,7 @@ describe('BillingService', () => {
         where: { id: 'sub-trial' },
         data: expect.objectContaining({
           status: SubscriptionStatus.TRIALING,
-        }),
+        }) as Record<string, unknown>,
         include: { plan: true },
       });
       expect(result.status).toBe(SubscriptionStatus.TRIALING);
@@ -279,11 +289,13 @@ describe('BillingService', () => {
 
       prismaMock.subscription.findFirst.mockResolvedValue(existing);
       prismaMock.plan.findFirst.mockResolvedValue(newPlan);
-      prismaMock.subscription.update.mockImplementation(({ data }) => ({
-        ...existing,
-        ...data,
-        plan: newPlan,
-      }));
+      prismaMock.subscription.update.mockImplementation(
+        ({ data }: { data: Record<string, unknown> }) => ({
+          ...existing,
+          ...data,
+          plan: newPlan,
+        }),
+      );
 
       const result = await service.planOverride(
         'sub-override',
@@ -295,7 +307,7 @@ describe('BillingService', () => {
         data: expect.objectContaining({
           planId: 'new-plan-id',
           status: SubscriptionStatus.ACTIVE,
-        }),
+        }) as Record<string, unknown>,
         include: { plan: true },
       });
       expect(result.planId).toBe('new-plan-id');

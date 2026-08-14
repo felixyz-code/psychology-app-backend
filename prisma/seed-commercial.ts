@@ -24,6 +24,8 @@ export const commercialIds = {
   entCanCustomBrand: seedUuid(31000000, 5),
   entMaxStorageMb: seedUuid(31000000, 6),
   entApiAccessEnabled: seedUuid(31000000, 7),
+  entMultiBranch: seedUuid(31000000, 8),
+  entMaxBranches: seedUuid(31000000, 9),
 
   // Plans
   planFree: seedUuid(32000000, 1),
@@ -100,6 +102,24 @@ export const entitlementDefinitions: Prisma.EntitlementDefinitionCreateInput[] =
     category: EntitlementCategory.INTEGRATION,
     defaultValue: { enabled: false },
   },
+  {
+    id: commercialIds.entMultiBranch,
+    key: 'MULTI_BRANCH',
+    name: 'Multi-Branch Location Management',
+    description: 'Enables creation and operation of multiple clinical branches.',
+    type: EntitlementType.BOOLEAN,
+    category: EntitlementCategory.FEATURE_FLAG,
+    defaultValue: { enabled: false },
+  },
+  {
+    id: commercialIds.entMaxBranches,
+    key: 'MAX_BRANCHES',
+    name: 'Maximum Operational Branches',
+    description: 'Maximum number of active physical or operational branch locations allowed.',
+    type: EntitlementType.NUMERIC,
+    category: EntitlementCategory.CAPACITY,
+    defaultValue: { value: 1 },
+  },
 ];
 
 export const plans = [
@@ -124,6 +144,8 @@ export const plans = [
       { definitionId: commercialIds.entCanCustomBrand, numericValue: null, booleanValue: false },
       { definitionId: commercialIds.entMaxStorageMb, numericValue: 100, booleanValue: null },
       { definitionId: commercialIds.entApiAccessEnabled, numericValue: null, booleanValue: false },
+      { definitionId: commercialIds.entMultiBranch, numericValue: null, booleanValue: false },
+      { definitionId: commercialIds.entMaxBranches, numericValue: 1, booleanValue: null },
     ],
   },
   {
@@ -147,6 +169,8 @@ export const plans = [
       { definitionId: commercialIds.entCanCustomBrand, numericValue: null, booleanValue: false },
       { definitionId: commercialIds.entMaxStorageMb, numericValue: 5000, booleanValue: null },
       { definitionId: commercialIds.entApiAccessEnabled, numericValue: null, booleanValue: false },
+      { definitionId: commercialIds.entMultiBranch, numericValue: null, booleanValue: true },
+      { definitionId: commercialIds.entMaxBranches, numericValue: 3, booleanValue: null },
     ],
   },
   {
@@ -170,6 +194,8 @@ export const plans = [
       { definitionId: commercialIds.entCanCustomBrand, numericValue: null, booleanValue: true },
       { definitionId: commercialIds.entMaxStorageMb, numericValue: -1, booleanValue: null },
       { definitionId: commercialIds.entApiAccessEnabled, numericValue: null, booleanValue: true },
+      { definitionId: commercialIds.entMultiBranch, numericValue: null, booleanValue: true },
+      { definitionId: commercialIds.entMaxBranches, numericValue: 999, booleanValue: null },
     ],
   },
 ];
@@ -337,6 +363,10 @@ export async function seedCommercialCoreData(
         id: commercialIds.subOrgSuspended,
         organizationId: organizationIds.orgSuspended,
         planId: commercialIds.planPro,
+        status: SubscriptionStatus.EXPIRED,
+        externalProvider: PaymentProvider.MANUAL,
+        currentPeriodStartedAt: pastDate,
+        currentPeriodEndsAt: expiredDate,
         endedAt: expiredDate,
       },
     });

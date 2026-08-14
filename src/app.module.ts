@@ -30,6 +30,7 @@ import { PaefGovernanceModule } from './common/paef-governance';
 import { OpsModule } from './ops/ops.module';
 import { EntitlementsModule } from './entitlements/entitlements.module';
 import { BillingModule } from './billing/billing.module';
+import { BranchesModule } from './modules/enterprise/branches/branches.module';
 
 @Module({
   imports: [
@@ -55,6 +56,7 @@ import { BillingModule } from './billing/billing.module';
     OpsModule,
     EntitlementsModule,
     BillingModule,
+    BranchesModule,
     PaefGovernanceModule,
   ],
   controllers: [AppController],

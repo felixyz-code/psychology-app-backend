@@ -273,10 +273,7 @@ export class ManualBillingAdapter implements BillingProvider {
   /**
    * Helper to calculate period end date according to the billing interval.
    */
-  private calculatePeriodEnd(
-    startDate: Date,
-    interval: BillingInterval,
-  ): Date {
+  private calculatePeriodEnd(startDate: Date, interval: BillingInterval): Date {
     const end = new Date(startDate);
     switch (interval) {
       case BillingInterval.MONTHLY:

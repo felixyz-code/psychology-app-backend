@@ -108,6 +108,18 @@ const ids = {
   pendingIncomeA: seedUuid(30000000, 5),
   incomeB: seedUuid(30000000, 6),
   expenseB: seedUuid(30000000, 7),
+  branchA1: seedUuid(34000000, 1),
+  branchA2: seedUuid(34000000, 2),
+  branchB1: seedUuid(34000000, 3),
+  userBranchAccessA1Owner: seedUuid(35000000, 1),
+  userBranchAccessA1Admin: seedUuid(35000000, 2),
+  userBranchAccessA2Admin: seedUuid(35000000, 3),
+  userBranchAccessA1PsychAssigned: seedUuid(35000000, 4),
+  userBranchAccessA2PsychUnassigned: seedUuid(35000000, 5),
+  userBranchAccessB1Owner: seedUuid(35000000, 6),
+  userBranchAccessB1Psych: seedUuid(35000000, 7),
+  userBranchAccessMultiA: seedUuid(35000000, 8),
+  userBranchAccessMultiB: seedUuid(35000000, 9),
 };
 
 type SeedUser = {
@@ -243,6 +255,105 @@ const memberships = [
     MembershipRole.PSYCHOLOGIST,
   ),
 ] satisfies Prisma.OrganizationMembershipCreateManyInput[];
+
+const branches = [
+  {
+    id: ids.branchA1,
+    organizationId: ids.orgA,
+    name: 'Sede Central (Matriz)',
+    code: 'CDMX-CENTRO',
+    address: 'Av. Insurgentes Sur 1234, CDMX',
+    phone: '+525512345678',
+    timezone: 'America/Mexico_City',
+    isActive: true,
+  },
+  {
+    id: ids.branchA2,
+    organizationId: ids.orgA,
+    name: 'Sede Norte',
+    code: 'CDMX-NORTE',
+    address: 'Av. Politécnico 456, CDMX',
+    phone: '+525587654321',
+    timezone: 'America/Mexico_City',
+    isActive: true,
+  },
+  {
+    id: ids.branchB1,
+    organizationId: ids.orgB,
+    name: 'Sede Principal',
+    code: 'GDL-MATRIZ',
+    address: 'Av. Vallarta 789, Guadalajara',
+    phone: '+523312345678',
+    timezone: 'America/Mexico_City',
+    isActive: true,
+  },
+] satisfies Prisma.BranchCreateManyInput[];
+
+const userBranchAccesses = [
+  {
+    id: ids.userBranchAccessA1Owner,
+    organizationId: ids.orgA,
+    userId: ids.ownerA,
+    branchId: ids.branchA1,
+    isPrimary: true,
+  },
+  {
+    id: ids.userBranchAccessA1Admin,
+    organizationId: ids.orgA,
+    userId: ids.adminA,
+    branchId: ids.branchA1,
+    isPrimary: true,
+  },
+  {
+    id: ids.userBranchAccessA2Admin,
+    organizationId: ids.orgA,
+    userId: ids.adminA,
+    branchId: ids.branchA2,
+    isPrimary: false,
+  },
+  {
+    id: ids.userBranchAccessA1PsychAssigned,
+    organizationId: ids.orgA,
+    userId: ids.psychologistAssignedA,
+    branchId: ids.branchA1,
+    isPrimary: true,
+  },
+  {
+    id: ids.userBranchAccessA2PsychUnassigned,
+    organizationId: ids.orgA,
+    userId: ids.psychologistUnassignedA,
+    branchId: ids.branchA2,
+    isPrimary: true,
+  },
+  {
+    id: ids.userBranchAccessB1Owner,
+    organizationId: ids.orgB,
+    userId: ids.ownerB,
+    branchId: ids.branchB1,
+    isPrimary: true,
+  },
+  {
+    id: ids.userBranchAccessB1Psych,
+    organizationId: ids.orgB,
+    userId: ids.psychologistB,
+    branchId: ids.branchB1,
+    isPrimary: true,
+  },
+  {
+    id: ids.userBranchAccessMultiA,
+    organizationId: ids.orgA,
+    userId: ids.multiMember,
+    branchId: ids.branchA1,
+    isPrimary: true,
+  },
+  {
+    id: ids.userBranchAccessMultiB,
+    organizationId: ids.orgB,
+    userId: ids.multiMember,
+    branchId: ids.branchB1,
+    isPrimary: true,
+  },
+] satisfies Prisma.UserBranchAccessCreateManyInput[];
 
 const patients = [
   patient(
@@ -1681,6 +1792,21 @@ async function resetTenantDevelopmentSeed() {
     prisma.psychologistProfile.deleteMany({
       where: { userId: { in: userIds } },
     }),
+    prisma.userBranchAccess.deleteMany({
+      where: {
+        OR: [
+          { organizationId: { in: organizationIds } },
+          { userId: { in: userIds } },
+        ],
+      },
+    }),
+    prisma.branch.deleteMany({
+      where: {
+        OR: [
+          { organizationId: { in: organizationIds } },
+        ],
+      },
+    }),
     prisma.organizationMembership.deleteMany({
       where: {
         OR: [
@@ -1814,6 +1940,9 @@ async function seedTenantDevelopmentData(passwordHash: string) {
     prisma.organizationMembership.createMany({ data: memberships }),
     prisma.patient.createMany({ data: patients }),
   ]);
+
+  await prisma.branch.createMany({ data: branches });
+  await prisma.userBranchAccess.createMany({ data: userBranchAccesses });
 
   await prisma.$transaction([
     prisma.patientAssignment.createMany({ data: assignments }),

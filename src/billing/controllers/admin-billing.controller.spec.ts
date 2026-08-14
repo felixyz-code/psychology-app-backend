@@ -41,7 +41,9 @@ describe('AdminBillingController', () => {
         if (!currentUser) {
           throw new UnauthorizedException('Authentication is required');
         }
-        const req = context.switchToHttp().getRequest();
+        const req = context
+          .switchToHttp()
+          .getRequest<{ user?: AuthenticatedUser }>();
         req.user = currentUser;
         return true;
       },
@@ -63,7 +65,9 @@ describe('AdminBillingController', () => {
       .compile();
 
     app = moduleRef.createNestApplication();
-    app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+    app.useGlobalPipes(
+      new ValidationPipe({ whitelist: true, transform: true }),
+    );
     await app.init();
   });
 

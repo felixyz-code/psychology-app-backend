@@ -20,12 +20,12 @@ export class PaefAuthorityGuard implements CanActivate {
   canActivate(context: ExecutionContext): boolean {
     const effectClass = this.reflector.getAllAndOverride<EffectClass>(
       PAEF_EFFECT_CLASS_KEY,
-      [context.getHandler(), context.getClass()]
+      [context.getHandler(), context.getClass()],
     );
 
     const targetScope = this.reflector.getAllAndOverride<string>(
       PAEF_TARGET_SCOPE_KEY,
-      [context.getHandler(), context.getClass()]
+      [context.getHandler(), context.getClass()],
     );
 
     // If not annotated or not AUTHORITY_SENSITIVE, pass through
@@ -33,7 +33,18 @@ export class PaefAuthorityGuard implements CanActivate {
       return true;
     }
 
-    const request = context.switchToHttp().getRequest();
+    type PaefRequest = {
+      headers?: Record<string, string | string[] | undefined>;
+      user?: {
+        id?: string;
+        email?: string;
+        username?: string;
+        role?: string;
+      };
+      paefDecision?: HumanAuthorityDecision;
+    };
+
+    const request = context.switchToHttp().getRequest<PaefRequest>();
     const headers = request.headers || {};
     const rawDecision = headers['x-paef-authority-decision'];
 
@@ -42,8 +53,8 @@ export class PaefAuthorityGuard implements CanActivate {
       try {
         decision =
           typeof rawDecision === 'string'
-            ? JSON.parse(rawDecision)
-            : rawDecision;
+            ? (JSON.parse(rawDecision) as HumanAuthorityDecision)
+            : (rawDecision as unknown as HumanAuthorityDecision);
       } catch {
         decision = null;
       }
@@ -51,7 +62,11 @@ export class PaefAuthorityGuard implements CanActivate {
 
     // Check if user session has direct clinical authority role
     const user = request.user;
-    if (!decision && user && (user.role === 'CLINICAL_LEAD' || user.role === 'ADMIN')) {
+    if (
+      !decision &&
+      user &&
+      (user.role === 'CLINICAL_LEAD' || user.role === 'ADMIN')
+    ) {
       decision = {
         decisionId: `SESSION-AUTH-${user.id || 'USER'}`,
         authorityIdentity: user.email || user.username || 'Clinical Lead',
@@ -82,7 +97,7 @@ export class PaefAuthorityGuard implements CanActivate {
             'PAEF Authority Gate: Human Authority approval required for this clinical mutation.',
           paefAuthorityRequest: authRequest,
         },
-        HttpStatus.PRECONDITION_REQUIRED
+        HttpStatus.PRECONDITION_REQUIRED,
       );
     }
 
@@ -96,7 +111,7 @@ export class PaefAuthorityGuard implements CanActivate {
             decision.rejectionReason || 'Rejected by policy'
           }`,
         },
-        HttpStatus.FORBIDDEN
+        HttpStatus.FORBIDDEN,
       );
     }
 

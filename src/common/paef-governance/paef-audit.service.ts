@@ -17,7 +17,10 @@ export class PaefAuditService {
   private redactSecrets(text: string): string {
     return text
       .replace(/(bearer\s+)[a-zA-Z0-9_\-.]{8,}/gi, '$1[REDACTED_SECRET]')
-      .replace(/(password|secret|token|apikey)\s*[:=]\s*['"]?([a-zA-Z0-9_\-.]{8,})['"]?/gi, '$1:[REDACTED_SECRET]')
+      .replace(
+        /(password|secret|token|apikey)\s*[:=]\s*['"]?([a-zA-Z0-9_\-.]{8,})['"]?/gi,
+        '$1:[REDACTED_SECRET]',
+      )
       .replace(/sk-[a-zA-Z0-9]{20,}/g, '[REDACTED_OPENAI_KEY]');
   }
 
@@ -48,9 +51,13 @@ export class PaefAuditService {
       }
 
       fs.appendFileSync(this.auditLogPath, `${sanitized}\n`, 'utf8');
-      this.logger.debug(`[PAEF Audit] Recorded execution '${record.executionId}' for scope '${event.contextScope}'`);
+      this.logger.debug(
+        `[PAEF Audit] Recorded execution '${record.executionId}' for scope '${event.contextScope}'`,
+      );
     } catch (err) {
-      this.logger.error(`[PAEF Audit] Failed to write audit record: ${(err as Error).message}`);
+      this.logger.error(
+        `[PAEF Audit] Failed to write audit record: ${(err as Error).message}`,
+      );
     }
   }
 }

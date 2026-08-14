@@ -152,6 +152,7 @@ model User {
   acceptedOrganizationInvitations OrganizationInvitation[] @relation("OrganizationInvitationAcceptedByUser")
   psychologistProfile             PsychologistProfile?
   auditLogs                       AuditLog[]
+  branchAccesses                  UserBranchAccess[]
   createdAt                       DateTime                 @default(now())
   updatedAt                       DateTime                 @updatedAt
 
@@ -183,6 +184,8 @@ model Organization {
   assignments      PatientAssignment[]
   auditLogs        AuditLog[]
   subscriptions    Subscription[]
+  branches         Branch[]
+  userBranchAccesses UserBranchAccess[]
   createdAt        DateTime                 @default(now()) @db.Timestamptz(3)
   updatedAt        DateTime                 @updatedAt @db.Timestamptz(3)
 
@@ -560,3 +563,43 @@ model PlanEntitlement {
   @@index([entitlementDefinitionId])
   @@map("plan_entitlements")
 }
+
+model Branch {
+  id             String    @id @default(uuid()) @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  name           String    @db.VarChar(120)
+  code           String    @db.VarChar(30)
+  address        String?   @db.VarChar(255)
+  phone          String?   @db.VarChar(30)
+  timezone       String    @default("UTC") @db.VarChar(50)
+  isActive       Boolean   @default(true) @map("is_active")
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt      DateTime? @map("deleted_at") @db.Timestamptz(3)
+
+  organization   Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userAccesses   UserBranchAccess[]
+
+  @@unique([organizationId, code])
+  @@index([organizationId, isActive, deletedAt])
+  @@map("branches")
+}
+
+model UserBranchAccess {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  userId         String   @map("user_id") @db.Uuid
+  branchId       String   @map("branch_id") @db.Uuid
+  isPrimary      Boolean  @default(false) @map("is_primary")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  branch       Branch       @relation(fields: [branchId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, branchId])
+  @@index([organizationId, userId])
+  @@index([branchId])
+  @@map("user_branch_accesses")
+}
+
