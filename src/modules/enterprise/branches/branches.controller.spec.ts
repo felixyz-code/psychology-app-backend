@@ -1,7 +1,6 @@
-import { Test, TestingModule } from '@nestjs/testing';
 import { MembershipRole, UserRole } from '@prisma/client';
 import { TenantResolutionMode } from '../../../common/request-context/request-context.service';
-import { TenantContext } from '../../../tenant-context/tenant-context.types';
+import type { TenantContext } from '../../../tenant-context/tenant-context.types';
 import { BranchesController } from './branches.controller';
 import { BranchesService } from './branches.service';
 

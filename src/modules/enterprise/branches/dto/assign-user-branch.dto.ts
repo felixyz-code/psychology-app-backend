@@ -11,7 +11,8 @@ export class AssignUserBranchDto {
   userId: string;
 
   @ApiPropertyOptional({
-    description: 'Branch UUID where access is granted (optional in body as it is extracted from route parameter)',
+    description:
+      'Branch UUID where access is granted (optional in body as it is extracted from route parameter)',
     example: '34000000-0000-4000-8000-000000000001',
   })
   @IsOptional()
