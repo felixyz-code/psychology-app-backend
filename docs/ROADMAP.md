@@ -139,7 +139,16 @@ POST-GO-LIVE.4                           FUNCTIONAL COMPLETE / CLOSEOUT REVIEW P
  |- 4.2 Organization Selection & Preferred Organization CERTIFIED / COMPLETE
  |- 4.3 Cross-Tenant State Invalidation    CERTIFIED / COMPLETE (frontend-only)
  `- 4.4 through 4.9 Frontend Integration   FUNCTIONAL COMPLETE / CLOSEOUT REVIEW PENDING
-POST-GO-LIVE.5                           PENDING
+POST-GO-LIVE.5 (Organization Branding & Configuration) CLOSED / INTEGRATED
+ |- 5.0 Architecture & Contract Specification CLOSED / INTEGRATED
+ |- 5.1 Backend Organization Configuration Runtime CLOSED / INTEGRATED
+ |- 5.2 Backend Protected Logo Storage & API Runtime CLOSED / INTEGRATED
+ |- 5.3 Backend Hardening & Test Verification CLOSED / INTEGRATED
+ |- 5.4 Frontend Organization Settings & Branding UX (PR #37) CLOSED / INTEGRATED
+ |- 5.5 Frontend Protected Organization Logo UX (PR #38) CLOSED / INTEGRATED
+ |- 5.6 Manual UX Certification & Accessibility CLOSED / INTEGRATED
+ |- 5.7 Cross-Repository Integration Certification CLOSED / INTEGRATED
+ `- 5.8 Normative Closeout & Master Roadmap Alignment CLOSED / INTEGRATED
 POST-GO-LIVE.6                           PENDING
 POST-GO-LIVE.7                           PENDING
 ```
