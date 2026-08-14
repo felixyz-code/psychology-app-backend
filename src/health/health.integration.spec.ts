@@ -33,11 +33,38 @@ describeIntegration('HealthService readiness integration', () => {
   });
 
   it('reports ready when PostgreSQL and the uploads directory are available', async () => {
+    const healthMock = {
+      check: jest
+        .fn()
+        .mockImplementation(
+          async (indicators: (() => Promise<Record<string, unknown>>)[]) => {
+            const results = await Promise.all(indicators.map((fn) => fn()));
+            const info = Object.assign({}, ...results) as Record<
+              string,
+              unknown
+            >;
+            return { status: 'ok', info };
+          },
+        ),
+    };
+    const memoryMock = {
+      checkHeap: jest.fn().mockResolvedValue({ memory_heap: { status: 'up' } }),
+      checkRSS: jest.fn().mockResolvedValue({ memory_rss: { status: 'up' } }),
+    };
+    const diskMock = {
+      checkStorage: jest
+        .fn()
+        .mockResolvedValue({ storage_uploads: { status: 'up' } }),
+    };
+
     const service = new HealthService(
+      healthMock as never,
+      memoryMock as never,
+      diskMock as never,
       prisma as never,
       { uploadsPath } as never,
     );
 
-    await expect(service.ready()).resolves.toEqual({ status: 'UP' });
+    await expect(service.ready()).resolves.toMatchObject({ status: 'ok' });
   });
 });

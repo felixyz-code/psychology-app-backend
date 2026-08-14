@@ -1,5 +1,6 @@
 import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
+import { LoggerModule } from 'nestjs-pino';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AppointmentsModule } from './appointments/appointments.module';
@@ -9,8 +10,10 @@ import { RolesGuard } from './auth/guards/roles.guard';
 import { CaseFilesModule } from './case-files/case-files.module';
 import { ErrorEnvelopeFilter } from './common/error-envelope.filter';
 import { HttpLoggingInterceptor } from './common/observability/http-logging.interceptor';
+import { createPinoHttpConfig } from './common/observability/pino-logger.config';
 import { RequestIdMiddleware } from './common/request-context/request-id.middleware';
 import { AppConfigModule } from './config/config.module';
+import { AppConfigService } from './config/configuration';
 import { DocumentsModule } from './documents/documents.module';
 import { FinancialTransactionsModule } from './financial-transactions/financial-transactions.module';
 import { HealthModule } from './health/health.module';
@@ -21,10 +24,18 @@ import { TenantContextGuard } from './tenant-context/guards/tenant-context.guard
 import { TenantContextModule } from './tenant-context/tenant-context.module';
 import { OrganizationsModule } from './organizations/organizations.module';
 import { OrganizationLogoAssetsModule } from './organization-logo-assets/organization-logo-assets.module';
+import { AuditLogsModule } from './audit-logs/audit-logs.module';
+import { AuditInterceptor } from './audit-logs/interceptors/audit.interceptor';
+import { OpsModule } from './ops/ops.module';
 
 @Module({
   imports: [
     AppConfigModule,
+    LoggerModule.forRootAsync({
+      imports: [AppConfigModule],
+      inject: [AppConfigService],
+      useFactory: createPinoHttpConfig,
+    }),
     PrismaModule,
     AuthModule,
     PatientsModule,
@@ -37,6 +48,8 @@ import { OrganizationLogoAssetsModule } from './organization-logo-assets/organiz
     TenantContextModule,
     OrganizationsModule,
     OrganizationLogoAssetsModule,
+    AuditLogsModule,
+    OpsModule,
   ],
   controllers: [AppController],
   providers: [
@@ -45,6 +58,10 @@ import { OrganizationLogoAssetsModule } from './organization-logo-assets/organiz
     {
       provide: APP_INTERCEPTOR,
       useClass: HttpLoggingInterceptor,
+    },
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: AuditInterceptor,
     },
     {
       provide: APP_FILTER,

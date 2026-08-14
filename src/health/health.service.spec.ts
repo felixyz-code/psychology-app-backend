@@ -1,44 +1,103 @@
 import { ServiceUnavailableException } from '@nestjs/common';
-import { access } from 'node:fs/promises';
+import {
+  HealthCheckService,
+  MemoryHealthIndicator,
+  DiskHealthIndicator,
+} from '@nestjs/terminus';
 import { AppConfigService } from '../config/configuration';
 import { PrismaService } from '../prisma/prisma.service';
 import { HealthService } from './health.service';
 
-jest.mock('node:fs/promises', () => ({
-  access: jest.fn(),
-  constants: { R_OK: 4, W_OK: 2 },
-}));
-
 describe('HealthService', () => {
-  const prisma = { $queryRawUnsafe: jest.fn() };
-  const config = { uploadsPath: 'uploads' } as AppConfigService;
+  let healthCheckService: jest.Mocked<HealthCheckService>;
+  let memoryHealthIndicator: jest.Mocked<MemoryHealthIndicator>;
+  let diskHealthIndicator: jest.Mocked<DiskHealthIndicator>;
+  let prismaService: { $queryRawUnsafe: jest.Mock };
+  let configService: AppConfigService;
   let service: HealthService;
 
   beforeEach(() => {
-    jest.clearAllMocks();
-    service = new HealthService(prisma as unknown as PrismaService, config);
+    healthCheckService = {
+      check: jest
+        .fn()
+        .mockImplementation(
+          async (indicators: (() => Promise<Record<string, unknown>>)[]) => {
+            const results = await Promise.all(indicators.map((fn) => fn()));
+            const info = Object.assign({}, ...results) as Record<
+              string,
+              unknown
+            >;
+            return {
+              status: 'ok',
+              info,
+              error: {},
+              details: info,
+            };
+          },
+        ),
+    } as unknown as jest.Mocked<HealthCheckService>;
+
+    memoryHealthIndicator = {
+      checkHeap: jest.fn().mockResolvedValue({ memory_heap: { status: 'up' } }),
+      checkRSS: jest.fn().mockResolvedValue({ memory_rss: { status: 'up' } }),
+    } as unknown as jest.Mocked<MemoryHealthIndicator>;
+
+    diskHealthIndicator = {
+      checkStorage: jest
+        .fn()
+        .mockResolvedValue({ storage_uploads: { status: 'up' } }),
+    } as unknown as jest.Mocked<DiskHealthIndicator>;
+
+    prismaService = {
+      $queryRawUnsafe: jest.fn().mockResolvedValue([{ '?column?': 1 }]),
+    };
+
+    configService = {
+      uploadsPath: 'uploads',
+    } as AppConfigService;
+
+    service = new HealthService(
+      healthCheckService,
+      memoryHealthIndicator,
+      diskHealthIndicator,
+      prismaService as unknown as PrismaService,
+      configService,
+    );
   });
 
   it('reports liveness without dependencies', () => {
     expect(service.live()).toEqual({ status: 'UP' });
-    expect(prisma.$queryRawUnsafe).not.toHaveBeenCalled();
+    expect(prismaService.$queryRawUnsafe).not.toHaveBeenCalled();
   });
 
-  it('reports readiness when PostgreSQL and uploads are available', async () => {
-    prisma.$queryRawUnsafe.mockResolvedValue([{ '?column?': 1 }]);
-    jest.mocked(access).mockResolvedValue(undefined);
+  it('reports readiness when indicators and database are healthy', async () => {
+    const result = await service.ready();
 
-    await expect(service.ready()).resolves.toEqual({ status: 'UP' });
-    expect(prisma.$queryRawUnsafe).toHaveBeenCalledWith('SELECT 1');
+    expect(result).toEqual({
+      status: 'ok',
+      info: {
+        database: { status: 'up' },
+        memory_heap: { status: 'up' },
+        memory_rss: { status: 'up' },
+        storage_uploads: { status: 'up' },
+      },
+      error: {},
+      details: {
+        database: { status: 'up' },
+        memory_heap: { status: 'up' },
+        memory_rss: { status: 'up' },
+        storage_uploads: { status: 'up' },
+      },
+    });
+    expect(prismaService.$queryRawUnsafe).toHaveBeenCalledWith('SELECT 1');
   });
 
-  it('returns a sanitized degraded response when a dependency fails', async () => {
-    prisma.$queryRawUnsafe.mockRejectedValue(
-      new Error('postgres password leaked'),
+  it('returns a sanitized ServiceUnavailableException when a dependency fails', async () => {
+    prismaService.$queryRawUnsafe.mockRejectedValue(
+      new Error('postgres connection terminated'),
     );
-    jest.mocked(access).mockResolvedValue(undefined);
 
-    await expect(service.ready()).rejects.toEqual(
+    await expect(service.ready()).rejects.toThrow(
       new ServiceUnavailableException('Service is not ready'),
     );
   });

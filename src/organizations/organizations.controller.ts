@@ -66,6 +66,7 @@ import { OrganizationConfigurationService } from './organization-configuration.s
 import { InvitationsService } from './invitations.service';
 import { MembershipsService } from './memberships.service';
 import { OrganizationsService } from './organizations.service';
+import { AuditLog } from '../audit-logs/decorators/audit-log.decorator';
 
 @ApiTags('organizations')
 @ApiBearerAuth('bearer')
@@ -159,6 +160,10 @@ export class OrganizationsController {
   )
   @UseGuards(CapabilitiesGuard)
   @RequireCapabilities(OrganizationCapability.ORGANIZATION_MANAGE)
+  @AuditLog({
+    action: 'ORGANIZATION_SETTINGS_UPDATE',
+    resourceType: 'OrganizationSettings',
+  })
   @ApiOperation({
     summary:
       'Update organization appointment-duration settings with compare-and-swap',
@@ -210,6 +215,10 @@ export class OrganizationsController {
   )
   @UseGuards(CapabilitiesGuard)
   @RequireCapabilities(OrganizationCapability.ORGANIZATION_MANAGE)
+  @AuditLog({
+    action: 'ORGANIZATION_BRANDING_UPDATE',
+    resourceType: 'OrganizationBranding',
+  })
   @ApiOperation({
     summary: 'Update organization brand accent with compare-and-swap',
     description:
@@ -238,6 +247,10 @@ export class OrganizationsController {
   )
   @UseGuards(CapabilitiesGuard)
   @RequireCapabilities(OrganizationCapability.ORGANIZATION_MANAGE)
+  @AuditLog({
+    action: 'ORGANIZATION_UPDATE',
+    resourceType: 'Organization',
+  })
   @ApiOperation({ summary: 'Update editable organization identity fields' })
   @ApiBadRequestResponse({
     description: 'Invalid payload or no editable organization fields provided',
@@ -261,6 +274,10 @@ export class OrganizationsController {
   )
   @UseGuards(CapabilitiesGuard)
   @RequireCapabilities(OrganizationCapability.ORGANIZATION_MANAGE)
+  @AuditLog({
+    action: 'ORGANIZATION_STATUS_CHANGE',
+    resourceType: 'Organization',
+  })
   @ApiOperation({ summary: 'Suspend or reactivate an organization' })
   @ApiConflictResponse({
     description: 'Invalid organization transition or concurrent change',
@@ -281,6 +298,10 @@ export class OrganizationsController {
   )
   @UseGuards(CapabilitiesGuard)
   @RequireCapabilities(OrganizationCapability.OWNERSHIP_TRANSFER)
+  @AuditLog({
+    action: 'ORGANIZATION_OWNERSHIP_TRANSFER',
+    resourceType: 'Organization',
+  })
   @HttpCode(200)
   @ApiOperation({
     summary:
@@ -321,6 +342,10 @@ export class OrganizationsController {
 
   @Patch(':organizationId/memberships/:membershipId/role')
   @TenantRequired()
+  @AuditLog({
+    action: 'MEMBERSHIP_ROLE_CHANGE',
+    resourceType: 'OrganizationMembership',
+  })
   @ApiOperation({ summary: 'Change a non-owner membership role' })
   @ApiOkResponse({ type: MembershipMutationResponseDto })
   @ApiBadRequestResponse({ description: 'Invalid role or precondition' })
@@ -347,6 +372,10 @@ export class OrganizationsController {
 
   @Patch(':organizationId/memberships/:membershipId/status')
   @TenantRequired()
+  @AuditLog({
+    action: 'MEMBERSHIP_STATUS_CHANGE',
+    resourceType: 'OrganizationMembership',
+  })
   @ApiOperation({ summary: 'Suspend or reactivate a membership' })
   @ApiOkResponse({ type: MembershipMutationResponseDto })
   @ApiBadRequestResponse({ description: 'Invalid status or precondition' })
@@ -373,6 +402,10 @@ export class OrganizationsController {
 
   @Delete(':organizationId/memberships/:membershipId')
   @TenantRequired()
+  @AuditLog({
+    action: 'MEMBERSHIP_REMOVE',
+    resourceType: 'OrganizationMembership',
+  })
   @ApiOperation({ summary: 'Remove a membership without deleting history' })
   @ApiOkResponse({ type: MembershipMutationResponseDto })
   @ApiBadRequestResponse({ description: 'Invalid or missing precondition' })
@@ -398,6 +431,10 @@ export class OrganizationsController {
 
   @Post(':organizationId/memberships/leave')
   @TenantRequired()
+  @AuditLog({
+    action: 'MEMBERSHIP_LEAVE',
+    resourceType: 'OrganizationMembership',
+  })
   @ApiOperation({ summary: 'Leave the current organization' })
   @ApiCreatedResponse({ type: MembershipMutationResponseDto })
   @ApiBadRequestResponse({ description: 'Invalid or missing precondition' })
@@ -438,6 +475,10 @@ export class OrganizationsController {
   @TenantRequired()
   @UseGuards(CapabilitiesGuard)
   @RequireCapabilities(OrganizationCapability.INVITATION_CREATE)
+  @AuditLog({
+    action: 'INVITATION_CREATE',
+    resourceType: 'OrganizationInvitation',
+  })
   @ApiOperation({ summary: 'Create a seven-day organization invitation' })
   @ApiCreatedResponse({ type: InvitationIssueResponseDto })
   @ApiBadRequestResponse({ description: 'Invalid payload or invite role' })
@@ -457,6 +498,10 @@ export class OrganizationsController {
   @TenantRequired()
   @UseGuards(CapabilitiesGuard)
   @RequireCapabilities(OrganizationCapability.INVITATION_REVOKE)
+  @AuditLog({
+    action: 'INVITATION_REVOKE',
+    resourceType: 'OrganizationInvitation',
+  })
   @ApiOperation({ summary: 'Revoke a pending invitation' })
   @HttpCode(200)
   @ApiOkResponse({ type: InvitationRevokeResponseDto })
@@ -475,6 +520,10 @@ export class OrganizationsController {
   @TenantRequired()
   @UseGuards(CapabilitiesGuard)
   @RequireCapabilities(OrganizationCapability.INVITATION_RESEND)
+  @AuditLog({
+    action: 'INVITATION_RESEND',
+    resourceType: 'OrganizationInvitation',
+  })
   @ApiOperation({
     summary: 'Replace a pending or expired invitation with a new token',
   })

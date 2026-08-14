@@ -38,6 +38,7 @@ import {
 import { OrganizationStatus } from '@prisma/client';
 import type { Response } from 'express';
 import { memoryStorage } from 'multer';
+import { AuditLog } from '../audit-logs/decorators/audit-log.decorator';
 import { RequireCapabilities } from '../tenant-context/authorization/require-capabilities.decorator';
 import { CapabilitiesGuard } from '../tenant-context/authorization/capabilities.guard';
 import { OrganizationCapability } from '../tenant-context/authorization/organization-capability';
@@ -129,6 +130,10 @@ export class OrganizationLogoController {
   )
   @UseGuards(CapabilitiesGuard)
   @RequireCapabilities(OrganizationCapability.ORGANIZATION_MANAGE)
+  @AuditLog({
+    action: 'ORGANIZATION_LOGO_UPLOAD',
+    resourceType: 'OrganizationLogoAsset',
+  })
   @UseInterceptors(
     FileInterceptor('file', {
       storage: memoryStorage(),
@@ -175,6 +180,10 @@ export class OrganizationLogoController {
   )
   @UseGuards(CapabilitiesGuard)
   @RequireCapabilities(OrganizationCapability.ORGANIZATION_MANAGE)
+  @AuditLog({
+    action: 'ORGANIZATION_LOGO_REMOVE',
+    resourceType: 'OrganizationLogoAsset',
+  })
   @ApiOperation({
     summary: 'Remove a protected organization logo with compare-and-swap',
   })

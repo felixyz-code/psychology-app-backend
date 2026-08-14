@@ -147,9 +147,11 @@ POST-GO-LIVE.5 (Organization Branding & Configuration) CLOSED / INTEGRATED
  |- 5.4 Frontend Organization Settings & Branding UX (PR #37) CLOSED / INTEGRATED
  |- 5.5 Frontend Protected Organization Logo UX (PR #38) CLOSED / INTEGRATED
  |- 5.6 Manual UX Certification & Accessibility CLOSED / INTEGRATED
- |- 5.7 Cross-Repository Integration Certification CLOSED / INTEGRATED
- `- 5.8 Normative Closeout & Master Roadmap Alignment CLOSED / INTEGRATED
-POST-GO-LIVE.6                           PENDING
+POST-GO-LIVE.6 (SaaS Operations & Reliability) CLOSED / INTEGRATED
+ |- 6.1 Observability & Health Probes (Pino JSON Logging & Terminus Health) CLOSED / INTEGRATED
+ |- 6.2 Administrative Audit & Traceability (AuditLog Model, Interceptor & Decorators) CLOSED / INTEGRATED
+ |- 6.3 Operational Recovery & Orphan Reconciliation (/ops/reconcile/uploads) CLOSED / INTEGRATED
+ `- 6.4 Deployment Hardening & Automation Alignment (Docker Log Rotation & DR Runbooks) CLOSED / INTEGRATED
 POST-GO-LIVE.7                           PENDING
 ```
 
@@ -742,3 +744,21 @@ Compatibility notes:
 - ownership transfer remains the only public route that can assign `OWNER`
 - suspended organizations remain blocked from ordinary membership,
   invitation, clinical, and financial routes
+
+## POST-GO-LIVE.6
+
+SaaS Operations & Reliability provides production-grade observability, health probing, administrative audit logging, storage reconciliation, and deployment hardening.
+
+Status:
+
+- CLOSED / INTEGRATED
+- Prisma migration required and created (`20260814053858_add_audit_log_entity`)
+- Docker compose log rotation aligned across repositories
+
+Implemented scope:
+
+- **Observability & Health Probes (Phase 6.1)**: Integrated NestJS `nestjs-pino` with structured JSON logging and asynchronous request correlation, and expanded `@nestjs/terminus` health checks with `/health/live` and `/health/ready` endpoints covering PostgreSQL connectivity, memory thresholds, and disk storage metrics.
+- **Administrative Audit & Traceability (Phase 6.2)**: Introduced `AuditLog` Prisma model and relation hooks, implemented `@AuditLog()` decorator and global `AuditInterceptor` with sensitive field redaction and request IP/UA capture across organization mutations.
+- **Operational Recovery & Orphan Reconciliation (Phase 6.3)**: Built `OrphanReconciliationService` and `OpsController` exposing `POST /ops/reconcile/uploads` with dry-run support, role-guarded by application-level `ADMIN` and bypassing tenant context.
+- **Deployment Hardening & Automation Alignment (Phase 6.4)**: Standardized Docker log rotation (`json-file`, `10m`/`3` files) across all compose files, hardened backup/restore scripts with environment variable isolation, and created `.gitattributes` line ending normalizations.
+

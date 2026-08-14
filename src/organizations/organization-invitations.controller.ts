@@ -10,6 +10,7 @@ import {
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { AuthenticatedUser } from '../auth/types/authenticated-user.type';
 import { SkipTenantContext } from '../tenant-context/decorators/skip-tenant-context.decorator';
+import { AuditLog } from '../audit-logs/decorators/audit-log.decorator';
 import { InvitationsService } from './invitations.service';
 
 @ApiTags('organization-invitations')
@@ -20,6 +21,10 @@ export class OrganizationInvitationsController {
   constructor(private readonly invitations: InvitationsService) {}
 
   @Post(':token/accept')
+  @AuditLog({
+    action: 'INVITATION_ACCEPT',
+    resourceType: 'OrganizationInvitation',
+  })
   @ApiOperation({
     summary: 'Accept an invitation bound to the authenticated recipient',
   })
@@ -38,6 +43,10 @@ export class OrganizationInvitationsController {
   }
 
   @Post(':token/reject')
+  @AuditLog({
+    action: 'INVITATION_REJECT',
+    resourceType: 'OrganizationInvitation',
+  })
   @ApiOperation({
     summary: 'Reject an invitation bound to the authenticated recipient',
   })

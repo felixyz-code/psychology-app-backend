@@ -1,5 +1,6 @@
 import { Controller, Get } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { HealthCheck } from '@nestjs/terminus';
 import { Public } from '../auth/decorators/public.decorator';
 import { HealthService } from './health.service';
 
@@ -10,6 +11,7 @@ export class HealthController {
 
   @Get('live')
   @Public()
+  @HealthCheck()
   @ApiOperation({ summary: 'Get process liveness' })
   live() {
     return this.healthService.live();
@@ -17,6 +19,7 @@ export class HealthController {
 
   @Get('ready')
   @Public()
+  @HealthCheck()
   @ApiOperation({ summary: 'Get service readiness' })
   ready() {
     return this.healthService.ready();
