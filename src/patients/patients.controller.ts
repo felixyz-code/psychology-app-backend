@@ -25,6 +25,7 @@ import {
   ValidationPipe,
 } from '@nestjs/common';
 import { UserRole } from '@prisma/client';
+import { AuditLog } from '../audit-logs/decorators/audit-log.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import type { AuthenticatedUser } from '../auth/types/authenticated-user.type';
@@ -64,6 +65,7 @@ export class PatientsController {
   constructor(private readonly patientsService: PatientsService) {}
 
   @Post()
+  @AuditLog({ action: 'CLINICAL_PATIENT_MUTATION', resourceType: 'Patient' })
   @ApiOperation({ summary: 'Create a patient' })
   @ApiBody({ type: CreatePatientDto })
   @ApiCreatedResponse({
@@ -83,6 +85,7 @@ export class PatientsController {
   }
 
   @Get()
+  @AuditLog({ action: 'CLINICAL_PATIENT_READ', resourceType: 'Patient' })
   @ApiOperation({ summary: 'List all patients' })
   @ApiOkResponse({
     description: 'Patients retrieved successfully',
@@ -97,6 +100,7 @@ export class PatientsController {
   }
 
   @Get(':id')
+  @AuditLog({ action: 'CLINICAL_PATIENT_READ', resourceType: 'Patient' })
   @ApiOperation({ summary: 'Get a patient by ID' })
   @ApiParam({
     name: 'id',
@@ -119,6 +123,7 @@ export class PatientsController {
   }
 
   @Patch(':id')
+  @AuditLog({ action: 'CLINICAL_PATIENT_MUTATION', resourceType: 'Patient' })
   @ApiOperation({ summary: 'Update a patient' })
   @ApiParam({
     name: 'id',
@@ -147,6 +152,7 @@ export class PatientsController {
   }
 
   @Delete(':id')
+  @AuditLog({ action: 'CLINICAL_PATIENT_MUTATION', resourceType: 'Patient' })
   @ApiOperation({ summary: 'Delete a patient' })
   @ApiParam({
     name: 'id',

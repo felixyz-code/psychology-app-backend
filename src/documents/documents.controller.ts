@@ -36,6 +36,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { UserRole } from '@prisma/client';
 import type { Response } from 'express';
 import { memoryStorage } from 'multer';
+import { AuditLog } from '../audit-logs/decorators/audit-log.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import type { AuthenticatedUser } from '../auth/types/authenticated-user.type';
@@ -71,6 +72,7 @@ export class DocumentsController {
   constructor(private readonly documentsService: DocumentsService) {}
 
   @Post('upload')
+  @AuditLog({ action: 'CLINICAL_DOCUMENT_UPLOAD', resourceType: 'Document' })
   @UseInterceptors(
     FileInterceptor('file', {
       storage: memoryStorage(),
@@ -141,6 +143,7 @@ export class DocumentsController {
   }
 
   @Post()
+  @AuditLog({ action: 'CLINICAL_DOCUMENT_CREATE', resourceType: 'Document' })
   @ApiOperation({ summary: 'Create document metadata' })
   @ApiBody({ type: CreateDocumentDto })
   @ApiCreatedResponse({
@@ -161,6 +164,7 @@ export class DocumentsController {
   }
 
   @Get()
+  @AuditLog({ action: 'CLINICAL_DOCUMENT_READ', resourceType: 'Document' })
   @ApiOperation({ summary: 'List all documents metadata' })
   @ApiOkResponse({
     description: 'Documents retrieved successfully',
@@ -175,6 +179,7 @@ export class DocumentsController {
   }
 
   @Get('case-file/:caseFileId')
+  @AuditLog({ action: 'CLINICAL_DOCUMENT_READ', resourceType: 'Document' })
   @ApiOperation({ summary: 'List documents by case file ID' })
   @ApiParam({
     name: 'caseFileId',
@@ -201,6 +206,7 @@ export class DocumentsController {
   }
 
   @Get(':id/download')
+  @AuditLog({ action: 'CLINICAL_DOCUMENT_DOWNLOAD', resourceType: 'Document' })
   @ApiOperation({ summary: 'Download a document file by ID' })
   @ApiParam({
     name: 'id',
@@ -246,6 +252,7 @@ export class DocumentsController {
   }
 
   @Get(':id/view')
+  @AuditLog({ action: 'CLINICAL_DOCUMENT_VIEW', resourceType: 'Document' })
   @ApiOperation({ summary: 'View a document file inline by ID' })
   @ApiParam({
     name: 'id',
@@ -290,6 +297,7 @@ export class DocumentsController {
   }
 
   @Get(':id')
+  @AuditLog({ action: 'CLINICAL_DOCUMENT_READ', resourceType: 'Document' })
   @ApiOperation({ summary: 'Get document metadata by ID' })
   @ApiParam({
     name: 'id',
@@ -312,6 +320,7 @@ export class DocumentsController {
   }
 
   @Patch(':id')
+  @AuditLog({ action: 'CLINICAL_DOCUMENT_UPDATE', resourceType: 'Document' })
   @ApiOperation({ summary: 'Update document metadata' })
   @ApiParam({
     name: 'id',
@@ -340,6 +349,7 @@ export class DocumentsController {
   }
 
   @Delete(':id')
+  @AuditLog({ action: 'CLINICAL_DOCUMENT_DELETE', resourceType: 'Document' })
   @ApiOperation({ summary: 'Delete document metadata' })
   @ApiParam({
     name: 'id',

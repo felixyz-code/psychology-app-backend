@@ -47,7 +47,7 @@ describe('AuditInterceptor', () => {
       getClass: () => controllerClass,
       switchToHttp: () => ({
         getRequest: () => mockRequest,
-        getResponse: () => ({}),
+        getResponse: () => ({ statusCode: 200 }),
         getNext: () => ({}),
       }),
     } as unknown as ExecutionContext;
@@ -76,46 +76,55 @@ describe('AuditInterceptor', () => {
     });
   });
 
-  it('captures audit log with extracted tenant context, user, IP, and sanitized payload', (done) => {
+  it('captures audit log with extracted tenant context, branchId, user, IP, and sanitized clinical payload', (done) => {
     jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue({
-      action: 'ORGANIZATION_UPDATE',
-      resourceType: 'Organization',
+      action: 'CLINICAL_NOTE_UPDATE',
+      resourceType: 'SessionNote',
     });
 
     const mockRequest = {
-      user: { id: 'user-456' },
-      tenantContext: { organizationId: 'org-789' },
+      user: { id: 'user-456', organizationRole: 'PSYCHOLOGIST' },
+      tenantContext: {
+        organizationId: 'org-789',
+        organizationRole: 'PSYCHOLOGIST',
+      },
       ip: '127.0.0.1',
       headers: {
         'user-agent': 'JestTestAgent/1.0',
         'x-forwarded-for': '203.0.113.195, 70.41.3.18',
+        'x-branch-id': 'branch-uuid-1',
       },
-      params: { organizationId: 'org-789' },
+      params: { id: 'note-uuid-999' },
       body: {
-        displayName: 'New Name',
+        title: 'Session 1',
+        notes: 'Highly confidential psychiatric clinical narrative',
+        diagnosis: 'F41.1',
         password: 'SuperSecretPassword',
         token: 'secret-token-123',
       },
     };
 
     const context = createMockExecutionContext(mockRequest);
-    const next = createMockCallHandler({
-      id: 'org-789',
-      displayName: 'New Name',
-    });
+    const next = createMockCallHandler({ id: 'note-uuid-999', updated: true });
 
     interceptor.intercept(context, next).subscribe({
       next: () => {
         expect(auditLogService.create).toHaveBeenCalledWith({
           organizationId: 'org-789',
+          branchId: 'branch-uuid-1',
           userId: 'user-456',
-          action: 'ORGANIZATION_UPDATE',
-          resourceType: 'Organization',
-          resourceId: 'org-789',
+          action: 'CLINICAL_NOTE_UPDATE',
+          resourceType: 'SessionNote',
+          resourceId: 'note-uuid-999',
           ipAddress: '203.0.113.195',
           userAgent: 'JestTestAgent/1.0',
+          statusCode: 200,
+          executionTimeMs: expect.any(Number),
+          actorRole: 'PSYCHOLOGIST',
           details: {
-            displayName: 'New Name',
+            title: 'Session 1',
+            notes: '[REDACTED]',
+            diagnosis: '[REDACTED]',
             password: '[REDACTED]',
             token: '[REDACTED]',
           },
@@ -125,42 +134,46 @@ describe('AuditInterceptor', () => {
     });
   });
 
-  it('extracts tenant context from RequestContextService if request context is initialized', (done) => {
+  it('uses requestContextService fallback if request has no tenantContext or user', (done) => {
     jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue({
-      action: 'ROLE_CHANGE',
-      resourceType: 'OrganizationMembership',
+      action: 'ORGANIZATION_STATUS_CHANGE',
+      resourceType: 'Organization',
     });
 
-    const mockRequest = {
-      headers: {},
-      params: { membershipId: 'mem-999' },
-      body: { role: 'ADMIN' },
-    };
-
-    const context = createMockExecutionContext(mockRequest);
-    const next = createMockCallHandler();
-
-    requestContextService.run('req-123', () => {
+    requestContextService.run('req-1', () => {
       requestContextService.setTenantContext({
-        userId: 'async-user-1',
-        organizationId: 'async-org-2',
-        membershipId: 'async-mem-3',
+        userId: 'fallback-user-id',
+        organizationId: 'fallback-org-id',
+        membershipId: 'fallback-mem-id',
         organizationRole: MembershipRole.OWNER,
         legacyUserRole: UserRole.ADMIN,
         resolutionMode: TenantResolutionMode.EXPLICIT,
       });
 
+      const mockRequest = {
+        headers: {},
+        params: { id: 'fallback-org-id' },
+        body: { status: 'SUSPENDED' },
+      };
+
+      const context = createMockExecutionContext(mockRequest);
+      const next = createMockCallHandler();
+
       interceptor.intercept(context, next).subscribe({
         next: () => {
           expect(auditLogService.create).toHaveBeenCalledWith({
-            organizationId: 'async-org-2',
-            userId: 'async-user-1',
-            action: 'ROLE_CHANGE',
-            resourceType: 'OrganizationMembership',
-            resourceId: 'mem-999',
+            organizationId: 'fallback-org-id',
+            branchId: null,
+            userId: 'fallback-user-id',
+            action: 'ORGANIZATION_STATUS_CHANGE',
+            resourceType: 'Organization',
+            resourceId: 'fallback-org-id',
             ipAddress: null,
             userAgent: null,
-            details: { role: 'ADMIN' },
+            statusCode: 200,
+            executionTimeMs: expect.any(Number),
+            actorRole: MembershipRole.OWNER,
+            details: { status: 'SUSPENDED' },
           });
           done();
         },
@@ -168,41 +181,40 @@ describe('AuditInterceptor', () => {
     });
   });
 
-  it('respects custom extractResourceId and extractDetails callbacks', (done) => {
-    type CustomResponse = { customId: string; value: string };
-
+  it('supports custom extractResourceId and extractDetails functions', (done) => {
     jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue({
       action: 'CUSTOM_ACTION',
       resourceType: 'CustomResource',
-      extractResourceId: (_req: unknown, res: unknown) =>
-        `custom-${(res as CustomResponse).customId}`,
-      extractDetails: (_req: unknown, res: unknown) => ({
-        customProp: (res as CustomResponse).value,
-      }),
+      extractResourceId: (req, res: any) => `custom-${res.customId}`,
+      extractDetails: (req, res: any) => ({ customMetric: res.score }),
     });
 
     const mockRequest = {
-      params: { id: 'default-id' },
-      body: { some: 'data' },
+      user: { id: 'user-1' },
+      tenantContext: { organizationId: 'org-1' },
+      headers: {},
+      params: {},
+      body: {},
     };
 
     const context = createMockExecutionContext(mockRequest);
-    const next = createMockCallHandler<CustomResponse>({
-      customId: '777',
-      value: 'custom-val',
-    });
+    const next = createMockCallHandler({ customId: '777', score: 100 });
 
     interceptor.intercept(context, next).subscribe({
       next: () => {
         expect(auditLogService.create).toHaveBeenCalledWith({
-          organizationId: null,
-          userId: null,
+          organizationId: 'org-1',
+          branchId: null,
+          userId: 'user-1',
           action: 'CUSTOM_ACTION',
           resourceType: 'CustomResource',
           resourceId: 'custom-777',
           ipAddress: null,
           userAgent: null,
-          details: { customProp: 'custom-val' },
+          statusCode: 200,
+          executionTimeMs: expect.any(Number),
+          actorRole: null,
+          details: { customMetric: 100 },
         });
         done();
       },

@@ -186,6 +186,11 @@ model Organization {
   subscriptions    Subscription[]
   branches         Branch[]
   userBranchAccesses UserBranchAccess[]
+  corporateClients CorporateClient[]
+  paefAgreements   PaefAgreement[]
+  benefitPools     BenefitPool[]
+  employeeEligibilities EmployeeEligibility[]
+  benefitDebitLogs BenefitDebitLog[]
   createdAt        DateTime                 @default(now()) @db.Timestamptz(3)
   updatedAt        DateTime                 @updatedAt @db.Timestamptz(3)
 
@@ -458,20 +463,26 @@ model PatientAssignment {
 }
 
 model AuditLog {
-  id             String        @id @default(uuid()) @db.Uuid
-  timestamp      DateTime      @default(now()) @db.Timestamptz(3)
-  organizationId String?       @db.Uuid
-  userId         String?       @db.Uuid
-  action         String        @db.VarChar(100)
-  resourceType   String        @db.VarChar(100)
-  resourceId     String?       @db.VarChar(255)
-  ipAddress      String?       @db.VarChar(100)
-  userAgent      String?       @db.Text
-  details        Json?
-  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull, onUpdate: Cascade)
-  user           User?         @relation(fields: [userId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  id              String        @id @default(uuid()) @db.Uuid
+  timestamp       DateTime      @default(now()) @db.Timestamptz(3)
+  organizationId  String?       @db.Uuid
+  branchId        String?       @db.Uuid
+  userId          String?       @db.Uuid
+  action          String        @db.VarChar(100)
+  resourceType    String        @db.VarChar(100)
+  resourceId      String?       @db.VarChar(255)
+  ipAddress       String?       @db.VarChar(100)
+  userAgent       String?       @db.Text
+  statusCode      Int?
+  executionTimeMs Int?
+  actorRole       String?       @db.VarChar(50)
+  details         Json?
+  organization    Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  branch          Branch?       @relation(fields: [branchId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  user            User?         @relation(fields: [userId], references: [id], onDelete: SetNull, onUpdate: Cascade)
 
   @@index([organizationId, timestamp])
+  @@index([organizationId, branchId, timestamp])
   @@index([userId])
   @@index([resourceType, resourceId])
   @@map("audit_logs")
@@ -579,6 +590,8 @@ model Branch {
 
   organization   Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   userAccesses   UserBranchAccess[]
+  benefitDebitLogs BenefitDebitLog[]
+  auditLogs      AuditLog[]
 
   @@unique([organizationId, code])
   @@index([organizationId, isActive, deletedAt])
@@ -602,4 +615,172 @@ model UserBranchAccess {
   @@index([branchId])
   @@map("user_branch_accesses")
 }
+
+enum PaefAgreementStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  TERMINATED
+  EXPIRED
+}
+
+enum BenefitPoolStatus {
+  ACTIVE
+  DEPLETED
+  EXPIRED
+  CANCELLED
+}
+
+enum EmployeeEligibilityStatus {
+  ACTIVE
+  INACTIVE
+  REVOKED
+}
+
+enum BenefitDebitStatus {
+  RESERVED
+  CONFIRMED
+  RELEASED
+  REFUNDED
+}
+
+enum BenefitDebitType {
+  SESSION_BOOKING
+  MANUAL_ADJUSTMENT
+  SESSION_CANCEL_REFUND
+}
+
+model CorporateClient {
+  id              String          @id @default(uuid()) @db.Uuid
+  organizationId  String          @map("organization_id") @db.Uuid
+  name            String          @db.VarChar(150)
+  commercialName  String?         @map("commercial_name") @db.VarChar(150)
+  taxId           String?         @map("tax_id") @db.VarChar(50)
+  contactEmail    String?         @map("contact_email") @db.VarChar(255)
+  contactPhone    String?         @map("contact_phone") @db.VarChar(30)
+  domainWhitelist String[]        @default([]) @map("domain_whitelist")
+  notes           String?         @db.Text
+  isActive        Boolean         @default(true) @map("is_active")
+  createdAt       DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime        @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization    Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  agreements      PaefAgreement[]
+
+  @@index([organizationId, isActive])
+  @@index([organizationId, name])
+  @@map("corporate_clients")
+}
+
+model PaefAgreement {
+  id                            String                  @id @default(uuid()) @db.Uuid
+  organizationId                String                  @map("organization_id") @db.Uuid
+  corporateClientId             String                  @map("corporate_client_id") @db.Uuid
+  code                          String                  @db.VarChar(50)
+  title                         String                  @db.VarChar(150)
+  description                   String?                 @db.Text
+  status                        PaefAgreementStatus     @default(ACTIVE)
+  isMultiBranch                 Boolean                 @default(true) @map("is_multi_branch")
+  allowedBranchIds              String[]                @default([]) @map("allowed_branch_ids")
+  defaultMaxSessionsPerEmployee Int                     @default(5) @map("default_max_sessions_per_employee")
+  validFrom                     DateTime                @map("valid_from") @db.Timestamptz(3)
+  validUntil                    DateTime                @map("valid_until") @db.Timestamptz(3)
+  createdAt                     DateTime                @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt                     DateTime                @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization                  Organization            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  corporateClient               CorporateClient         @relation(fields: [corporateClientId], references: [id], onDelete: Restrict)
+  benefitPools                  BenefitPool[]
+  employeeEligibilities         EmployeeEligibility[]
+  debitLogs                     BenefitDebitLog[]
+
+  @@unique([organizationId, code])
+  @@index([organizationId, status])
+  @@index([corporateClientId])
+  @@index([validFrom, validUntil])
+  @@map("paef_agreements")
+}
+
+model BenefitPool {
+  id                String            @id @default(uuid()) @db.Uuid
+  organizationId    String            @map("organization_id") @db.Uuid
+  agreementId       String            @map("agreement_id") @db.Uuid
+  name              String            @db.VarChar(120)
+  totalSessions     Int               @map("total_sessions")
+  consumedSessions  Int               @default(0) @map("consumed_sessions")
+  reservedSessions  Int               @default(0) @map("reserved_sessions")
+  status            BenefitPoolStatus @default(ACTIVE)
+  validFrom         DateTime          @map("valid_from") @db.Timestamptz(3)
+  validUntil        DateTime          @map("valid_until") @db.Timestamptz(3)
+  createdAt         DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt         DateTime          @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization      Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  agreement         PaefAgreement     @relation(fields: [agreementId], references: [id], onDelete: Cascade)
+  debitLogs         BenefitDebitLog[]
+
+  @@index([agreementId, status])
+  @@index([organizationId, status])
+  @@map("benefit_pools")
+}
+
+model EmployeeEligibility {
+  id                 String                    @id @default(uuid()) @db.Uuid
+  organizationId     String                    @map("organization_id") @db.Uuid
+  agreementId        String                    @map("agreement_id") @db.Uuid
+  email              String                    @db.VarChar(255)
+  employeeNumber     String?                   @map("employee_number") @db.VarChar(60)
+  nationalId         String?                   @map("national_id") @db.VarChar(60)
+  firstName          String?                   @map("first_name") @db.VarChar(100)
+  lastName           String?                   @map("last_name") @db.VarChar(100)
+  department         String?                   @db.VarChar(100)
+  maxSessionsAllowed Int                       @map("max_sessions_allowed")
+  consumedSessions   Int                       @default(0) @map("consumed_sessions")
+  reservedSessions   Int                       @default(0) @map("reserved_sessions")
+  status             EmployeeEligibilityStatus @default(ACTIVE)
+  createdAt          DateTime                  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt          DateTime                  @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization       Organization              @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  agreement          PaefAgreement             @relation(fields: [agreementId], references: [id], onDelete: Cascade)
+  debitLogs          BenefitDebitLog[]
+
+  @@unique([agreementId, email])
+  @@index([agreementId, email])
+  @@index([organizationId, email])
+  @@index([agreementId, employeeNumber])
+  @@map("employee_eligibilities")
+}
+
+model BenefitDebitLog {
+  id              String             @id @default(uuid()) @db.Uuid
+  organizationId  String             @map("organization_id") @db.Uuid
+  agreementId     String             @map("agreement_id") @db.Uuid
+  poolId          String             @map("pool_id") @db.Uuid
+  eligibilityId   String?            @map("eligibility_id") @db.Uuid
+  branchId        String?            @map("branch_id") @db.Uuid
+  appointmentId   String?            @map("appointment_id") @db.Uuid
+  patientId       String?            @map("patient_id") @db.Uuid
+  userId          String?            @map("user_id") @db.Uuid
+  transactionType BenefitDebitType   @map("transaction_type")
+  sessionQuantity Int                @default(1) @map("session_quantity")
+  status          BenefitDebitStatus
+  reason          String?            @db.VarChar(255)
+  metadata        Json?
+  createdAt       DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  organization    Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  agreement       PaefAgreement      @relation(fields: [agreementId], references: [id], onDelete: Cascade)
+  pool            BenefitPool        @relation(fields: [poolId], references: [id], onDelete: Cascade)
+  eligibility     EmployeeEligibility? @relation(fields: [eligibilityId], references: [id], onDelete: SetNull)
+  branch          Branch?            @relation(fields: [branchId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, createdAt])
+  @@index([agreementId])
+  @@index([poolId])
+  @@index([eligibilityId])
+  @@index([appointmentId])
+  @@map("benefit_debit_logs")
+}
+
 

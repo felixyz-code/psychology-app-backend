@@ -24,6 +24,7 @@ import {
   ValidationPipe,
 } from '@nestjs/common';
 import { UserRole } from '@prisma/client';
+import { AuditLog } from '../audit-logs/decorators/audit-log.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import type { AuthenticatedUser } from '../auth/types/authenticated-user.type';
@@ -57,6 +58,7 @@ export class SessionNotesController {
   constructor(private readonly sessionNotesService: SessionNotesService) {}
 
   @Post()
+  @AuditLog({ action: 'CLINICAL_NOTE_CREATE', resourceType: 'SessionNote' })
   @ApiOperation({ summary: 'Create a session note' })
   @ApiBody({ type: CreateSessionNoteDto })
   @ApiCreatedResponse({
@@ -77,6 +79,7 @@ export class SessionNotesController {
   }
 
   @Get()
+  @AuditLog({ action: 'CLINICAL_NOTE_READ', resourceType: 'SessionNote' })
   @ApiOperation({ summary: 'List all session notes' })
   @ApiOkResponse({
     description: 'Session notes retrieved successfully',
@@ -91,6 +94,7 @@ export class SessionNotesController {
   }
 
   @Get('case-file/:caseFileId')
+  @AuditLog({ action: 'CLINICAL_NOTE_READ', resourceType: 'SessionNote' })
   @ApiOperation({ summary: 'List session notes by case file ID' })
   @ApiParam({
     name: 'caseFileId',
@@ -117,6 +121,7 @@ export class SessionNotesController {
   }
 
   @Get(':id')
+  @AuditLog({ action: 'CLINICAL_NOTE_READ', resourceType: 'SessionNote' })
   @ApiOperation({ summary: 'Get a session note by ID' })
   @ApiParam({
     name: 'id',
@@ -139,6 +144,7 @@ export class SessionNotesController {
   }
 
   @Patch(':id')
+  @AuditLog({ action: 'CLINICAL_NOTE_UPDATE', resourceType: 'SessionNote' })
   @ApiOperation({ summary: 'Update a session note' })
   @ApiParam({
     name: 'id',
@@ -167,6 +173,7 @@ export class SessionNotesController {
   }
 
   @Delete(':id')
+  @AuditLog({ action: 'CLINICAL_NOTE_DELETE', resourceType: 'SessionNote' })
   @ApiOperation({ summary: 'Delete a session note' })
   @ApiParam({
     name: 'id',

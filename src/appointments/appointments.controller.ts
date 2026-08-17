@@ -24,6 +24,7 @@ import {
   ValidationPipe,
 } from '@nestjs/common';
 import { UserRole } from '@prisma/client';
+import { AuditLog } from '../audit-logs/decorators/audit-log.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import type { AuthenticatedUser } from '../auth/types/authenticated-user.type';
@@ -56,6 +57,10 @@ export class AppointmentsController {
   constructor(private readonly appointmentsService: AppointmentsService) {}
 
   @Post()
+  @AuditLog({
+    action: 'CLINICAL_APPOINTMENT_MUTATION',
+    resourceType: 'Appointment',
+  })
   @ApiOperation({ summary: 'Create an appointment' })
   @ApiBody({ type: CreateAppointmentDto })
   @ApiCreatedResponse({
@@ -138,6 +143,10 @@ export class AppointmentsController {
   }
 
   @Patch(':id')
+  @AuditLog({
+    action: 'CLINICAL_APPOINTMENT_MUTATION',
+    resourceType: 'Appointment',
+  })
   @ApiOperation({ summary: 'Update an appointment' })
   @ApiParam({
     name: 'id',
@@ -168,6 +177,10 @@ export class AppointmentsController {
   }
 
   @Delete(':id')
+  @AuditLog({
+    action: 'CLINICAL_APPOINTMENT_MUTATION',
+    resourceType: 'Appointment',
+  })
   @ApiOperation({ summary: 'Delete an appointment' })
   @ApiParam({
     name: 'id',
