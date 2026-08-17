@@ -42,6 +42,13 @@ import { PaefAgreementsService } from './services/paef-agreements.service';
 import { BenefitPoolsService } from './services/benefit-pools.service';
 import { EmployeeEligibilityService } from './services/employee-eligibility.service';
 import { BenefitDebitService } from './services/benefit-debit.service';
+import type { Response } from 'express';
+import { Res } from '@nestjs/common';
+import { CorporateReportingService } from './services/corporate-reporting.service';
+import {
+  CorporateBillingStatementQueryDto,
+  CorporateReportQueryDto,
+} from './dto/corporate-report-query.dto';
 import { CreateCorporateClientDto } from './dto/create-corporate-client.dto';
 import { UpdateCorporateClientDto } from './dto/update-corporate-client.dto';
 import { CreatePaefAgreementDto } from './dto/create-paef-agreement.dto';
@@ -88,6 +95,7 @@ export class CorporateController {
     private readonly poolsService: BenefitPoolsService,
     private readonly eligibilityService: EmployeeEligibilityService,
     private readonly debitService: BenefitDebitService,
+    private readonly reportingService: CorporateReportingService,
   ) {}
 
   // ==================== CORPORATE CLIENTS ====================
@@ -494,5 +502,86 @@ export class CorporateController {
       appointmentId,
       status,
     });
+  }
+
+  // ==================== EXECUTIVE REPORTING & BILLING RECONCILIATION ====================
+
+  @Get('agreements/:id/reports/executive')
+  @AuditLog({
+    action: 'CORPORATE_EXECUTIVE_REPORT_READ',
+    resourceType: 'PaefAgreement',
+  })
+  @ApiOperation({
+    summary:
+      'Get aggregated executive PAEF report with Zero ePHI Leakage and k-anonymity (k >= 5)',
+    description:
+      'Compiles pool utilization rates, coverage KPIs, and anonymous departmental breakdown adhering strictly to NOM-004 / HIPAA privacy rules.',
+  })
+  @ApiParam({ name: 'id', description: 'PAEF agreement UUID' })
+  getExecutiveReport(
+    @CurrentTenant(true) tenant: TenantContext,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query() query: CorporateReportQueryDto,
+  ) {
+    return this.reportingService.getExecutiveReport(
+      tenant.organizationId,
+      id,
+      query,
+    );
+  }
+
+  @Get('agreements/:id/reports/billing-statement')
+  @AuditLog({
+    action: 'CORPORATE_BILLING_STATEMENT_READ',
+    resourceType: 'PaefAgreement',
+  })
+  @ApiOperation({
+    summary: 'Get monthly billing reconciliation statement for PAEF agreement',
+    description:
+      'Calculates confirmed sessions, subtotal, IVA, and anonymized debit audit ledger for corporate invoicing.',
+  })
+  @ApiParam({ name: 'id', description: 'PAEF agreement UUID' })
+  getBillingStatement(
+    @CurrentTenant(true) tenant: TenantContext,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query() query: CorporateBillingStatementQueryDto,
+  ) {
+    return this.reportingService.getBillingStatement(
+      tenant.organizationId,
+      id,
+      query,
+    );
+  }
+
+  @Get('agreements/:id/reports/export/csv')
+  @AuditLog({
+    action: 'CORPORATE_BILLING_CSV_EXPORT',
+    resourceType: 'PaefAgreement',
+  })
+  @ApiOperation({
+    summary: 'Export monthly billing reconciliation statement as UTF-8 BOM CSV',
+    description:
+      'Generates a UTF-8 BOM CSV file containing financial reconciliation and anonymized debit ledger ready for ERP / Excel.',
+  })
+  @ApiParam({ name: 'id', description: 'PAEF agreement UUID' })
+  async exportBillingCsv(
+    @CurrentTenant(true) tenant: TenantContext,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query() query: CorporateBillingStatementQueryDto,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const csvContent = await this.reportingService.exportBillingCsv(
+      tenant.organizationId,
+      id,
+      query,
+    );
+
+    response.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    response.setHeader(
+      'Content-Disposition',
+      `attachment; filename="paef-billing-${encodeURIComponent(id)}-${Date.now()}.csv"`,
+    );
+
+    return csvContent;
   }
 }

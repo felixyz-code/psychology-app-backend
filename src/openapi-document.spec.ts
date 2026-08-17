@@ -44,7 +44,7 @@ describe('OpenAPI document', () => {
   it('documents every certified route and the Bearer security scheme', () => {
     const document = createDocument(app);
 
-    expect(Object.keys(document.paths)).toHaveLength(73);
+    expect(Object.keys(document.paths)).toHaveLength(76);
     expect(document.components?.securitySchemes?.bearer).toEqual({
       type: 'http',
       scheme: 'bearer',
@@ -62,6 +62,12 @@ describe('OpenAPI document', () => {
     ]);
     expect(document.paths['/audit-logs/{id}'].get?.responses).toHaveProperty(
       '200',
+    );
+    expect(document.paths['/audit-logs/{id}'].get?.responses).toHaveProperty(
+      '401',
+    );
+    expect(document.paths['/audit-logs/{id}'].get?.responses).toHaveProperty(
+      '403',
     );
     expect(document.paths['/audit-logs/{id}'].get?.responses).toHaveProperty(
       '404',
@@ -99,6 +105,19 @@ describe('OpenAPI document', () => {
     ).toEqual([{ bearer: [] }]);
     expect(
       document.paths['/enterprise/corporate/debit/reserve'].post?.security,
+    ).toEqual([{ bearer: [] }]);
+    expect(
+      document.paths['/enterprise/corporate/agreements/{id}/reports/executive']
+        .get?.security,
+    ).toEqual([{ bearer: [] }]);
+    expect(
+      document.paths[
+        '/enterprise/corporate/agreements/{id}/reports/billing-statement'
+      ].get?.security,
+    ).toEqual([{ bearer: [] }]);
+    expect(
+      document.paths['/enterprise/corporate/agreements/{id}/reports/export/csv']
+        .get?.security,
     ).toEqual([{ bearer: [] }]);
     expect(document.paths['/ops/reconcile/uploads'].post?.security).toEqual([
       { bearer: [] },

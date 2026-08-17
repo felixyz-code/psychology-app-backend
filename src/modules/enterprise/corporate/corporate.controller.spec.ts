@@ -5,6 +5,7 @@ import { PaefAgreementsService } from './services/paef-agreements.service';
 import { BenefitPoolsService } from './services/benefit-pools.service';
 import { EmployeeEligibilityService } from './services/employee-eligibility.service';
 import { BenefitDebitService } from './services/benefit-debit.service';
+import { CorporateReportingService } from './services/corporate-reporting.service';
 import { MembershipRole, UserRole } from '@prisma/client';
 import {
   TenantContext,
@@ -18,6 +19,7 @@ describe('CorporateController', () => {
   let poolsService: any;
   let eligibilityService: any;
   let debitService: any;
+  let reportingService: any;
 
   const mockTenant: TenantContext = {
     organizationId: 'org-1111-uuid',
@@ -75,6 +77,19 @@ describe('CorporateController', () => {
       getDebitLogs: jest.fn().mockResolvedValue([]),
     };
 
+    reportingService = {
+      getExecutiveReport: jest.fn().mockResolvedValue({
+        kpis: { totalSessionsContracted: 100, burnRatePercentage: 45 },
+      }),
+      getBillingStatement: jest.fn().mockResolvedValue({
+        statementNumber: 'PAEF-BILL-123',
+        summary: { totalAmount: 5800 },
+      }),
+      exportBillingCsv: jest
+        .fn()
+        .mockResolvedValue('\uFEFF"ESTADO DE CUENTA"\r\n'),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       controllers: [CorporateController],
       providers: [
@@ -83,6 +98,7 @@ describe('CorporateController', () => {
         { provide: BenefitPoolsService, useValue: poolsService },
         { provide: EmployeeEligibilityService, useValue: eligibilityService },
         { provide: BenefitDebitService, useValue: debitService },
+        { provide: CorporateReportingService, useValue: reportingService },
       ],
     }).compile();
 
@@ -128,5 +144,50 @@ describe('CorporateController', () => {
       email: 'john@globex.com',
     });
     expect(result.isEligible).toBe(true);
+  });
+
+  it('should get executive report', async () => {
+    const result = await controller.getExecutiveReport(
+      mockTenant,
+      'agreement-1',
+      {},
+    );
+    expect(result.kpis.totalSessionsContracted).toBe(100);
+    expect(reportingService.getExecutiveReport).toHaveBeenCalledWith(
+      mockTenant.organizationId,
+      'agreement-1',
+      {},
+    );
+  });
+
+  it('should get billing statement', async () => {
+    const result = await controller.getBillingStatement(
+      mockTenant,
+      'agreement-1',
+      { unitPrice: 500 },
+    );
+    expect(result.statementNumber).toBe('PAEF-BILL-123');
+    expect(reportingService.getBillingStatement).toHaveBeenCalledWith(
+      mockTenant.organizationId,
+      'agreement-1',
+      { unitPrice: 500 },
+    );
+  });
+
+  it('should export billing csv', async () => {
+    const mockRes: any = {
+      setHeader: jest.fn(),
+    };
+    const result = await controller.exportBillingCsv(
+      mockTenant,
+      'agreement-1',
+      {},
+      mockRes,
+    );
+    expect(result).toContain('ESTADO DE CUENTA');
+    expect(mockRes.setHeader).toHaveBeenCalledWith(
+      'Content-Type',
+      'text/csv; charset=utf-8',
+    );
   });
 });

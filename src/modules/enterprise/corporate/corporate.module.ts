@@ -9,6 +9,7 @@ import { PaefAgreementsService } from './services/paef-agreements.service';
 import { BenefitPoolsService } from './services/benefit-pools.service';
 import { EmployeeEligibilityService } from './services/employee-eligibility.service';
 import { BenefitDebitService } from './services/benefit-debit.service';
+import { CorporateReportingService } from './services/corporate-reporting.service';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { BenefitDebitService } from './services/benefit-debit.service';
     BenefitPoolsService,
     EmployeeEligibilityService,
     BenefitDebitService,
+    CorporateReportingService,
   ],
   exports: [
     CorporateClientsService,
@@ -31,6 +33,7 @@ import { BenefitDebitService } from './services/benefit-debit.service';
     BenefitPoolsService,
     EmployeeEligibilityService,
     BenefitDebitService,
+    CorporateReportingService,
   ],
 })
 export class CorporateModule {}
