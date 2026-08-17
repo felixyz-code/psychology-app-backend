@@ -24,6 +24,7 @@ import {
   ValidationPipe,
 } from '@nestjs/common';
 import { UserRole } from '@prisma/client';
+import { AuditLog } from '../audit-logs/decorators/audit-log.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import type { AuthenticatedUser } from '../auth/types/authenticated-user.type';
@@ -58,6 +59,7 @@ export class CaseFilesController {
   constructor(private readonly caseFilesService: CaseFilesService) {}
 
   @Post()
+  @AuditLog({ action: 'CLINICAL_CASE_FILE_CREATE', resourceType: 'CaseFile' })
   @ApiOperation({ summary: 'Create a case file' })
   @ApiBody({ type: CreateCaseFileDto })
   @ApiCreatedResponse({
@@ -81,6 +83,7 @@ export class CaseFilesController {
   }
 
   @Get()
+  @AuditLog({ action: 'CLINICAL_CASE_FILE_READ', resourceType: 'CaseFile' })
   @ApiOperation({ summary: 'List all case files' })
   @ApiOkResponse({
     description: 'Case files retrieved successfully',
@@ -95,6 +98,7 @@ export class CaseFilesController {
   }
 
   @Get('patient/:patientId')
+  @AuditLog({ action: 'CLINICAL_CASE_FILE_READ', resourceType: 'CaseFile' })
   @ApiOperation({ summary: 'Get a case file by patient ID' })
   @ApiParam({
     name: 'patientId',
@@ -120,6 +124,7 @@ export class CaseFilesController {
   }
 
   @Get(':id/workspace')
+  @AuditLog({ action: 'CLINICAL_CASE_FILE_READ', resourceType: 'CaseFile' })
   @ApiOperation({ summary: 'Get a clinical workspace by case file ID' })
   @ApiParam({
     name: 'id',
@@ -145,6 +150,7 @@ export class CaseFilesController {
   }
 
   @Get(':id')
+  @AuditLog({ action: 'CLINICAL_CASE_FILE_READ', resourceType: 'CaseFile' })
   @ApiOperation({ summary: 'Get a case file by ID' })
   @ApiParam({
     name: 'id',
@@ -167,6 +173,7 @@ export class CaseFilesController {
   }
 
   @Patch(':id')
+  @AuditLog({ action: 'CLINICAL_CASE_FILE_UPDATE', resourceType: 'CaseFile' })
   @ApiOperation({ summary: 'Update a case file' })
   @ApiParam({
     name: 'id',

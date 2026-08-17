@@ -463,20 +463,26 @@ model PatientAssignment {
 }
 
 model AuditLog {
-  id             String        @id @default(uuid()) @db.Uuid
-  timestamp      DateTime      @default(now()) @db.Timestamptz(3)
-  organizationId String?       @db.Uuid
-  userId         String?       @db.Uuid
-  action         String        @db.VarChar(100)
-  resourceType   String        @db.VarChar(100)
-  resourceId     String?       @db.VarChar(255)
-  ipAddress      String?       @db.VarChar(100)
-  userAgent      String?       @db.Text
-  details        Json?
-  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull, onUpdate: Cascade)
-  user           User?         @relation(fields: [userId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  id              String        @id @default(uuid()) @db.Uuid
+  timestamp       DateTime      @default(now()) @db.Timestamptz(3)
+  organizationId  String?       @db.Uuid
+  branchId        String?       @db.Uuid
+  userId          String?       @db.Uuid
+  action          String        @db.VarChar(100)
+  resourceType    String        @db.VarChar(100)
+  resourceId      String?       @db.VarChar(255)
+  ipAddress       String?       @db.VarChar(100)
+  userAgent       String?       @db.Text
+  statusCode      Int?
+  executionTimeMs Int?
+  actorRole       String?       @db.VarChar(50)
+  details         Json?
+  organization    Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  branch          Branch?       @relation(fields: [branchId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  user            User?         @relation(fields: [userId], references: [id], onDelete: SetNull, onUpdate: Cascade)
 
   @@index([organizationId, timestamp])
+  @@index([organizationId, branchId, timestamp])
   @@index([userId])
   @@index([resourceType, resourceId])
   @@map("audit_logs")
@@ -585,6 +591,7 @@ model Branch {
   organization   Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   userAccesses   UserBranchAccess[]
   benefitDebitLogs BenefitDebitLog[]
+  auditLogs      AuditLog[]
 
   @@unique([organizationId, code])
   @@index([organizationId, isActive, deletedAt])

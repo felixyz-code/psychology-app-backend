@@ -5,7 +5,7 @@ import {
   NestInterceptor,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { Request } from 'express';
+import { Request, Response } from 'express';
 import { Observable, tap } from 'rxjs';
 import { RequestContextService } from '../../common/request-context/request-context.service';
 import { AUDIT_LOG_METADATA_KEY } from '../audit-logs.constants';
@@ -21,6 +21,16 @@ const REDACTED_KEYS = new Set([
   'authorization',
   'refreshtoken',
   'accesstoken',
+  'notes',
+  'content',
+  'clinicalnotes',
+  'evolutionnotes',
+  'diagnosis',
+  'treatmentplan',
+  'medicalhistory',
+  'psychologicalhistory',
+  'symptoms',
+  'prescription',
 ]);
 
 @Injectable()
@@ -42,21 +52,50 @@ export class AuditInterceptor implements NestInterceptor {
       return next.handle();
     }
 
-    const request = context.switchToHttp().getRequest<Request>();
+    const startTime = Date.now();
+    const httpCtx = context.switchToHttp();
+    const request = httpCtx.getRequest<Request>();
+    const response = httpCtx.getResponse<Response>();
+
     const ipAddress = this.extractIpAddress(request);
     const userAgent = (request.headers['user-agent'] as string) || null;
+    const branchHeader = request.headers['x-branch-id'];
+    const branchId =
+      typeof branchHeader === 'string' && branchHeader.trim().length > 0
+        ? branchHeader.trim()
+        : Array.isArray(branchHeader) && branchHeader.length > 0
+          ? branchHeader[0].trim()
+          : null;
 
     // Tenant context and user identification
     const reqAny = request as unknown as Record<string, unknown>;
+    const userObj = reqAny.user as
+      | { id?: string; role?: string; organizationRole?: string }
+      | undefined;
+    const tenantCtx =
+      (reqAny.tenantContext as
+        | {
+            organizationId?: string;
+            organizationRole?: string;
+            userId?: string;
+          }
+        | undefined) ?? this.requestContext.tenantContext;
+
     const userId =
-      (reqAny.user as { id?: string } | undefined)?.id ??
+      userObj?.id ??
+      tenantCtx?.userId ??
       this.requestContext.tenantContext?.userId ??
+      null;
+
+    const actorRole =
+      tenantCtx?.organizationRole ??
+      userObj?.organizationRole ??
+      userObj?.role ??
       null;
 
     const orgParam = request.params?.organizationId;
     const organizationId =
-      (reqAny.tenantContext as { organizationId?: string } | undefined)
-        ?.organizationId ??
+      tenantCtx?.organizationId ??
       this.requestContext.tenantContext?.organizationId ??
       (typeof orgParam === 'string'
         ? orgParam
@@ -65,25 +104,34 @@ export class AuditInterceptor implements NestInterceptor {
           : null);
 
     return next.handle().pipe(
-      tap((result) => {
-        const resourceId = auditOptions.extractResourceId
-          ? auditOptions.extractResourceId(request, result)
-          : this.resolveResourceId(request, result);
+      tap({
+        next: (result) => {
+          const executionTimeMs = Date.now() - startTime;
+          const statusCode = response?.statusCode ?? 200;
 
-        const details = auditOptions.extractDetails
-          ? auditOptions.extractDetails(request, result)
-          : this.sanitizeDetails(request.body);
+          const resourceId = auditOptions.extractResourceId
+            ? auditOptions.extractResourceId(request, result)
+            : this.resolveResourceId(request, result);
 
-        void this.auditLogService.create({
-          organizationId,
-          userId,
-          action: auditOptions.action,
-          resourceType: auditOptions.resourceType,
-          resourceId: resourceId ?? null,
-          ipAddress,
-          userAgent,
-          details: details ?? null,
-        });
+          const details = auditOptions.extractDetails
+            ? auditOptions.extractDetails(request, result)
+            : this.sanitizeDetails(request.body);
+
+          void this.auditLogService.create({
+            organizationId,
+            branchId,
+            userId,
+            action: auditOptions.action,
+            resourceType: auditOptions.resourceType,
+            resourceId: resourceId ?? null,
+            ipAddress,
+            userAgent,
+            statusCode,
+            executionTimeMs,
+            actorRole,
+            details: details ?? null,
+          });
+        },
       }),
     );
   }
@@ -107,6 +155,10 @@ export class AuditInterceptor implements NestInterceptor {
       params.invitationId ||
       params.patientId ||
       params.caseFileId ||
+      params.noteId ||
+      params.documentId ||
+      params.appointmentId ||
+      params.branchId ||
       params.id ||
       params.organizationId;
 
@@ -136,7 +188,15 @@ export class AuditInterceptor implements NestInterceptor {
       if (REDACTED_KEYS.has(key.toLowerCase())) {
         sanitized[key] = '[REDACTED]';
       } else if (value !== undefined) {
-        sanitized[key] = value;
+        if (
+          typeof value === 'object' &&
+          value !== null &&
+          !Array.isArray(value)
+        ) {
+          sanitized[key] = this.sanitizeDetails(value);
+        } else {
+          sanitized[key] = value;
+        }
       }
     }
 

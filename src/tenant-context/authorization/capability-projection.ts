@@ -4,6 +4,7 @@ import { CapabilityResolverService } from './capability-resolver.service';
 const AUTH_CONTEXT_CAPABILITY_CATALOG = new Set([
   'appointment.manage',
   'appointment.read',
+  'audit.read',
   'case_file.create',
   'case_file.read',
   'case_file.update',

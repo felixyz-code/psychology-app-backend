@@ -5,8 +5,11 @@ import { PaefAgreementsService } from './services/paef-agreements.service';
 import { BenefitPoolsService } from './services/benefit-pools.service';
 import { EmployeeEligibilityService } from './services/employee-eligibility.service';
 import { BenefitDebitService } from './services/benefit-debit.service';
-import { MembershipRole } from '@prisma/client';
-import type { TenantContext } from '../../../tenant-context/tenant-context.types';
+import { MembershipRole, UserRole } from '@prisma/client';
+import {
+  TenantContext,
+  TenantResolutionMode,
+} from '../../../common/request-context/request-context.service';
 
 describe('CorporateController', () => {
   let controller: CorporateController;
@@ -21,8 +24,8 @@ describe('CorporateController', () => {
     userId: 'user-1111-uuid',
     membershipId: 'membership-1111-uuid',
     organizationRole: MembershipRole.ADMIN,
-    organizationSlug: 'clinic-alpha',
-    systemRole: 'ADMIN' as any,
+    legacyUserRole: UserRole.ADMIN,
+    resolutionMode: TenantResolutionMode.EXPLICIT,
   };
 
   beforeEach(async () => {
@@ -62,13 +65,13 @@ describe('CorporateController', () => {
     debitService = {
       reserveBenefitSession: jest
         .fn()
-        .mockResolvedValue({ status: 'RESERVED' }),
+        .mockResolvedValue({ debitLog: { status: 'RESERVED' } }),
       confirmBenefitSession: jest
         .fn()
-        .mockResolvedValue({ status: 'CONFIRMED' }),
+        .mockResolvedValue({ debitLog: { status: 'CONFIRMED' } }),
       releaseOrRefundBenefitSession: jest
         .fn()
-        .mockResolvedValue({ status: 'RELEASED' }),
+        .mockResolvedValue({ debitLog: { status: 'RELEASED' } }),
       getDebitLogs: jest.fn().mockResolvedValue([]),
     };
 
@@ -107,7 +110,7 @@ describe('CorporateController', () => {
       poolId: 'pool-1',
       eligibilityId: 'eligibility-1',
     });
-    expect(result.status).toBe('RESERVED');
+    expect(result.debitLog.status).toBe('RESERVED');
     expect(debitService.reserveBenefitSession).toHaveBeenCalledWith(
       mockTenant.organizationId,
       {
