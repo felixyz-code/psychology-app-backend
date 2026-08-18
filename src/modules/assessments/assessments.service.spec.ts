@@ -444,5 +444,232 @@ describe('AssessmentsService', () => {
         service.completeByAccessToken('nonexistent'),
       ).rejects.toThrow(NotFoundException);
     });
+
+    it('should save responses if dto is provided before calling complete', async () => {
+      mockPrismaService.assessmentAdministration.findUnique.mockResolvedValue({
+        id: 'adm-123',
+        organizationId: 'org-1',
+        status: AdministrationStatus.ASSIGNED,
+      });
+
+      const saveSpy = jest
+        .spyOn(service, 'saveResponses')
+        .mockResolvedValue({} as any);
+      const completeSpy = jest
+        .spyOn(service, 'complete')
+        .mockResolvedValue({ status: AdministrationStatus.COMPLETED } as any);
+
+      const dto = { responses: { PHQ9_1: 2 } };
+      const res = await service.completeByAccessToken('token-123', dto);
+
+      expect(saveSpy).toHaveBeenCalledWith('org-1', 'adm-123', dto);
+      expect(completeSpy).toHaveBeenCalledWith('org-1', 'adm-123');
+      expect(res.status).toBe(AdministrationStatus.COMPLETED);
+    });
+  });
+
+  describe('getReport', () => {
+    it('should return enriched psychometric report for a completed assessment', async () => {
+      const mockResult = {
+        id: 'res-1',
+        administrationId: mockAdministrationId,
+        rawScore: 14,
+        normalizedScore: 51.9,
+        strataCode: 'MODERATE',
+        strataTitle: 'Depresión Moderada',
+        severity: 'MODERATE',
+        subscaleScoresJson: {},
+        flagsJson: [],
+        scoringSpecSnapshotJson: { schemaVersion: '1.0', scoringType: 'SUM', strata: [] },
+        createdAt: new Date(),
+      };
+
+      mockPrismaService.assessmentAdministration.findFirst.mockResolvedValue({
+        id: mockAdministrationId,
+        organizationId: mockOrgId,
+        status: 'COMPLETED',
+        createdAt: new Date(),
+        startedAt: new Date(Date.now() - 480000),
+        completedAt: new Date(),
+        result: mockResult,
+        patient: {
+          id: mockPatientId,
+          firstName: 'Juan',
+          lastName: 'Pérez',
+          email: null,
+          birthDate: new Date('1985-03-15'),
+        },
+        professional: {
+          id: mockProfessionalId,
+          name: 'Dr. Ana López',
+          email: 'ana@clinic.com',
+          psychologistProfile: {
+            professionalName: 'Dra. Ana López Méndez',
+            licenseNumber: '1234567',
+          },
+        },
+        branch: {
+          id: 'branch-1',
+          name: 'Polanco',
+          code: 'POL',
+          address: 'Av. Reforma 123',
+          phone: '55-0000-0000',
+          timezone: 'America/Mexico_City',
+        },
+        caseFile: { id: 'cf-1' },
+        instrumentVersion: {
+          id: 'ver-1',
+          versionNumber: 1,
+          instrument: {
+            id: 'inst-1',
+            code: 'PHQ-9',
+            name: 'Patient Health Questionnaire-9',
+            targetPopulation: 'Adults',
+          },
+          definitionJson: {
+            schemaVersion: '1.0',
+            metadata: { title: 'PHQ-9', acronym: 'PHQ-9', author: 'Kroenke et al.' },
+            items: [
+              { code: 'PHQ9_1', sequenceNumber: 1, prompt: 'Poco interés o placer', required: true, options: [{ value: '0', label: 'Nunca', weight: 0 }] },
+            ],
+          },
+        },
+        responses: [
+          { itemCode: 'PHQ9_1', responseValue: '0', numericWeight: 0, createdAt: new Date(), updatedAt: new Date() },
+        ],
+        organization: {
+          id: mockOrgId,
+          legalName: 'Clínica Psicológica XYZ S.A. de C.V.',
+          displayName: 'Clínica XYZ',
+          slug: 'clinica-xyz',
+          branding: { primaryColor: '#0284c7', accentColor: '#0369a1', visualName: null },
+          logoAsset: null,
+        },
+      });
+
+      const report = await service.getReport(mockOrgId, mockAdministrationId);
+
+      expect(report.reportVersion).toBe('1.0');
+      expect(report.patient.fullName).toBe('Juan Pérez');
+      expect(report.patient.age).toBeGreaterThan(30);
+      expect(report.professional.licenseNumber).toBe('1234567');
+      expect(report.instrument.acronym).toBe('PHQ-9');
+      expect(report.result.rawScore).toBe(14);
+      expect(report.legalDisclaimer).toContain('NOM-004-SSA3-2012');
+      expect(report.itemResponses).toHaveLength(1);
+      expect(report.itemResponses[0].prompt).toBe('Poco interés o placer');
+    });
+
+    it('should throw NotFoundException if administration not found', async () => {
+      mockPrismaService.assessmentAdministration.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.getReport(mockOrgId, mockAdministrationId),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should throw UnprocessableEntityException if assessment is not completed', async () => {
+      mockPrismaService.assessmentAdministration.findFirst.mockResolvedValue({
+        id: mockAdministrationId,
+        organizationId: mockOrgId,
+        status: 'IN_PROGRESS',
+        result: null,
+      });
+
+      await expect(
+        service.getReport(mockOrgId, mockAdministrationId),
+      ).rejects.toThrow(UnprocessableEntityException);
+    });
+  });
+
+  describe('getLongitudinalSeries', () => {
+    it('should return longitudinal series with delta for a patient', async () => {
+      mockPrismaService.patient.findFirst.mockResolvedValue({
+        id: mockPatientId,
+        firstName: 'Juan',
+        lastName: 'Pérez',
+      });
+
+      mockPrismaService.assessmentAdministration.findMany.mockResolvedValue([
+        {
+          id: 'adm-A',
+          completedAt: new Date('2026-06-01'),
+          instrumentVersion: {
+            versionNumber: 1,
+            instrument: { code: 'PHQ-9', name: 'PHQ-9' },
+          },
+          result: {
+            rawScore: 20,
+            normalizedScore: 74,
+            strataCode: 'SEVERE',
+            strataTitle: 'Severa',
+            severity: 'SEVERE',
+            subscaleScoresJson: {},
+            flagsJson: [],
+          },
+        },
+        {
+          id: 'adm-B',
+          completedAt: new Date('2026-08-01'),
+          instrumentVersion: {
+            versionNumber: 1,
+            instrument: { code: 'PHQ-9', name: 'PHQ-9' },
+          },
+          result: {
+            rawScore: 14,
+            normalizedScore: 51.9,
+            strataCode: 'MODERATE',
+            strataTitle: 'Moderada',
+            severity: 'MODERATE',
+            subscaleScoresJson: {},
+            flagsJson: [],
+          },
+        },
+      ]);
+
+      const result = await service.getLongitudinalSeries(
+        mockOrgId,
+        mockPatientId,
+        { instrumentCode: 'PHQ-9', limit: 20 },
+      );
+
+      expect(result.patientId).toBe(mockPatientId);
+      expect(result.series).toHaveLength(2);
+      expect(result.series[0].delta).toBeNull();
+      expect(result.series[1].delta!.rawScoreDelta).toBe(-6);
+      expect(result.series[1].delta!.severityChange).toBe('IMPROVED');
+      expect(result.series[1].delta!.clinicalSignificance).toBe('CLINICALLY_SIGNIFICANT');
+      expect(result.summary.scoreTrend).toBe('IMPROVING');
+      expect(result.summary.scoreMin).toBe(14);
+      expect(result.summary.scoreMax).toBe(20);
+    });
+
+    it('should throw NotFoundException if patient not found in organization', async () => {
+      mockPrismaService.patient.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.getLongitudinalSeries(mockOrgId, mockPatientId, { limit: 20 }),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should return empty series with INSUFFICIENT_DATA trend when no completed assessments', async () => {
+      mockPrismaService.patient.findFirst.mockResolvedValue({
+        id: mockPatientId,
+        firstName: 'Juan',
+        lastName: 'Pérez',
+      });
+      mockPrismaService.assessmentAdministration.findMany.mockResolvedValue([]);
+
+      const result = await service.getLongitudinalSeries(
+        mockOrgId,
+        mockPatientId,
+        { limit: 20 },
+      );
+
+      expect(result.series).toHaveLength(0);
+      expect(result.summary.totalCompletedAssessments).toBe(0);
+      expect(result.summary.scoreTrend).toBe('INSUFFICIENT_DATA');
+    });
   });
 });
+
