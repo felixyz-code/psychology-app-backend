@@ -1,6 +1,6 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
-import { BenefitPoolStatus, PaefAgreementStatus } from '@prisma/client';
+import { PaefAgreementStatus } from '@prisma/client';
 import { PrismaService } from '../../../../prisma/prisma.service';
 import { BenefitPoolsService } from './benefit-pools.service';
 

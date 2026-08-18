@@ -10,6 +10,7 @@ import {
   BenefitPoolStatus,
   EmployeeEligibilityStatus,
   PaefAgreementStatus,
+  Prisma,
 } from '@prisma/client';
 import { PrismaService } from '../../../../prisma/prisma.service';
 import {
@@ -183,7 +184,7 @@ export class BenefitDebitService {
           sessionQuantity: quantity,
           status: BenefitDebitStatus.RESERVED,
           reason: dto.reason || 'Benefit session reservation',
-          metadata: (dto.metadata as any) || {},
+          metadata: (dto.metadata as Prisma.InputJsonValue) || {},
         },
       });
 

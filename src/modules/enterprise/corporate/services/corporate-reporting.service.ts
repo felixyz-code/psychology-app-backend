@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { BenefitDebitStatus } from '@prisma/client';
+import { BenefitDebitStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../../../../prisma/prisma.service';
 import {
   CorporateBillingStatementQueryDto,
@@ -284,7 +284,7 @@ export class CorporateReportingService {
     );
 
     // 4. Period specific debits count (Zero ePHI: only counts / dates)
-    const debitWhere: any = {
+    const debitWhere: Prisma.BenefitDebitLogWhereInput = {
       agreementId,
       organizationId,
       status: BenefitDebitStatus.CONFIRMED,

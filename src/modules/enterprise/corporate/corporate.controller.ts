@@ -19,8 +19,6 @@ import {
   ApiCreatedResponse,
   ApiForbiddenResponse,
   ApiHeader,
-  ApiNotFoundResponse,
-  ApiOkResponse,
   ApiOperation,
   ApiParam,
   ApiQuery,
