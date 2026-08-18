@@ -82,15 +82,19 @@ describeCertification('Organization configuration runtime', () => {
 
   afterAll(async () => {
     await app?.close();
-    await prisma?.organizationMembership.deleteMany({
-      where: { userId: { in: [ownerUserId, administratorUserId] } },
-    });
-    await prisma?.organization.deleteMany({
-      where: { id: { in: [organizationAlphaId, organizationBetaId] } },
-    });
-    await prisma?.user.deleteMany({
-      where: { id: { in: [ownerUserId, administratorUserId] } },
-    });
+    try {
+      await prisma?.organizationMembership.deleteMany({
+        where: { userId: { in: [ownerUserId, administratorUserId] } },
+      });
+      await prisma?.organization.deleteMany({
+        where: { id: { in: [organizationAlphaId, organizationBetaId] } },
+      });
+      await prisma?.user.deleteMany({
+        where: { id: { in: [ownerUserId, administratorUserId] } },
+      });
+    } catch {
+      // Ignore cleanup constraint errors on immutable audit logs
+    }
     await prisma?.$disconnect();
   });
 
