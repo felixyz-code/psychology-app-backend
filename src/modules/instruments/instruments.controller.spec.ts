@@ -1,4 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { MembershipRole, UserRole } from '@prisma/client';
+import { TenantResolutionMode } from '../../common/request-context/request-context.service';
 import { InstrumentsController } from './instruments.controller';
 import { InstrumentsService } from './instruments.service';
 import type { TenantContext } from '../../tenant-context/tenant-context.types';
@@ -11,9 +13,9 @@ describe('InstrumentsController', () => {
     organizationId: '22000000-0000-4000-8000-000000000001',
     userId: '23000000-0000-4000-8000-000000000001',
     membershipId: '24000000-0000-4000-8000-000000000001',
-    organizationRole: 'OWNER' as any,
-    legacyUserRole: 'PSYCHOLOGIST' as any,
-    resolutionMode: 'EXPLICIT' as any,
+    organizationRole: MembershipRole.OWNER,
+    legacyUserRole: UserRole.PSYCHOLOGIST,
+    resolutionMode: TenantResolutionMode.EXPLICIT,
   };
 
   const mockService = {
