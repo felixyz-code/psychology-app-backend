@@ -26,6 +26,7 @@ describe('InstrumentsController', () => {
     getVersionDetails: jest.fn(),
     updateDraftVersion: jest.fn(),
     publishVersion: jest.fn(),
+    calculateScoreForVersion: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -87,6 +88,27 @@ describe('InstrumentsController', () => {
       expect(service.publishVersion).toHaveBeenCalledWith(
         mockTenant.organizationId,
         'ver-1',
+      );
+    });
+  });
+
+  describe('calculateScore', () => {
+    it('should delegate to service.calculateScoreForVersion', async () => {
+      const responses = { PHQ9_Q1: '2' };
+      const expectedResult = { rawScore: 2, isComplete: false };
+      mockService.calculateScoreForVersion.mockResolvedValue(expectedResult);
+
+      const result = await controller.calculateScore(
+        mockTenant,
+        '22222222-2222-4000-8000-222222222222',
+        responses,
+      );
+
+      expect(result).toEqual(expectedResult);
+      expect(service.calculateScoreForVersion).toHaveBeenCalledWith(
+        mockTenant.organizationId,
+        '22222222-2222-4000-8000-222222222222',
+        responses,
       );
     });
   });
