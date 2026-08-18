@@ -1,5 +1,777 @@
 # Changelog
 
+---
+
+# POST-GO-LIVE.4 Final Closure Sync
+
+## Status
+
+* The frontend functional sequence is complete through 4.9 at
+  `092eca3a1f9ed236586d9c0bb1b5f1c59f1e2a7c`; the supporting backend baseline
+  remains `ef4c1f7cefa9d5ab5bfc3b27e59ed51c8ea72fee` with Backend CI #127.
+* No backend runtime change was introduced by 4.9-R1B/R1B2. Backend
+  authorization remained authoritative throughout Phase 4.
+* This sync is documentation-only and does not include runtime, dependency,
+  schema/migration, deployment, or production action.
+* `PHASE 4 FUNCTIONAL COMPLETE / FORMAL CLOSEOUT REVIEW PENDING`.
+
+---
+
+# POST-GO-LIVE.4 Roadmap Continuation
+
+## Status
+
+* `POST-GO-LIVE.4.1`, `.4.2`, and `.4.3` are certified and complete; `.4.3`
+  is frontend-only and does not change the backend baseline.
+* Historical checkpoint: this entry recorded the pre-implementation roadmap
+  state; the frontend sequence is now functionally complete through 4.9.
+
+## Scope
+
+* The backend contribution is its already certified organization detail,
+  identity update, and `ACTIVE`/`SUSPENDED` lifecycle API surface.
+* No backend runtime, DTO, schema, migration, test, infrastructure, or
+  deployment change is authorized by this roadmap entry.
+
+---
+
+# POST-GO-LIVE.4 Documentation Closeout
+
+## Status
+
+* Documentacion contractual cerrada para POST-GO-LIVE.4.
+* Estado: `CONTRACT COMPLETE / IMPLEMENTATION READY`.
+* Historical closeout statement: the initial next phase was
+  `POST-GO-LIVE.4.1 Tenant Context Foundation`; it is now certified and merged.
+
+## Baseline
+
+* Contract version: `1`.
+* Contract commit: `48b48ef56615d382ade0f0616dcb67358faf3dfe`.
+* Documentation branch: `codex/post-go-live-4-0-frontend-integration-contract`.
+* Pull request: `#44`.
+* Date: `2026-08-02`.
+
+## Validation and rollback
+
+* Backend CI `#108` completed successfully.
+* Document-only rollback: `git revert <documentation-commit>` and restore the previous documentation baseline.
+* No runtime, DTO, Angular, NestJS, Prisma, infrastructure, or Postman changes are included.
+
+---
+
+# POST-GO-LIVE.3 Phase Closeout
+
+## Status
+
+Published as a documentation-only closeout package from functional baseline
+`6c65a4d8956723071514c40ec6942ecc39c0dcd2`. Phase 3 functional work is
+complete, while the formal closeout merge remains pending review and CI.
+
+## Highlights
+
+* Certified POST-GO-LIVE.3.0 through POST-GO-LIVE.3.6 as closed and integrated
+  on `development`.
+* Recorded merge ancestry, merged PRs, and post-merge CI success through
+  `Backend CI #104`.
+* Certified the current seven Prisma migrations as the complete Phase 3 schema
+  baseline.
+* Consolidated canonical identity, organization administration, membership
+  administration, invitation administration, ownership transfer, public
+  freelancer bootstrap, and preferred organization UX into one closeout
+  baseline.
+* Published `POST_GO_LIVE_3_PHASE_CLOSEOUT.md` as the formal closeout record.
+
+## Compatibility
+
+* No runtime code changes.
+* No Prisma schema changes.
+* No new migrations.
+* No seed or Postman artifact changes.
+* No production rollout, deployment, or infrastructure changes.
+
+# POST-GO-LIVE.3.6 Preferred Organization UX Runtime
+
+## Status
+
+Closed and integrated on `development` at merge commit
+`6c65a4d8956723071514c40ec6942ecc39c0dcd2` on Sunday, August 2, 2026.
+
+## Highlights
+
+* Added nullable `User.preferredOrganizationId` plus a safe FK with
+  `ON DELETE SET NULL` and no authorization semantics.
+* Added `PUT /auth/context/preference` as a JWT-authenticated UX-only
+  preference write endpoint with explicit DTO validation and serializable
+  eligibility checks.
+* Extended `GET /auth/context` so `RESOLVED`, `UNRESOLVED`, and
+  `LEGACY_COMPATIBILITY` all expose sanitized
+  `preferredOrganizationId: uuid | null`.
+* Added post-commit observability event
+  `active_organization_preference_changed`.
+* Extended development seed, seed certification, Postman artifacts, OpenAPI,
+  persistence, PostgreSQL E2E, and concurrency coverage for preferred
+  organization behavior.
+
+## Compatibility
+
+* `X-Organization-Id` remains the only tenant-selection hint for
+  tenant-required requests.
+* JWT remains identity-only and is never reissued by preference writes.
+* `TenantContextGuard`, capabilities, membership state, and request-time
+  tenant authority are unchanged.
+* Stale persisted preferences are sanitized to `null` on read and are never
+  auto-corrected or used as request fallback.
+
+# POST-GO-LIVE.3.5 Public Freelancer Bootstrap Runtime
+
+## Status
+
+Closed and integrated on `development` at merge commit
+`7b456901074807891c0384e214181e2ec8417d37` on Sunday, August 2, 2026.
+
+## Highlights
+
+* Added canonical user identity through required unique
+  `User.normalizedEmail`.
+* Added Prisma migration
+  `20260801120000_add_user_normalized_email_bootstrap_runtime` with fail-closed
+  legacy backfill, collision guards, and unsupported non-ASCII legacy-email
+  rejection.
+* Switched login and recipient user binding to canonical
+  `normalizedEmail` lookup.
+* Added public `POST /auth/freelancer-bootstrap` that creates one
+  `User`, one `ACTIVE` organization, and one `OWNER` `ACTIVE` membership in
+  one serializable transaction.
+* Added explicit `PUBLIC_FREELANCER_BOOTSTRAP_ENABLED` runtime gating for the
+  public bootstrap route.
+* Added route-scoped bootstrap throttling by client IP and canonical email
+  with limits `5/IP/15m` and `3/normalizedEmail/15m`.
+* Added post-commit bootstrap observability events
+  `freelancer_bootstrap_completed` and `freelancer_bootstrap_denied`.
+* Extended unit, OpenAPI, persistence, PostgreSQL E2E, and concurrency
+  coverage for canonical identity and freelancer bootstrap runtime paths.
+
+## Compatibility
+
+* No refresh-token flow.
+* No password reset.
+* No email verification.
+* No MFA.
+* No invitation auto-bind, auto-accept, or auto-revoke side effects.
+* No automatic `PsychologistProfile` creation.
+* JWT remains identity-only and does not carry tenant, organization,
+  membership, or capability claims.
+
+# POST-GO-LIVE.3.4 Organization Ownership Transfer Runtime
+
+## Status
+
+Closed and integrated on `development` at merge commit
+`77b4b6e6a70ef133459b84ea71c5d9590bfb6d0a` on Friday, July 31, 2026.
+
+## Highlights
+
+* Added dedicated `POST /organizations/:organizationId/ownership-transfer`
+  instead of reusing generic role mutation.
+* Added the closed capability `ownership.transfer`, granted only to `OWNER`.
+* Implemented serializable compare-and-set ownership handoff that promotes the
+  target to `OWNER`, demotes the actor to `ADMIN`, and verifies the active
+  owner invariant before commit.
+* Added post-commit `organization_ownership_transferred` observability with
+  actor/source/target role metadata only.
+* Extended unit, OpenAPI, PostgreSQL E2E, and PostgreSQL concurrency coverage
+  for owner handoff and stale-actor conflict paths.
+
+## Compatibility
+
+* No Prisma schema change.
+* No migration or backfill.
+* No new owner-designation table or primary-owner column.
+* Generic membership role mutation still never grants `OWNER`.
+* Suspended organizations remain fail-closed for the ownership-transfer
+  operation itself.
+
+# POST-GO-LIVE.3.2 Membership Administration Runtime
+
+## Status
+
+Closed and integrated on `development` at merge commit
+`206371972ee10958f62f01434c9ac2f5631d4ec6`.
+
+## Highlights
+
+* Replaced the absolute `OrganizationMembership` uniqueness on
+  `organizationId + userId` with a PostgreSQL partial unique index that allows
+  multiple historical `REVOKED` rows while preserving at most one non-terminal
+  row (`INVITED`, `ACTIVE`, `SUSPENDED`).
+* Added a dedicated Prisma migration
+  `20260729030000_membership_historical_reentry` with an explicit preflight
+  guard for unsafe legacy duplicate non-terminal rows.
+* Hardened tenant resolution and `GET /auth/context` so historical `REVOKED`
+  rows are ignored deterministically and suspended memberships never authorize
+  tenant context.
+* Restricted the public membership-status DTO and Swagger contract to
+  `ACTIVE` and `SUSPENDED` only.
+* Kept membership administration listing behavior focused on current
+  non-terminal rows while preserving full historical membership periods in the
+  database.
+* Updated invitation acceptance so revoked history no longer blocks re-entry;
+  the accepted invitation creates a new `ACTIVE` membership row instead of
+  reactivating the revoked record.
+* Extended unit, persistence, migration, and PostgreSQL E2E coverage for
+  historical re-entry, partial-index conflicts, target-policy hardening, and
+  last-owner concurrency.
+
+## Compatibility
+
+* No new public `POST /memberships` route.
+* No frontend changes.
+* No infrastructure changes.
+* No production access.
+* No deployment or backfill activity.
+* POST-GO-LIVE.3.2 is closed and integrated as the organization-domain
+  baseline.
+* POST-GO-LIVE.3.3 invitation administration runtime is closed and integrated
+  on merge commit `5bb75dc4ae8deed67543f745abb23bac88508066` via PR `#39`.
+
+# POST-GO-LIVE.3.3 Invitation Administration Runtime
+
+## Status
+
+Closed and integrated on `development` without a Prisma migration.
+
+## Highlights
+
+* Added hardened administrative invitation listing with derived
+  `logicalStatus`, sanitized projections, and deterministic ordering.
+* Hardened invitation creation so `OWNER` is rejected in both DTO and service,
+  logically expired duplicates are materialized before insert, and known
+  recipients with `INVITED`, `ACTIVE`, or `SUSPENDED` memberships fail closed.
+* Added owner-only `POST /organizations/:organizationId/invitations/:invitationId/resend`
+  with replacement semantics, fresh token generation, and post-commit
+  `invitation_resent` observability.
+* Hardened accept/reject flows with canonicalized recipient email checks,
+  organization-active enforcement, exactly-once terminal transitions, and
+  historical membership re-entry via a new membership row.
+* Extended unit, persistence, and PostgreSQL E2E/concurrency coverage for
+  invitation administration runtime scenarios.
+
+## Compatibility
+
+* No Prisma schema change.
+* No new migration.
+* No real email delivery.
+* No frontend change.
+* No production access or deployment.
+
+# POST-GO-LIVE.3.1 Organization Administration Runtime
+
+## Status
+
+Closed and integrated on `development` at merge commit
+`2373ff046d56f455ecb9b5c4cc075f36f9ab778f` as the first runtime phase after
+the merged POST-GO-LIVE.3.0 contract baseline.
+
+## Highlights
+
+* Added owner-only `PATCH /organizations/:organizationId` for editable
+  organization identity fields: `legalName`, `displayName`, `slug`,
+  `timezone`, `locale`, and `currency`.
+* Added owner-only `PATCH /organizations/:organizationId/status` for
+  `ACTIVE <-> SUSPENDED` lifecycle transitions.
+* Extended organization admin reads so `GET /organizations`,
+  `GET /organizations/current`, and `GET /organizations/:organizationId`
+  can surface suspended organizations for safe administrative recovery.
+* Preserved identity-first JWT and per-request tenant validation by adding a
+  route-scoped suspended-organization allowance only on organization
+  read/update/status routes.
+* Added structured organization-domain log events for organization update,
+  suspension, and reactivation.
+* Added unit, OpenAPI, and opt-in E2E coverage for the organization
+  administration runtime.
+
+## Compatibility
+
+* No Prisma schema changes.
+* No new migrations.
+* No frontend changes.
+* No infrastructure changes.
+* No production access.
+* No deployment or backfill activity.
+
+# POST-GO-LIVE.3.0 Closeout
+
+## Status
+
+Closed as a merged documentation-only contract baseline after PR `#35`.
+
+## Highlights
+
+* Certified merge commit `7d897ec8db2c5d372fce0b4dc0eaf3bd3b1d4b13` as the new
+  official POST-GO-LIVE.3.0 baseline on `development`.
+* Confirmed post-merge `Backend CI / backend` succeeded on workflow run
+  `30411839106`, job `90449491216`.
+* Recorded POST-GO-LIVE.3.0 as closed at the documentation/contract/architecture
+  level only.
+* Preserved the merged decisions for active organization selection,
+  owner-protection rules, corrected membership endpoint matrix, and schema-gated
+  historical membership re-entry.
+* Registered POST-GO-LIVE.3.1 Organization Administration Runtime as the next
+  phase, still not started and not implemented.
+
+## Compatibility
+
+* No runtime code changes.
+* No Prisma schema changes.
+* No new migrations.
+* No frontend changes.
+* No infrastructure changes.
+* No production access.
+* No deployment or backfill activity.
+
+# POST-GO-LIVE.3.0 Organization & Membership Administration Contract
+
+## Status
+
+Documented for review as a documentation-only organization-domain audit and
+contract phase.
+
+## Highlights
+
+* Audited the real backend baseline for `Organization`,
+  `OrganizationMembership`, `OrganizationInvitation`, `Auth`, `TenantContext`,
+  runtime capabilities, and tenant-aware tooling.
+* Recorded that the organization domain is already partially implemented in the
+  current backend through organization read routes, membership administration,
+  invitation lifecycle routes, and owner-protection invariants.
+* Published the normative POST-GO-LIVE.3.0 contract in
+  `POST_GO_LIVE_3_0_ORGANIZATION_MEMBERSHIP_ADMINISTRATION_CONTRACT.md`.
+* Published the active organization selection ADR in
+  `adr/ADR-ORGANIZATION-ACTIVE-SELECTION.md`.
+* Corrected source-of-truth documentation that still described the 2.1C2
+  organization routes as unimplemented.
+
+## Compatibility
+
+* No runtime code changes.
+* No Prisma schema changes.
+* No new migrations.
+* No frontend changes.
+* No infrastructure changes.
+* No production access.
+* No deployment or backfill activity.
+
+# POST-GO-LIVE.2.1D5 Tenant Platform Certification
+
+## Status
+
+Published for D5-R review; no production rollout, merge, or closure performed.
+
+## Highlights
+
+* Added an opt-in tenant platform certification E2E suite gated by
+  `RUN_TENANT_PLATFORM_CERTIFICATION_TESTS=true`.
+* Published the D5 readiness report in
+  `POST_GO_LIVE_2_1_TENANT_PLATFORM_CERTIFICATION.md`.
+* Certified representative final-platform gates for tenant context,
+  suspended access, cross-tenant Patient redaction, clinical assignment,
+  role boundaries, blob isolation, server-owned financial fields, tenant
+  summary filters, legacy-null exclusion, default-deny capabilities, and
+  OpenAPI server-owned DTO contracts.
+* No Prisma schema changes.
+* No new migrations.
+
+## Compatibility
+
+* D5 is certification and documentation only. It does not add endpoints, change
+  public response contracts, touch frontend behavior, access production data,
+  deploy infrastructure, run backfills, merge the branch, or start
+  POST-GO-LIVE.3.
+
+---
+
+# POST-GO-LIVE.2.1D4 Integrated Tenant Certification
+
+## Status
+
+Certified locally and merged before D5.
+
+## Highlights
+
+* Added an opt-in integrated tenant contract E2E suite for D1 through D3
+  surfaces.
+* Certified the freelancer `OWNER` flow across Patients, Case Files,
+  Workspace, Session Notes, Documents/blob access, Appointments with notes,
+  Financial Transactions, and Financial Summary.
+* Certified multi-role boundaries, cross-tenant isolation, legacy
+  `organizationId = NULL` exclusion, clinical assignment, document storage-key
+  defenses, appointment-note projection, server-owned `createdById`, and
+  tenant-scoped financial summaries in one disposable PostgreSQL database.
+* No Prisma schema changes.
+* No new migrations.
+
+## Changed
+
+* Added `test/integrated-tenant-contract.e2e-spec.ts` as an explicit opt-in
+  certification suite gated by `RUN_INTEGRATED_TENANT_CONTRACT_TESTS=true`.
+* Recorded the D4 integrated certification boundary without declaring
+  POST-GO-LIVE.2.1D closed.
+
+## Security Notes
+
+* The integrated suite uses synthetic data only and verifies sanitized
+  telemetry does not contain appointment notes, clinical content, filenames,
+  tokens, passwords, database URLs, SQL, Prisma internals, or upload paths.
+* Document blob access remains authorized through tenant-aware metadata before
+  filesystem access. Missing blobs and cross-tenant blobs return sanitized
+  denials.
+
+## Compatibility
+
+* No business functionality, frontend, production access, deployment,
+  backfill, Prisma schema change, migration, global Prisma middleware, RLS, or
+  POST-GO-LIVE.2.1D closure action was introduced.
+
+# POST-GO-LIVE.2.1D3 Scheduling and Financial Tenant Conversion
+
+## Status
+
+Certified locally
+
+## Highlights
+
+* Converted Appointments to tenant-aware scheduling.
+* Protected `Appointment.notes` as clinical content.
+* Converted Financial Transactions to tenant-aware CRUD.
+* Converted Financial Summary to tenant-aware aggregates.
+* Added explicit `finance.summary_read` capability.
+* Added scheduling and financial tenant certification E2E coverage.
+* Certified D3 against disposable local PostgreSQL with opt-in E2E coverage.
+* No Prisma schema changes.
+* No new migrations.
+
+## Changed
+
+* Appointment controllers now require resolved tenant context and pass immutable
+  request scope to the service.
+* Appointment reads and mutations use `organizationId` as the primary boundary
+  and exclude legacy `organizationId = NULL` rows.
+* Appointment operational projections omit notes unless clinical capability and
+  active same-tenant assignment are both present.
+* Receptionist scheduling access is limited to operational fields and cannot
+  read or mutate appointment notes.
+* Financial transaction reads, writes, deletes, filters, and summaries are
+  scoped by selected `organizationId`.
+* Financial transaction creation derives `createdById` from the authenticated
+  request scope; the client no longer owns that field.
+* Financial summary uses `finance.summary_read`; `report.read` is not a
+  substitute.
+
+## Security Notes
+
+* Cross-tenant and legacy-null appointment and financial direct resources
+  return redacted `404`.
+* Cross-tenant mutations perform no side effects.
+* Financial aggregates exclude foreign and legacy-null rows.
+* Clinical assignment does not grant finance access.
+
+## Compatibility
+
+* No Prisma schema change, migration, seed, frontend change, production data
+  access, deployment, global Prisma middleware, RLS, or infrastructure change
+  was introduced.
+
+# POST-GO-LIVE.2.1D2 Clinical Core and Documents Tenant Conversion
+
+## Status
+
+Completed
+
+## Highlights
+
+* Converted Clinical Core to tenant-aware architecture.
+* Case Files.
+* Workspace.
+* Session Notes.
+* Documents.
+* Blob access.
+* Shared `ClinicalAccessPolicyService`.
+* D2 capability catalog completed.
+* PostgreSQL certification completed.
+* Full regression passed.
+* No Prisma schema changes.
+* No new migrations.
+
+## Changed
+
+* Aligned Case Files, Workspace, Session Notes, and Documents/blob access with
+  the 2.1D0 tenant-aware policy: resolved tenant context, active membership,
+  active organization, explicit domain capability, active clinical assignment,
+  and temporary legacy psychologist restriction.
+* Converted direct, list, relationship, workspace, metadata, download, update,
+  and delete flows to scope by `organizationId` and exclude legacy
+  `organizationId = NULL` records.
+* Session note and document creation/update ignore server-owned tenant and
+  actor fields from request payloads and derive them from the validated
+  request context.
+* Document blob access now authorizes metadata before filesystem access and
+  constrains physical paths to the assigned patient folder; document deletes
+  remove metadata first and then run sanitized best-effort blob cleanup.
+
+## Security Notes
+
+* Cross-tenant and legacy-null direct resources return redacted `404`.
+* Visible in-tenant clinical resources without active assignment return `403`.
+* `OWNER` and `ADMIN` do not bypass clinical assignment.
+* `AUDITOR` and `READ_ONLY` receive no clinical core or document projection in
+  this phase.
+
+## Compatibility
+
+* No Prisma schema change, migration, seed, frontend change, production data
+  access, deployment, Appointments, Financial Transactions, Financial Summary,
+  or D3 conversion was introduced.
+
+# POST-GO-LIVE.2.1D1 Patients Tenant Policy Alignment
+
+## Changed
+
+* Aligned the Patients module with the 2.1D0 tenant-aware policy: tenant
+  context, explicit `patient.*` capabilities, active same-tenant membership,
+  active organization, active assignment, and temporary legacy psychologist
+  restriction.
+* Patient creation now derives `organizationId` and legacy `psychologistId`
+  from the validated request context and creates an active primary assignment
+  for the current membership.
+* Patient reads, updates and deletes now require active assignment. Lists only
+  return assigned tenant patients and continue excluding legacy
+  `organizationId = NULL` rows.
+* Patient direct misses and cross-tenant resources use a generic redacted
+  `404`; visible in-tenant capability or assignment failures use `403`.
+
+## Security Notes
+
+* `OWNER` and `ADMIN` no longer bypass patient assignment for clinical patient
+  access.
+* `AUDITOR` and `READ_ONLY` receive no patient clinical/personal projection in
+  this phase.
+
+## Compatibility
+
+* No Prisma schema change, migration, seed, frontend change, production data
+  access, deployment, Case Files, Workspace, Session Notes, Documents,
+  Appointments, Financial Transactions, or Financial Summary conversion was
+  introduced.
+
+# POST-GO-LIVE.2.1D0 Clinical and Financial Tenant Conversion Contract
+
+## Added
+
+* Documentation-only D0 contract for the 2.1D conversion of Patients, Case
+  Files, Workspace, Session Notes, Documents, Appointments, Financial
+  Transactions, and Financial Summary.
+* Approved single-role membership posture: capabilities and clinical assignment
+  express combined responsibilities without accumulated roles.
+* Role, capability, module, legacy-null, projection, observability, HTTP, and
+  test-gate matrices for D1 through D4.
+
+## Security Notes
+
+* `OWNER` and `ADMIN` do not gain clinical-content access by organizational
+  role alone.
+* `AUDITOR` and `READ_ONLY` have no clinical-content, session-note, or document
+  download access during 2.1D.
+* Tenant-aware endpoints must exclude legacy `organizationId = NULL` rows from
+  reads, writes, counts, summaries, and relationships.
+
+## Compatibility
+
+* No runtime code, Prisma schema, migration, seed, production data, deployment,
+  frontend behavior, D1 implementation, or merge behavior changed.
+
+# POST-GO-LIVE.2.1C2 Organization, Membership & Invitation APIs
+
+## Added
+
+* Tenant-scoped Organization, Membership and Invitation API routes with typed
+  default-deny capabilities and sanitized lifecycle observations.
+* Serializable membership and invitation mutations that use conditional writes,
+  protect the last active OWNER, materialize relevant expired invitations, and
+  preserve membership history.
+
+## Compatibility
+
+* No Prisma schema/migration, backfill, production action, frontend change,
+  global enforcement, or conversion of legacy clinical modules was added.
+
+---
+
+# POST-GO-LIVE.2.1C1 Invitation Lifecycle Persistence
+
+## Added
+
+* Prisma persistence for normalized invitation recipients, optional invitee and
+  accepter identity bindings, recipient rejection, and materialized expiry.
+* A PostgreSQL terminal-state check and SQL-managed partial unique index that
+  prevents concurrent terminal-free invitations with the same organization and
+  normalized email.
+* Fail-closed legacy preflight for unsafe normalized invitation keys, plus
+  schema/migration certification coverage.
+
+## Compatibility
+
+* No APIs, controllers, services, repositories, guards, DTOs, email delivery,
+  backfill, tenant enforcement, production migration, or deployment behavior
+  was introduced. Expiry materialization belongs to the expressly deferred API
+  transaction flow.
+
+---
+
+# POST-GO-LIVE.2.1C0 Invitation & Membership Mutation Contract
+
+## Added
+
+* An approved, default-deny capability contract for invitation lifecycle and
+  membership mutations.
+* Contract definitions separating revocation, recipient rejection, expiry,
+  administrative removal, and self-leave.
+* A recommended schema/migration boundary, recipient-binding model,
+  anti-enumeration semantics, concurrency gates, and staged 2.1C1/2.1C2 plan.
+* Approved product decisions for ADMIN non-OWNER management, AUDITOR sanitized
+  reads, seven-day expiry, persistent rejection/expiry, re-invitation after
+  rejection, no MVP ownership transfer, and no production email delivery.
+
+## Compatibility
+
+* No Prisma schema, migration, runtime module, endpoint, DTO, service,
+  repository, backfill, frontend, production data, or deployment behavior was
+  changed. The current typed capability catalog remains unchanged.
+
+---
+
+# POST-GO-LIVE.2.1B Tenant Context, Capability Resolution & Observability
+
+## Added
+
+* Closed, typed organization-capability catalog and centralized policy resolver
+  derived from the approved capability matrix. Conditional capabilities remain
+  denied until their specific assignment, redaction, or owner policy exists.
+* Sanitized tenant-resolution telemetry for successful resolution, malformed
+  selection, redacted denial, ambiguity, missing required context, and
+  capability denial.
+* Request-context protections that freeze TenantContext, reject a second
+  resolution in the same request, and expose typed absent-context errors.
+* Unit coverage for strict header parsing, inactive membership states,
+  capability default-deny behavior, conditional AUDITOR/READ_ONLY behavior,
+  reusable guard ordering, and interleaved AsyncLocalStorage contexts.
+
+## Changed
+
+* Tenant resolution now reads the authenticated user's membership status and
+  organization status together, allowing safe reason-code telemetry without
+  changing the redacted external `403` response.
+* Swagger documents `X-Organization-Id` on the tenant-required Patients pilot.
+
+## Compatibility
+
+* No Prisma schema, migration, seed, backfill, JWT tenant claim, global tenant
+  enforcement, or legacy clinical-module conversion was introduced. Patients
+  retains its `organizationId + psychologistId` double barrier; capability
+  enforcement for clinical modules remains deferred to 2.1D.
+
+---
+
+# POST-GO-LIVE.2.1A Domain, Tenant Context & Authorization Contract
+
+## Added
+
+* Versioned tenant-context and data-isolation ADRs.
+* Primary authorization contract, capability matrix, endpoint scope matrix,
+  and tenant security test contract.
+
+## Compatibility
+
+* No Prisma schema, migration, runtime guard, service, controller, JWT, API,
+  frontend, data, backfill, or deployment behavior changed.
+
+---
+
+# POST-GO-LIVE.1.7A Tenant-Aware Patients Pilot
+
+## Changed
+
+* Patients is the first tenant-aware clinical module. Every Patients endpoint
+  requires a resolved TenantContext and scopes access by both `organizationId`
+  and authenticated `psychologistId`; legacy global ADMIN access is not used.
+* Patient create and update contracts no longer accept ownership fields. A
+  nullable `organizationId` is deliberately excluded from the pilot scope.
+
+## Security Notes
+
+* The pilot uses explicit scope parameters; it adds neither a global Prisma
+  middleware nor global tenant enforcement. Other clinical modules remain on
+  legacy ownership compatibility.
+* A future deployment requires separate certification that the target database
+  has completed the versioned backfill. No index or migration was added here.
+
+---
+
+# POST-GO-LIVE.1.6 Tenant Context & Runtime Compatibility Foundation
+
+## Added
+
+* Request-isolated tenant context resolution from the authenticated user and
+  active PostgreSQL memberships, with safe explicit organization selection.
+* `@TenantRequired()` and `@CurrentTenant()` for gradual route adoption, plus
+  tenant-optional `GET /auth/context` for safe organization selection.
+* Unit, concurrency, and opt-in PostgreSQL integration coverage for tenant
+  resolution, cross-tenant rejection, and context isolation.
+
+## Changed
+
+* Existing authenticated routes are tenant-optional; public routes bypass
+  resolution. Legacy `User.role`, `psychologistId`, JWT format, and clinical
+  ownership queries are unchanged.
+* Structured HTTP logs may include only tenant/user/membership identifiers and
+  resolution mode; no headers, clinical data, names, emails, or tokens are
+  added.
+
+## Security Notes
+
+* `X-Organization-Id` is never trusted until matched to the authenticated
+  user's active membership and an active organization.
+* Ambiguous memberships are never resolved by order. Required routes return a
+  redacted conflict, and optional legacy routes receive no tenant context.
+
+---
+
+# POST-GO-LIVE.1.5 Legacy Organization & Backfill Foundation
+
+## Added
+
+* A manifest-validated `npm run saas:legacy-backfill` operational command with
+  dry-run, explicit apply confirmation, structured redacted reports,
+  serializable transaction handling and idempotence checks.
+* Unit coverage for manifests, safety gates, role mapping, planning,
+  no-change second runs and report privacy.
+* Opt-in PostgreSQL coverage for the end-to-end legacy backfill path.
+* `docs/SAAS_LEGACY_BACKFILL.md` runbook, including rollback guidance.
+
+## Changed
+
+* No runtime NestJS routes, guards, authorization rules, ownership filtering
+  or API contracts changed.
+* No Prisma schema migration was added. The active-PRIMARY partial index and
+  cross-tenant constraints are deliberately deferred.
+
+## Security Notes
+
+* Apply rejects production-like database names, requires a dedicated
+  confirmation value and defaults to `_test` databases.
+* Reports avoid passwords, URLs with credentials, patient names, clinical
+  notes, documents and other PHI.
+
 > Backend change log for the Psychology Management System Backend.
 
 ---

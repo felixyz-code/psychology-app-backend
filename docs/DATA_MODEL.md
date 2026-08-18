@@ -72,6 +72,10 @@ The workspace timeline is derived at request time from existing timestamps and d
 
 Defines authorization level inside the application.
 
+`User.role` remains the legacy runtime authorization role. It is deliberately
+separate from `OrganizationMembership.role`, which represents authority inside
+one organization and is carried independently in Tenant Context.
+
 ---
 
 ## AppointmentStatus
@@ -165,6 +169,7 @@ Represents an authenticated system user.
 * `id`
 * `name`
 * `email`
+* `normalizedEmail`
 * `passwordHash`
 * `role`
 
@@ -183,6 +188,99 @@ Users act as the ownership root for psychologist-scoped resources.
 ### Business Notes
 
 Current roles are `ADMIN` and `PSYCHOLOGIST`.
+
+`email` remains the presentation value. `normalizedEmail` is the canonical user
+identity and is derived exactly as `email.trim().toLocaleLowerCase('en-US')`.
+It is required, unique, and is the lookup key for login, public bootstrap, and
+recipient identity binding.
+
+For POST-GO-LIVE.3.5 the supported public-bootstrap and migrated legacy user
+email domain is ASCII-only. The migration trims PostgreSQL whitespace with
+`regexp_replace(..., '^[[:space:]]+|[[:space:]]+$', '', 'g')`, lowercases the
+trimmed candidate, and fails closed if a legacy user email is blank after
+trimming, exceeds the canonical byte limit, collides canonically, or contains
+non-ASCII characters that require manual remediation.
+
+---
+
+## Organization
+
+### Purpose
+
+Represents one tenant boundary for administrative, clinical, and operational
+data.
+
+### Database Table
+
+`organizations`
+
+### Main Fields
+
+* `id`
+* `slug`
+* `legalName`
+* `displayName`
+* `status`
+* `timezone`
+* `locale`
+* `currency`
+
+### Relationships
+
+* Has many `OrganizationMembership` records
+* Has many `OrganizationInvitation` records
+* May have one `OrganizationSettings`
+* May have one `OrganizationBranding`
+
+### Business Notes
+
+POST-GO-LIVE.3.5 public freelancer bootstrap creates exactly one initial
+organization with `status = ACTIVE`, a server-generated `slug`, and default
+timezone/locale/currency when no later administration change has been applied.
+
+`OrganizationSettings` and `OrganizationBranding` are reserved one-to-one rows
+and are not created automatically. POST-GO-LIVE.5.2 exposes only
+`defaultAppointmentDuration` and `primaryColor` through explicit runtime
+resources. Other reserved fields remain server-owned and are not part of those
+request or response contracts.
+
+`OrganizationLogoAsset` is also a reserved one-to-one row. POST-GO-LIVE.5.3
+uses it as the sole canonical current-logo metadata: storage keys stay internal,
+validated bytes live in the confined organization namespace, and protected
+reads always pass tenant authorization rather than a public/static route.
+
+---
+
+## OrganizationMembership
+
+### Purpose
+
+Represents a user's authority inside one organization.
+
+### Database Table
+
+`organization_memberships`
+
+### Main Fields
+
+* `id`
+* `organizationId`
+* `userId`
+* `role`
+* `status`
+* `joinedAt`
+
+### Relationships
+
+* Belongs to one `Organization`
+* Belongs to one `User`
+* May participate in `PatientAssignment`
+
+### Business Notes
+
+POST-GO-LIVE.3.5 public freelancer bootstrap creates exactly one initial
+membership with `role = OWNER`, `status = ACTIVE`, and a committed `joinedAt`
+timestamp. Bootstrap never creates multiple memberships for the same request.
 
 ---
 
@@ -509,6 +607,193 @@ To avoid duplicated ownership columns and maintain consistency.
 To preserve the existing ownership rule of the project.
 
 Ownership must be inferred through related entities when they exist, and only fall back to `createdById` for general movements.
+
+---
+
+# Additive SaaS Foundation
+
+The SaaS foundation is additive and does not yet make the application
+multi-tenant. It introduces `Organization`, `OrganizationMembership`,
+`PsychologistProfile`, organization settings/branding, inactive invitation
+storage and `PatientAssignment` persistence without public API flows or tenant
+authorization enforcement.
+
+`Patient`, `CaseFile`, `SessionNote`, `Document`, `Appointment` and
+`FinancialTransaction` now expose a nullable `organizationId`. Existing
+`psychologistId`, global `User.role` and all legacy ownership behaviour remain
+the runtime source of truth until a later backfill and enforcement phase.
+
+The additive migration intentionally does not create a Legacy Organization,
+infer an OWNER, populate memberships or assignments, move uploads, or make any
+legacy column mandatory. Cross-tenant composite constraints, a partial unique
+index for active primary assignments, soft-delete, audit events and tenant
+filters are deferred until data has been backfilled and validated.
+
+`OrganizationMembership` is unique per organization and user. A
+`PsychologistProfile` is one-to-one with a user but grants neither membership
+nor clinical access. `PatientAssignment` is stored for future historical
+professional assignment; it is not yet populated or used by authorization.
+
+POST-GO-LIVE.3.5 adds canonical user identity to the same additive foundation.
+`User.normalizedEmail` is backfilled from legacy `email`, made `NOT NULL`, and
+protected by a unique index through the versioned Prisma migration
+`20260801120000_add_user_normalized_email_bootstrap_runtime`. The migration is
+fail-closed for blank canonical emails, overlength canonical emails, and legacy
+canonical collisions; it never merges or deletes users automatically.
+
+### POST-GO-LIVE.2.1D0 assignment and tenant boundary
+
+`POST_GO_LIVE_2_1D0_TENANT_CONVERSION_CONTRACT.md` makes `organizationId` the
+primary tenant isolation boundary for the future D1 through D3 module
+conversion. Nullable `organizationId` remains a legacy state and is not visible
+through tenant-aware endpoints until a separate certified backfill.
+
+Each `OrganizationMembership` stores one organizational role only. Combined
+responsibilities are represented by capabilities plus `PatientAssignment`, not
+by accumulating roles. `PatientAssignment` becomes the required clinical
+condition for clinical content during 2.1D; it must belong to the same
+organization as the patient and membership. `psychologistId` remains only a
+temporary additional assignment restriction and must not be used as a tenant
+fallback.
+
+### POST-GO-LIVE.2.1D1 Patients runtime alignment
+
+Patients is the first module aligned with the 2.1D0 runtime policy. Tenant-aware
+patient reads and mutations use `Patient.organizationId` as the outer boundary
+and require an active same-tenant `PatientAssignment` for the current
+membership. The legacy `Patient.psychologistId` column is still enforced as a
+temporary additional restriction and does not broaden tenant scope.
+
+Creating a patient derives `organizationId` from tenant context and creates an
+active `PRIMARY` assignment for the current membership. No Prisma schema change,
+new migration, or legacy null backfill is introduced by this runtime alignment.
+
+### POST-GO-LIVE.2.1D4 integrated certification
+
+D4 certifies the existing tenant-aware data model across Patients, Case Files,
+Session Notes, Documents, Appointments, Financial Transactions, Financial
+Summary, memberships, assignments, and legacy-null rows in one disposable
+PostgreSQL database. The certification uses the existing four migrations only
+and confirms that `organizationId`, `createdById`, `authorId`, `uploadedById`,
+clinical assignment, and document file paths remain server-owned or
+tenant-scoped where documented.
+
+D4 does not add or modify tables, columns, enums, indexes, relations, Prisma
+schema definitions, migrations, seed data, production data, or backfill
+behavior.
+
+### POST-GO-LIVE.2.1D5 tenant platform certification
+
+D5 certifies the same tenant-aware data model as a final readiness package. The
+certification confirms that the platform still uses the existing four Prisma
+migrations only, keeps `organizationId = NULL` legacy rows excluded from
+tenant-aware runtime access, derives server-owned tenant fields from request
+scope, and preserves clinical assignment plus tenant predicates across the
+converted clinical, document, scheduling, and financial models.
+
+D5 does not add or modify tables, columns, enums, indexes, relations, Prisma
+schema definitions, migrations, seeds, production data, or backfill behavior.
+
+### POST-GO-LIVE.1.4 validation
+
+The additive migration was validated against disposable PostgreSQL 16.14
+databases both from an empty schema and from a representative legacy schema.
+The legacy validation preserved row counts, `User.role`, `Patient.psychologistId`
+and null `organizationId` values, while creating no Organization, Membership or
+Profile automatically. Prisma migration status and `migrate diff` reported no
+drift. This confirms N/N+1 schema compatibility only; it does not activate
+tenant enforcement or complete the later backfill phase.
+
+### POST-GO-LIVE.1.5 legacy backfill foundation
+
+The legacy backfill is an explicit operational command documented in
+`SAAS_LEGACY_BACKFILL.md`, not a Prisma migration or runtime behavior. It uses
+a versioned manifest to create or validate exactly one Legacy Organization and
+a manually selected OWNER. It preserves legacy row counts,
+`Patient.psychologistId` and global `User.role`.
+
+`Patient` receives its scope directly; clinical child entities derive theirs
+from the Patient relationship. Financial transactions derive from Patient,
+then Appointment's Patient, with a documented single-legacy fallback for
+unlinked operational transactions. The command creates one active PRIMARY
+`PatientAssignment` from each Patient's legacy `psychologistId` and matching
+membership. It remains idempotent and fails closed on conflicts.
+
+The active-PRIMARY partial unique index and cross-tenant composite foreign
+keys remain deferred until organization scopes are enforced and non-nullable
+where appropriate. No tenant filtering is active in this phase.
+
+### POST-GO-LIVE.2.1C1 invitation lifecycle persistence
+
+2.1C1 adds persistence only; it does not add invitation, membership, or
+organization APIs, delivery, backfill, tenant enforcement, or a production
+deployment. `OrganizationInvitation` retains the original `email` and adds
+required `normalizedEmail`, optional `invitedUserId`, optional
+`acceptedByUserId`, `rejectedAt`, and `expiredAt`. The optional user references
+use `SET NULL` for an invitee and `RESTRICT` for an accepted-by identity, so a
+historical acceptance cannot be silently erased by a user deletion.
+
+The canonical key is `lower(btrim(email))` under the PostgreSQL database
+collation: trim first, then lowercase. It is limited to 255 bytes. The future
+API must validate email format and apply this exact canonicalization before
+write; the database deliberately has no complex email regex. PostgreSQL's
+`lower()` is collation-aware but is not Unicode full case folding, so the API
+must not substitute a locale-dependent normalization. Normalized email is
+personal data and must not be emitted in logs or public projections.
+
+Invitation state remains derived, not persisted as an enum: `PENDING` has no
+terminal timestamp; `ACCEPTED`, `REJECTED`, `REVOKED`, and `EXPIRED` each have
+exactly their corresponding terminal timestamp. `expiredAt` materializes a
+previously derived expiry only inside a future serializable lifecycle/create
+transaction after `expiresAt` has elapsed. It is retained to release the
+pending uniqueness key without an invalid `now()` predicate and to preserve
+the reason for terminality.
+
+The migration adds a named check that permits at most one of `acceptedAt`,
+`rejectedAt`, `revokedAt`, and `expiredAt`, plus a check that an `expiredAt` is
+not earlier than `expiresAt`. The SQL-managed partial unique index over
+`(organizationId, normalizedEmail)` covers only rows with all terminal
+timestamps null. Thus a future create flow must first materialize equivalent
+expired rows and then insert; rejection, revocation, acceptance, and
+materialized expiry each release the key.
+
+POST-GO-LIVE.3.3 uses that persisted shape without any schema change. Runtime
+responses derive `logicalStatus` with deterministic precedence
+`ACCEPTED > REJECTED > REVOKED > EXPIRED > PENDING`, administrative resend
+creates a replacement row instead of mutating the token in place, and
+acceptance after historical revocation still creates a brand new
+`OrganizationMembership` row rather than reopening history.
+
+POST-GO-LIVE.3.4 ownership transfer likewise introduces no schema change,
+column, migration, or owner-designation table. The runtime reuses the existing
+`OrganizationMembership.role` field and swaps responsibility by promoting one
+active same-organization membership to `OWNER` while demoting the acting owner
+to `ADMIN` inside a serializable transaction. There is still no persisted
+primary owner flag; the active owner set remains derived from membership rows.
+
+The migration is safe for legacy rows: it derives `normalizedEmail` from the
+existing required `email`, then sets it `NOT NULL`. It aborts without exposing
+the value if a legacy email is blank, exceeds the canonical column limit, or
+would create duplicate terminal-free invitations. It does not invent an
+invitee or accepter; historical accepted rows can therefore retain a null
+`acceptedByUserId`, while future acceptance must supply it atomically.
+
+| Proposed change | Classification | Rationale |
+| --- | --- | --- |
+| Invitation status enum | NOT_NEEDED | Timestamp-derived terminal state avoids an enum migration and preserves accepted/rejected/revoked distinction. |
+| `rejectedAt` and `expiredAt` | REQUIRED | Recipient rejection and materialized time expiry remain distinct from revocation. |
+| `normalizedEmail` | REQUIRED | Recipient binding and pending-duplicate key. |
+| `invitedUserId` | REQUIRED | Optional recipient binding approved by the lifecycle contract. |
+| `acceptedByUserId` | REQUIRED | Future acceptance durable proof; nullable only for unmappable legacy history. |
+| `rejectedByUserId` | REJECTED | The approved contract requires `rejectedAt`, not a persistent rejection actor. |
+| `createdByMembershipId` / `revokedByMembershipId` | DEFERRED | Sanitized structured observability suffices for the API phase; persistent audit design needs separate approval. |
+| Pending-invitation partial unique index | REQUIRED | Database-level protection for `(organizationId, normalizedEmail)` while every terminal timestamp is null. |
+| Terminal timestamp check constraint | REQUIRED | Prevents mutually incompatible accepted/rejected/revoked/expired states. |
+| PatientAssignment PRIMARY index | NOT_NEEDED | It is unrelated to invitation or membership lifecycle and remains deferred. |
+
+PostgreSQL partial indexes cannot be represented completely in Prisma schema;
+the reviewed 2.1C1 migration contains the SQL and requires local validation and
+a rollback rehearsal. It authorizes neither production execution nor backfill.
 
 ---
 

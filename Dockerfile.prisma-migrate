@@ -1,0 +1,39 @@
+FROM node:20-bookworm-slim
+
+ARG VCS_REF
+ARG SOURCE_URL
+ARG CREATED
+
+LABEL org.opencontainers.image.revision="${VCS_REF}" \
+      org.opencontainers.image.source="${SOURCE_URL}" \
+      org.opencontainers.image.title="psychology-app-prisma-migrate" \
+      org.opencontainers.image.description="Certified Prisma migration artifact" \
+      org.opencontainers.image.created="${CREATED}"
+
+WORKDIR /app
+
+# Prisma's PostgreSQL engine requires OpenSSL at runtime on the slim base.
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends openssl \
+  && rm -rf /var/lib/apt/lists/*
+
+# Only the Prisma CLI, generated engines, and versioned migration inputs are
+# copied into this image. Runtime source, host node_modules, Git metadata, and
+# .env files are excluded by the build context rules.
+COPY --chown=node:node package.json package-lock.json ./
+RUN chown node:node /app
+USER node
+RUN npm ci --ignore-scripts
+
+COPY --chown=node:node prisma.config.ts ./
+COPY --chown=node:node prisma ./prisma
+
+# Prisma resolves DATABASE_URL while generating local engines. This uses only a
+# non-routable placeholder at build time; callers supply approved runtime
+# credentials when they explicitly request a Prisma command.
+RUN DATABASE_URL='postgresql://placeholder:placeholder@invalid:5432/placeholder?schema=public' \
+    ./node_modules/.bin/prisma generate
+
+# This is an explicit Prisma command runner. It never migrates on startup.
+ENTRYPOINT ["./node_modules/.bin/prisma"]
+CMD ["--help"]

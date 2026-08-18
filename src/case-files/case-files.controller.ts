@@ -24,9 +24,14 @@ import {
   ValidationPipe,
 } from '@nestjs/common';
 import { UserRole } from '@prisma/client';
+import { AuditLog } from '../audit-logs/decorators/audit-log.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import type { AuthenticatedUser } from '../auth/types/authenticated-user.type';
+import { CurrentTenant } from '../tenant-context/decorators/current-tenant.decorator';
+import { TenantRequired } from '../tenant-context/decorators/tenant-required.decorator';
+import type { ClinicalAccessScope } from '../tenant-context/clinical-access.types';
+import type { TenantContext } from '../tenant-context/tenant-context.types';
 import { CaseFilesService } from './case-files.service';
 import { CaseFileWorkspaceResponseDto } from './dto/case-file-workspace-response.dto';
 import { CreateCaseFileDto } from './dto/create-case-file.dto';
@@ -41,6 +46,7 @@ import { CaseFileResponseDto } from './dto/case-file-response.dto';
 @ApiForbiddenResponse({
   description: 'Authenticated user lacks a permitted role',
 })
+@TenantRequired()
 @Controller('case-files')
 @Roles(UserRole.ADMIN, UserRole.PSYCHOLOGIST)
 @UsePipes(
@@ -53,6 +59,7 @@ export class CaseFilesController {
   constructor(private readonly caseFilesService: CaseFilesService) {}
 
   @Post()
+  @AuditLog({ action: 'CLINICAL_CASE_FILE_CREATE', resourceType: 'CaseFile' })
   @ApiOperation({ summary: 'Create a case file' })
   @ApiBody({ type: CreateCaseFileDto })
   @ApiCreatedResponse({
@@ -67,22 +74,31 @@ export class CaseFilesController {
   create(
     @Body() createCaseFileDto: CreateCaseFileDto,
     @CurrentUser() user: AuthenticatedUser,
+    @CurrentTenant(true) tenant: TenantContext,
   ) {
-    return this.caseFilesService.create(createCaseFileDto, user);
+    return this.caseFilesService.create(
+      createCaseFileDto,
+      this.createScope(tenant, user),
+    );
   }
 
   @Get()
+  @AuditLog({ action: 'CLINICAL_CASE_FILE_READ', resourceType: 'CaseFile' })
   @ApiOperation({ summary: 'List all case files' })
   @ApiOkResponse({
     description: 'Case files retrieved successfully',
     type: CaseFileResponseDto,
     isArray: true,
   })
-  findAll(@CurrentUser() user: AuthenticatedUser) {
-    return this.caseFilesService.findAll(user);
+  findAll(
+    @CurrentUser() user: AuthenticatedUser,
+    @CurrentTenant(true) tenant: TenantContext,
+  ) {
+    return this.caseFilesService.findAll(this.createScope(tenant, user));
   }
 
   @Get('patient/:patientId')
+  @AuditLog({ action: 'CLINICAL_CASE_FILE_READ', resourceType: 'CaseFile' })
   @ApiOperation({ summary: 'Get a case file by patient ID' })
   @ApiParam({
     name: 'patientId',
@@ -99,11 +115,16 @@ export class CaseFilesController {
   findByPatientId(
     @Param('patientId', ParseUUIDPipe) patientId: string,
     @CurrentUser() user: AuthenticatedUser,
+    @CurrentTenant(true) tenant: TenantContext,
   ) {
-    return this.caseFilesService.findByPatientId(patientId, user);
+    return this.caseFilesService.findByPatientId(
+      patientId,
+      this.createScope(tenant, user),
+    );
   }
 
   @Get(':id/workspace')
+  @AuditLog({ action: 'CLINICAL_CASE_FILE_READ', resourceType: 'CaseFile' })
   @ApiOperation({ summary: 'Get a clinical workspace by case file ID' })
   @ApiParam({
     name: 'id',
@@ -120,11 +141,16 @@ export class CaseFilesController {
   findWorkspace(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser() user: AuthenticatedUser,
+    @CurrentTenant(true) tenant: TenantContext,
   ) {
-    return this.caseFilesService.findWorkspace(id, user);
+    return this.caseFilesService.findWorkspace(
+      id,
+      this.createScope(tenant, user),
+    );
   }
 
   @Get(':id')
+  @AuditLog({ action: 'CLINICAL_CASE_FILE_READ', resourceType: 'CaseFile' })
   @ApiOperation({ summary: 'Get a case file by ID' })
   @ApiParam({
     name: 'id',
@@ -141,11 +167,13 @@ export class CaseFilesController {
   findOne(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser() user: AuthenticatedUser,
+    @CurrentTenant(true) tenant: TenantContext,
   ) {
-    return this.caseFilesService.findOne(id, user);
+    return this.caseFilesService.findOne(id, this.createScope(tenant, user));
   }
 
   @Patch(':id')
+  @AuditLog({ action: 'CLINICAL_CASE_FILE_UPDATE', resourceType: 'CaseFile' })
   @ApiOperation({ summary: 'Update a case file' })
   @ApiParam({
     name: 'id',
@@ -164,7 +192,26 @@ export class CaseFilesController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updateCaseFileDto: UpdateCaseFileDto,
     @CurrentUser() user: AuthenticatedUser,
+    @CurrentTenant(true) tenant: TenantContext,
   ) {
-    return this.caseFilesService.update(id, updateCaseFileDto, user);
+    return this.caseFilesService.update(
+      id,
+      updateCaseFileDto,
+      this.createScope(tenant, user),
+    );
+  }
+
+  private createScope(
+    tenant: TenantContext,
+    user: AuthenticatedUser,
+  ): ClinicalAccessScope {
+    return {
+      organizationId: tenant.organizationId,
+      membershipId: tenant.membershipId,
+      organizationRole: tenant.organizationRole,
+      userId: user.id,
+      legacyUserRole: tenant.legacyUserRole,
+      resolutionMode: tenant.resolutionMode,
+    };
   }
 }

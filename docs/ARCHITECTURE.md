@@ -177,6 +177,33 @@ Prisma ORM
 PostgreSQL
 ```
 
+Public bootstrap lifecycle:
+
+```text
+Client
+    |
+    v
+POST /auth/freelancer-bootstrap
+    |
+    v
+DTO trim/validation
+    |
+    v
+Route-scoped bootstrap throttle
+    |
+    v
+AuthService.freelancerBootstrap
+    |
+    v
+Serializable Prisma transaction
+    |
+    v
+Post-commit observability
+    |
+    v
+Identity-only JWT
+```
+
 ---
 
 # Authorization Flow
@@ -214,6 +241,15 @@ Ownership Validation
 
 Business Logic
 ```
+
+Public freelancer bootstrap is intentionally outside the JWT flow. It is a
+public route that creates a new identity and issues the first JWT only after a
+successful database commit.
+
+The route is additionally protected by an explicit runtime feature flag:
+`PUBLIC_FREELANCER_BOOTSTRAP_ENABLED` must be `true` for the endpoint to be
+served. When the flag is disabled, the backend returns a safe `404 Not Found`
+before applying the bootstrap-specific throttle or persistence flow.
 
 Current roles:
 
@@ -437,6 +473,13 @@ must enforce route-specific controls for login, authenticated API routes,
 uploads, downloads and reports. It must exclude `/health/live` and
 `/health/ready`, which are deliberately unauthenticated probe endpoints.
 
+POST-GO-LIVE.3.5 adds one explicit application-level exception:
+`POST /auth/freelancer-bootstrap` now enforces a route-scoped in-memory
+throttle by client IP and canonicalized user email. The current contract is
+`5` attempts per `15` minutes per IP and `3` attempts per `15` minutes per
+canonical email. This protects the public bootstrap flow without changing
+other endpoint throttle posture.
+
 ## Production Operations
 
 Container startup validates configuration, optionally applies versioned Prisma
@@ -514,6 +557,202 @@ Future architecture may include:
 - External Integrations
 
 These features should extend the current architecture without replacing it.
+
+## Legacy SaaS Backfill Boundary
+
+The manifest-driven `saas:legacy-backfill` command is an offline data
+preparation tool. It is intentionally outside the Nest request path and is not
+called by seed, startup or Prisma migration deployment. It does not introduce
+a TenantResolver, organization filtering or authorization changes. Existing
+ownership filtering continues to use `psychologistId` and global `User.role`
+until a later explicitly approved enforcement phase.
+
+Its serializable transaction, prevalidation and postvalidation protect the
+data-preparation operation without claiming to provide a business audit trail.
+Operational use, dry-run, apply confirmation and non-production rollback are
+documented in `SAAS_LEGACY_BACKFILL.md`.
+
+## Ownership Transfer Runtime (POST-GO-LIVE.3.4)
+
+Organization ownership transfer stays inside the existing
+`MembershipsService`; no new controller helper, table, background job, or
+primary-owner persistence is introduced. The dedicated
+`POST /organizations/:organizationId/ownership-transfer` route requires the
+closed capability `ownership.transfer`, resolved tenant context, and the
+existing JWT and tenant guards.
+
+The runtime executes one serializable PostgreSQL transaction that:
+
+1. revalidates the actor membership from the selected tenant context;
+2. rejects suspended organizations at the business-operation boundary;
+3. revalidates the target membership inside the same organization;
+4. promotes the target with compare-and-set `updateMany()`;
+5. demotes the source owner with compare-and-set `updateMany()`;
+6. verifies at least one active `OWNER` still exists before commit.
+
+Post-commit structured observability emits
+`organization_ownership_transferred` only after the transaction succeeds. This
+keeps the existing architecture rule that business audit telemetry must not
+claim success before durable commit.
+
+## Public Freelancer Bootstrap Runtime (POST-GO-LIVE.3.5)
+
+The public bootstrap runtime stays inside the existing `AuthModule` and adds no
+tenant claim to JWT, no invitation side effect, and no bootstrap-specific
+controller helper outside Auth. One shared canonical email helper is reused for
+login, bootstrap, and invitation recipient identity.
+
+The runtime executes one serializable PostgreSQL transaction that:
+
+1. canonicalizes user email identity;
+2. verifies that no canonical user already exists;
+3. creates the `User` with presentation `email` plus canonical
+   `normalizedEmail`;
+4. creates one `ACTIVE` organization with a server-generated slug;
+5. creates one `OWNER` `ACTIVE` membership;
+6. commits before emitting observability or JWT.
+
+Post-commit structured observability emits
+`freelancer_bootstrap_completed` or `freelancer_bootstrap_denied` without
+logging passwords, password hashes, JWTs, or full email addresses.
+
+The in-memory throttle is a single-instance application safeguard only. Edge
+rate limiting at the reverse proxy or WAF remains mandatory before production
+exposure because multiple application instances do not share the in-memory
+buckets.
+
+## Invitation Administration Runtime (POST-GO-LIVE.3.3)
+
+Invitation administration now stays entirely on the existing
+`OrganizationInvitation` persistence model. The runtime derives
+`logicalStatus` from timestamps plus wall-clock expiry, keeps token persistence
+hash-only through SHA-256 digests, and executes create/revoke/resend/accept/
+reject mutations inside serializable PostgreSQL transactions with conditional
+updates. Administrative resend is implemented as replacement semantics: the
+previous invitation becomes terminal and a new row with a new token digest is
+created atomically. Structured organization-domain observability emits
+`invitation_created`, `invitation_revoked`, `invitation_resent`,
+`invitation_accepted`, `invitation_rejected`, and `invitation_expired` only
+after commit and never logs tokens or digests.
+
+## Tenant Context Foundation (POST-GO-LIVE.1.6)
+
+Authenticated requests now pass through `TenantContextGuard` after JWT
+authentication and before legacy role authorization. The guard resolves active
+memberships from PostgreSQL, validates the selected organization is `ACTIVE`,
+and places one immutable context in the existing request `AsyncLocalStorage`.
+The same object is exposed on the request only for the `@CurrentTenant()`
+parameter decorator; neither path reads a client header after resolution.
+
+`X-Organization-Id` is an optional UUID selection request, not evidence of
+access. It is checked against the authenticated user's active membership on
+every request. Without the header, exactly one eligible membership resolves
+automatically; multiple eligible memberships deliberately remain unresolved;
+zero memberships preserve legacy compatibility for optional routes. No legacy
+clinical query has changed: `psychologistId` and global `User.role` remain the
+runtime ownership and authorization mechanisms.
+
+`LEGACY_COMPATIBILITY` is an absence of tenant context, not a virtual
+organization or membership and not tenant authorization. It never permits an
+organization ID from a header or request body to become authoritative.
+
+New organizational routes use `@TenantRequired()`; existing authenticated
+routes are tenant-optional by default, and `@Public()` routes bypass resolution.
+`GET /auth/context` is authenticated but tenant-optional to avoid a
+multi-membership bootstrap cycle: unresolved users receive only their own
+selectable memberships and can retry with `X-Organization-Id`. A later
+enforcement phase can opt clinical endpoints into `@TenantRequired()`
+individually.
+
+`@SkipTenantContext()` takes precedence over `@TenantRequired()` so explicit
+infrastructure or public bypasses cannot accidentally perform a membership
+query. The combination is reserved for intentional framework routes and is
+covered by guard tests.
+
+The membership query is `OrganizationMembership` filtered by `(userId,
+status=ACTIVE)`, backed by `organization_memberships_userId_status_idx`; the
+selected organization is joined in that same query. There is intentionally no
+cache, because revocation, role changes and organization suspension must take
+effect on the next request. Any future cache needs explicit invalidation for
+those mutations.
+
+## Tenant-Aware Patients Pilot (POST-GO-LIVE.1.7A)
+
+Patients is the first clinical module to opt into `@TenantRequired()`. Its
+controller builds an immutable explicit scope from `@CurrentTenant(true)` and
+the authenticated user, then passes it to the service. Every CRUD operation
+intersects `organizationId` with legacy `psychologistId`; `User.role === ADMIN`
+does not create a global bypass in this pilot. `organizationId = NULL` is never
+included as a compatibility fallback.
+
+The pilot does not add a Prisma middleware, a schema migration, or a compound
+index. The existing `(organizationId, createdAt)` index remains unchanged; a
+future production-sized plan review should decide whether an additional index
+is warranted. All non-Patients clinical modules continue with legacy ownership
+until explicitly migrated. Deployment requires separate backfill certification
+for the target database.
+
+## POST-GO-LIVE.2.1D0 Tenant Conversion Contract
+
+`POST_GO_LIVE_2_1D0_TENANT_CONVERSION_CONTRACT.md` defines the
+documentation-only architecture contract for converting Patients, Case Files,
+Workspace, Session Notes, Documents, Appointments, Financial Transactions, and
+Financial Summary. It keeps controllers thin, services explicit, and
+authorization local to the converted module shape before any broader helper is
+introduced.
+
+The approved architecture uses `organizationId` as the primary isolation
+boundary, capabilities as explicit permissions, and `PatientAssignment` as the
+clinical-content condition. `psychologistId` remains a temporary additional
+restriction during conversion only. A role such as `OWNER` or `ADMIN` does not
+replace assignment, and a document blob may be opened only after tenant-aware
+metadata authorization succeeds.
+
+## Tenant-Aware Patients Alignment (POST-GO-LIVE.2.1D1)
+
+Patients now implements the first D0 conversion step. Its controller remains
+tenant-required and passes an immutable request scope to the service. The
+service enforces `organizationId`, active same-tenant assignment, explicit
+`patient.*` capabilities, and the temporary legacy psychologist restriction.
+`OWNER` and `ADMIN` membership roles do not bypass assignment for clinical
+patient access.
+
+Patient creation derives the organization and legacy psychologist from the
+validated request context and creates an active primary assignment for the
+current membership. This supports the freelancer `OWNER` operating through one
+organizational role plus capabilities and assignment. Legacy
+`organizationId = NULL` patients are not included in tenant-aware reads or
+mutations.
+
+## Integrated Tenant Certification (POST-GO-LIVE.2.1D4)
+
+The converted D1 through D3 modules are certified together by an opt-in
+PostgreSQL E2E suite that exercises tenant context resolution, role and
+capability boundaries, clinical assignment, cross-tenant redaction, legacy-null
+exclusion, document blob authorization, appointment notes projections,
+server-owned ownership fields, financial filters, summary totals, and
+sanitized observability.
+
+D4 is a certification layer only. It introduces no new architecture primitive,
+Prisma schema change, migration, deployment, frontend behavior, production data
+operation, global Prisma middleware, or broader authorization bypass. Final
+POST-GO-LIVE.2.1D closure remains reserved for D5-R review, controlled merge,
+and post-merge verification.
+
+## Tenant Platform Certification (POST-GO-LIVE.2.1D5)
+
+D5 is the final local readiness layer for the converted tenant-aware clinical
+and financial backend platform. It adds an opt-in certification suite and a
+readiness report that confirm the composed architecture still depends on
+validated tenant context, explicit capability checks, scoped repository
+predicates, server-owned tenant fields, assignment for clinical content, and
+document metadata authorization before blob access.
+
+D5 introduces no new architecture primitive, public endpoint, Prisma schema
+change, migration, deployment, frontend behavior, production data operation,
+global Prisma middleware, RLS policy, tenant administration product expansion,
+or POST-GO-LIVE.3 work. Final closure remains pending controlled review and
+merge evidence.
 
 ---
 

@@ -36,6 +36,7 @@ describe('validateRuntimeEnv', () => {
       corsOrigins: ['http://localhost:4200', 'http://localhost:4201'],
       swaggerEnabled: true,
       trustProxyHops: 0,
+      publicFreelancerBootstrapEnabled: false,
     });
   });
 
@@ -157,4 +158,26 @@ describe('validateRuntimeEnv', () => {
       validateRuntimeEnv(createValidEnv({ TRUST_PROXY_HOPS: '3' })),
     ).toThrow('TRUST_PROXY_HOPS must be an integer between 0 and 2');
   });
+
+  it('keeps public freelancer bootstrap disabled by default', () => {
+    const config = validateRuntimeEnv(createValidEnv());
+
+    expect(config.publicFreelancerBootstrapEnabled).toBe(false);
+  });
+
+  it.each([
+    ['true', true],
+    ['false', false],
+  ])(
+    'uses the explicit PUBLIC_FREELANCER_BOOTSTRAP_ENABLED=%s override',
+    (value, expected) => {
+      const config = validateRuntimeEnv(
+        createValidEnv({
+          PUBLIC_FREELANCER_BOOTSTRAP_ENABLED: value,
+        }),
+      );
+
+      expect(config.publicFreelancerBootstrapEnabled).toBe(expected);
+    },
+  );
 });

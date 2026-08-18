@@ -1,10 +1,12 @@
 import { ExecutionContext, INestApplication } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { Test, TestingModule } from '@nestjs/testing';
-import { UserRole } from '@prisma/client';
+import { MembershipRole, UserRole } from '@prisma/client';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { AuthenticatedUser } from '../auth/types/authenticated-user.type';
+import { TenantResolutionMode } from '../common/request-context/request-context.service';
+import type { TenantContext } from '../tenant-context/tenant-context.types';
 import { DocumentsController } from './documents.controller';
 import { DocumentsService } from './documents.service';
 
@@ -17,8 +19,18 @@ const authenticatedUser: AuthenticatedUser = {
   role: UserRole.PSYCHOLOGIST,
 };
 
+const tenantContext: TenantContext = {
+  organizationId: '550e8400-e29b-41d4-a716-446655440001',
+  membershipId: '550e8400-e29b-41d4-a716-446655440002',
+  organizationRole: MembershipRole.PSYCHOLOGIST,
+  legacyUserRole: UserRole.PSYCHOLOGIST,
+  userId: authenticatedUser.id,
+  resolutionMode: TenantResolutionMode.EXPLICIT,
+};
+
 type RequestWithUser = {
   user?: AuthenticatedUser;
+  tenantContext?: TenantContext;
 };
 
 describe('DocumentsController', () => {
@@ -36,6 +48,7 @@ describe('DocumentsController', () => {
           .switchToHttp()
           .getRequest<RequestWithUser>();
         httpRequest.user = authenticatedUser;
+        httpRequest.tenantContext = tenantContext;
 
         return true;
       },
@@ -70,6 +83,7 @@ describe('DocumentsController', () => {
   it('accepts a valid multipart upload using the file field and caseFileId metadata', async () => {
     documentsService.upload.mockResolvedValue({
       id: 'document-id',
+      organizationId: null,
       caseFileId,
       uploadedById: authenticatedUser.id,
       fileName: 'consent.pdf',
@@ -90,7 +104,7 @@ describe('DocumentsController', () => {
 
     expect(documentsService.upload).toHaveBeenCalledTimes(1);
 
-    const [uploadDocumentDto, file, user] =
+    const [uploadDocumentDto, file, scope] =
       documentsService.upload.mock.calls[0];
 
     expect(uploadDocumentDto).toMatchObject({ caseFileId });
@@ -98,7 +112,14 @@ describe('DocumentsController', () => {
     expect(file.originalname).toBe('consent.pdf');
     expect(file.mimetype).toBe('application/pdf');
     expect(file.buffer).toEqual(Buffer.from('%PDF-1.4'));
-    expect(user).toEqual(authenticatedUser);
+    expect(scope).toEqual({
+      organizationId: tenantContext.organizationId,
+      membershipId: tenantContext.membershipId,
+      organizationRole: tenantContext.organizationRole,
+      legacyUserRole: tenantContext.legacyUserRole,
+      userId: authenticatedUser.id,
+      resolutionMode: tenantContext.resolutionMode,
+    });
   });
 
   it('rejects upload requests without a file', async () => {

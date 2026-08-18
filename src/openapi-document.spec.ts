@@ -44,20 +44,156 @@ describe('OpenAPI document', () => {
   it('documents every certified route and the Bearer security scheme', () => {
     const document = createDocument(app);
 
-    expect(Object.keys(document.paths)).toHaveLength(26);
+    expect(Object.keys(document.paths)).toHaveLength(76);
     expect(document.components?.securitySchemes?.bearer).toEqual({
       type: 'http',
       scheme: 'bearer',
       bearerFormat: 'JWT',
       description: 'Paste the JWT access token here',
     });
+    expect(document.paths['/audit-logs'].get?.security).toEqual([
+      { bearer: [] },
+    ]);
+    expect(document.paths['/audit-logs'].get?.responses).toHaveProperty('200');
+    expect(document.paths['/audit-logs'].get?.responses).toHaveProperty('401');
+    expect(document.paths['/audit-logs'].get?.responses).toHaveProperty('403');
+    expect(document.paths['/audit-logs/{id}'].get?.security).toEqual([
+      { bearer: [] },
+    ]);
+    expect(document.paths['/audit-logs/{id}'].get?.responses).toHaveProperty(
+      '200',
+    );
+    expect(document.paths['/audit-logs/{id}'].get?.responses).toHaveProperty(
+      '401',
+    );
+    expect(document.paths['/audit-logs/{id}'].get?.responses).toHaveProperty(
+      '403',
+    );
+    expect(document.paths['/audit-logs/{id}'].get?.responses).toHaveProperty(
+      '404',
+    );
     expect(document.paths['/auth/login'].post?.security).toBeUndefined();
+    expect(
+      document.paths['/auth/freelancer-bootstrap'].post?.security,
+    ).toBeUndefined();
+    expect(document.paths['/auth/context'].get?.security).toEqual([
+      { bearer: [] },
+    ]);
+    expect(document.paths['/auth/context/preference'].put?.security).toEqual([
+      { bearer: [] },
+    ]);
     expect(document.paths['/health'].get?.security).toBeUndefined();
     expect(document.paths['/health/live'].get?.security).toBeUndefined();
     expect(document.paths['/health/ready'].get?.security).toBeUndefined();
     expect(document.paths['/patients'].get?.security).toEqual([{ bearer: [] }]);
     expect(document.paths['/patients'].get?.responses).toHaveProperty('401');
     expect(document.paths['/patients'].get?.responses).toHaveProperty('403');
+    expect(document.paths['/enterprise/branches'].get?.security).toEqual([
+      { bearer: [] },
+    ]);
+    expect(document.paths['/enterprise/branches'].post?.security).toEqual([
+      { bearer: [] },
+    ]);
+    expect(
+      document.paths['/enterprise/branches'].post?.responses,
+    ).toHaveProperty('201');
+    expect(
+      document.paths['/enterprise/corporate/clients'].post?.security,
+    ).toEqual([{ bearer: [] }]);
+    expect(
+      document.paths['/enterprise/corporate/agreements'].post?.security,
+    ).toEqual([{ bearer: [] }]);
+    expect(
+      document.paths['/enterprise/corporate/debit/reserve'].post?.security,
+    ).toEqual([{ bearer: [] }]);
+    expect(
+      document.paths['/enterprise/corporate/agreements/{id}/reports/executive']
+        .get?.security,
+    ).toEqual([{ bearer: [] }]);
+    expect(
+      document.paths[
+        '/enterprise/corporate/agreements/{id}/reports/billing-statement'
+      ].get?.security,
+    ).toEqual([{ bearer: [] }]);
+    expect(
+      document.paths['/enterprise/corporate/agreements/{id}/reports/export/csv']
+        .get?.security,
+    ).toEqual([{ bearer: [] }]);
+    expect(document.paths['/ops/reconcile/uploads'].post?.security).toEqual([
+      { bearer: [] },
+    ]);
+    expect(
+      document.paths['/ops/reconcile/uploads'].post?.responses,
+    ).toHaveProperty('200');
+    expect(
+      document.paths['/admin/billing/manual-transition'].post?.security,
+    ).toEqual([{ bearer: [] }]);
+    expect(
+      document.paths['/admin/billing/manual-transition'].post?.responses,
+    ).toHaveProperty('200');
+    expect(
+      document.paths['/admin/billing/extend-trial'].post?.security,
+    ).toEqual([{ bearer: [] }]);
+    expect(
+      document.paths['/admin/billing/extend-trial'].post?.responses,
+    ).toHaveProperty('200');
+    expect(
+      document.paths['/admin/billing/plan-override'].patch?.security,
+    ).toEqual([{ bearer: [] }]);
+    expect(
+      document.paths['/admin/billing/plan-override'].patch?.responses,
+    ).toHaveProperty('200');
+    expect(document.paths['/organizations'].get?.security).toEqual([
+      { bearer: [] },
+    ]);
+    expect(
+      document.paths['/organizations/{organizationId}/status'].patch,
+    ).toBeDefined();
+    expect(
+      document.paths['/organizations/{organizationId}/settings'].get,
+    ).toBeDefined();
+    expect(
+      document.paths['/organizations/{organizationId}/settings'].patch,
+    ).toBeDefined();
+    expect(
+      document.paths['/organizations/{organizationId}/branding'].get,
+    ).toBeDefined();
+    expect(
+      document.paths['/organizations/{organizationId}/branding'].patch,
+    ).toBeDefined();
+    expect(
+      document.paths['/organizations/{organizationId}/logo'].get,
+    ).toBeDefined();
+    expect(
+      document.paths['/organizations/{organizationId}/logo'].put,
+    ).toBeDefined();
+    expect(
+      document.paths['/organizations/{organizationId}/logo'].delete,
+    ).toBeDefined();
+    expect(
+      document.paths['/organizations/{organizationId}/logo/content'].get,
+    ).toBeDefined();
+    expect(
+      document.paths['/organizations/{organizationId}/ownership-transfer'].post,
+    ).toBeDefined();
+    expect(
+      document.paths['/organizations/{organizationId}/invitations'].post
+        ?.responses,
+    ).toHaveProperty('201');
+    expect(
+      document.paths[
+        '/organizations/{organizationId}/invitations/{invitationId}/resend'
+      ].post?.responses,
+    ).toHaveProperty('201');
+    expect(
+      document.paths['/organization-invitations/{token}/accept'].post?.security,
+    ).toEqual([{ bearer: [] }]);
+    expect(
+      getHeaderParameter(document, '/patients', 'get', 'X-Organization-Id'),
+    ).toMatchObject({
+      required: false,
+      schema: { type: 'string' },
+    });
     expect(
       getQueryParameterNames(document, '/financial-transactions', 'get'),
     ).toEqual([
@@ -77,6 +213,24 @@ describe('OpenAPI document', () => {
     const document = createDocument(app);
 
     expect(document.paths['/auth/login'].post?.responses).toHaveProperty('201');
+    expect(
+      document.paths['/auth/freelancer-bootstrap'].post?.responses,
+    ).toHaveProperty('201');
+    expect(
+      document.paths['/auth/freelancer-bootstrap'].post?.responses,
+    ).toHaveProperty('409');
+    expect(
+      document.paths['/auth/freelancer-bootstrap'].post?.responses,
+    ).toHaveProperty('429');
+    expect(
+      document.paths['/auth/freelancer-bootstrap'].post?.responses,
+    ).toHaveProperty('500');
+    expect(
+      document.paths['/auth/context/preference'].put?.responses,
+    ).toHaveProperty('200');
+    expect(
+      document.paths['/auth/context/preference'].put?.responses,
+    ).toHaveProperty('404');
     expect(document.paths['/auth/login'].post?.responses).not.toHaveProperty(
       '200',
     );
@@ -101,6 +255,325 @@ describe('OpenAPI document', () => {
         amount: { type: 'string', example: '850.50' },
       },
     });
+    expect(
+      document.components?.schemas?.InvitationIssueResponseDto,
+    ).toMatchObject({
+      properties: {
+        logicalStatus: {
+          enum: ['PENDING', 'ACCEPTED', 'REJECTED', 'REVOKED', 'EXPIRED'],
+        },
+      },
+    });
+    expect(
+      getRequestContent(
+        document,
+        '/organizations/{organizationId}/ownership-transfer',
+        'post',
+      )['application/json']?.schema,
+    ).toEqual({ $ref: '#/components/schemas/TransferOwnershipDto' });
+    expect(
+      getResponseContent(
+        document,
+        '/organizations/{organizationId}/ownership-transfer',
+        'post',
+        '200',
+      )['application/json']?.schema,
+    ).toEqual({
+      $ref: '#/components/schemas/OwnershipTransferResponseDto',
+    });
+    expect(
+      getRequestContent(document, '/auth/freelancer-bootstrap', 'post')[
+        'application/json'
+      ]?.schema,
+    ).toEqual({
+      $ref: '#/components/schemas/CreateFreelancerBootstrapDto',
+    });
+    expect(
+      getResponseContent(document, '/auth/freelancer-bootstrap', 'post', '201')[
+        'application/json'
+      ]?.schema,
+    ).toEqual({
+      $ref: '#/components/schemas/FreelancerBootstrapResponseDto',
+    });
+    expect(
+      getRequestContent(document, '/auth/context/preference', 'put')[
+        'application/json'
+      ]?.schema,
+    ).toEqual({
+      $ref: '#/components/schemas/UpdateAuthContextPreferenceDto',
+    });
+    expect(
+      getResponseContent(document, '/auth/context/preference', 'put', '200')[
+        'application/json'
+      ]?.schema,
+    ).toEqual({
+      $ref: '#/components/schemas/AuthContextPreferenceResponseDto',
+    });
+    expect(
+      getResponseContent(
+        document,
+        '/organizations/{organizationId}/memberships',
+        'get',
+        '200',
+      )['application/json']?.schema,
+    ).toEqual({
+      type: 'array',
+      items: { $ref: '#/components/schemas/MembershipListItemDto' },
+    });
+    expect(document.components?.schemas?.MembershipListItemDto).toMatchObject({
+      properties: {
+        displayName: { type: 'string' },
+        email: { type: 'string', format: 'email' },
+        updatedAt: { type: 'string', format: 'date-time' },
+        allowedActions: {
+          type: 'array',
+          items: {
+            type: 'string',
+            enum: ['CHANGE_ROLE', 'SUSPEND', 'REACTIVATE', 'REMOVE'],
+          },
+        },
+      },
+    });
+    expect(
+      getRequestContent(
+        document,
+        '/organizations/{organizationId}/settings',
+        'patch',
+      )['application/json']?.schema,
+    ).toEqual({ $ref: '#/components/schemas/UpdateOrganizationSettingsDto' });
+    expect(
+      getResponseContent(
+        document,
+        '/organizations/{organizationId}/settings',
+        'get',
+        '200',
+      )['application/json']?.schema,
+    ).toEqual({ $ref: '#/components/schemas/OrganizationSettingsResponseDto' });
+    expect(
+      getRequestContent(
+        document,
+        '/organizations/{organizationId}/branding',
+        'patch',
+      )['application/json']?.schema,
+    ).toEqual({ $ref: '#/components/schemas/UpdateOrganizationBrandingDto' });
+    expect(
+      getResponseContent(
+        document,
+        '/organizations/{organizationId}/branding',
+        'get',
+        '200',
+      )['application/json']?.schema,
+    ).toEqual({ $ref: '#/components/schemas/OrganizationBrandingResponseDto' });
+    expect(
+      document.components?.schemas?.UpdateOrganizationSettingsDto,
+    ).toMatchObject({
+      properties: {
+        defaultAppointmentDuration: {
+          minimum: 1,
+          maximum: 1440,
+          nullable: true,
+        },
+        expectedRowState: { enum: ['ABSENT'] },
+        expectedUpdatedAt: { type: 'string', format: 'date-time' },
+      },
+    });
+    expect(
+      document.components?.schemas?.OrganizationSettingsResponseDto,
+    ).toMatchObject({
+      properties: {
+        rowState: { enum: ['ABSENT', 'PRESENT'] },
+        updatedAt: { nullable: true },
+        defaultAppointmentDuration: { minimum: 1, maximum: 1440 },
+        persistedDefaultAppointmentDuration: { nullable: true },
+      },
+    });
+    expect(
+      document.components?.schemas?.UpdateOrganizationBrandingDto,
+    ).toMatchObject({
+      properties: {
+        primaryColor: { pattern: '^#[0-9A-F]{6}$', nullable: true },
+      },
+    });
+    expect(
+      getResponseContent(
+        document,
+        '/organizations/{organizationId}/logo',
+        'get',
+        '200',
+      )['application/json']?.schema,
+    ).toEqual({ $ref: '#/components/schemas/OrganizationLogoResponseDto' });
+    expect(
+      getResponseContent(
+        document,
+        '/organizations/{organizationId}/logo',
+        'put',
+        '200',
+      )['application/json']?.schema,
+    ).toEqual({ $ref: '#/components/schemas/OrganizationLogoResponseDto' });
+    expect(
+      getResponseContent(
+        document,
+        '/organizations/{organizationId}/logo/content',
+        'get',
+        '200',
+      )['image/png']?.schema,
+    ).toEqual({ type: 'string', format: 'binary' });
+    expect(
+      document.paths['/organizations/{organizationId}/logo'].put?.responses,
+    ).toHaveProperty('413');
+    expect(
+      document.components?.schemas?.OrganizationLogoResponseDto,
+    ).toMatchObject({
+      properties: {
+        rowState: { enum: ['ABSENT', 'PRESENT'] },
+        updatedAt: { nullable: true },
+        mimeType: { nullable: true },
+      },
+    });
+    expect(
+      (
+        document.components?.schemas?.MembershipListItemDto as {
+          required?: string[];
+        }
+      ).required,
+    ).toEqual(
+      expect.arrayContaining([
+        'displayName',
+        'email',
+        'updatedAt',
+        'allowedActions',
+      ]),
+    );
+    expect(document.components?.schemas?.ChangeMembershipRoleDto).toMatchObject(
+      {
+        properties: {
+          expectedUpdatedAt: { type: 'string', format: 'date-time' },
+        },
+      },
+    );
+    expect(
+      (
+        document.components?.schemas?.ChangeMembershipRoleDto as {
+          required?: string[];
+        }
+      ).required,
+    ).toEqual(expect.arrayContaining(['role', 'expectedUpdatedAt']));
+    expect(
+      document.components?.schemas?.ChangeMembershipStatusDto,
+    ).toMatchObject({
+      properties: {
+        expectedUpdatedAt: { type: 'string', format: 'date-time' },
+      },
+    });
+    expect(
+      (
+        document.components?.schemas?.ChangeMembershipStatusDto as {
+          required?: string[];
+        }
+      ).required,
+    ).toEqual(expect.arrayContaining(['status', 'expectedUpdatedAt']));
+    expect(
+      getRequestContent(
+        document,
+        '/organizations/{organizationId}/memberships/{membershipId}',
+        'delete',
+      )['application/json']?.schema,
+    ).toEqual({
+      $ref: '#/components/schemas/MembershipMutationPreconditionDto',
+    });
+    expect(
+      getRequestContent(
+        document,
+        '/organizations/{organizationId}/memberships/leave',
+        'post',
+      )['application/json']?.schema,
+    ).toEqual({
+      $ref: '#/components/schemas/MembershipMutationPreconditionDto',
+    });
+    const membershipConflictOperations = [
+      {
+        path: '/organizations/{organizationId}/memberships/{membershipId}/role',
+        method: 'patch',
+      },
+      {
+        path: '/organizations/{organizationId}/memberships/{membershipId}/status',
+        method: 'patch',
+      },
+      {
+        path: '/organizations/{organizationId}/memberships/{membershipId}',
+        method: 'delete',
+      },
+      {
+        path: '/organizations/{organizationId}/memberships/leave',
+        method: 'post',
+      },
+    ] as const;
+
+    for (const operation of membershipConflictOperations) {
+      expect(
+        getResponseContent(document, operation.path, operation.method, '409')[
+          'application/json'
+        ]?.schema,
+      ).toEqual({
+        $ref: '#/components/schemas/MembershipConflictResponseDto',
+      });
+    }
+    expect(
+      document.components?.schemas?.MembershipConflictResponseDto,
+    ).toMatchObject({
+      properties: {
+        code: {
+          enum: [
+            'CONFLICT',
+            'CONCURRENT_UPDATE',
+            'LAST_OWNER_PROTECTED',
+            'TENANT_CONTEXT_REQUIRED',
+          ],
+        },
+      },
+    });
+    const authContextSchema = document.components?.schemas
+      ?.AuthContextResponseV1Dto as unknown as {
+      properties?: {
+        schemaVersion?: unknown;
+        status?: unknown;
+        preferredOrganizationId?: unknown;
+        capabilities?: {
+          type?: string;
+          items?: { type?: string; enum?: unknown[] };
+        };
+      };
+    };
+
+    expect(authContextSchema).toMatchObject({
+      properties: {
+        schemaVersion: { enum: [1] },
+        status: {
+          enum: [
+            'ACTIVE_TENANT_READY',
+            'AMBIGUOUS_SELECTION',
+            'NO_ACTIVE_TENANT',
+            'ADMIN_SUSPENDED_CONTEXT',
+          ],
+        },
+        preferredOrganizationId: {
+          type: 'string',
+          nullable: true,
+        },
+        capabilities: {
+          type: 'array',
+          items: { type: 'string' },
+        },
+      },
+    });
+    expect(authContextSchema.properties?.capabilities?.items?.enum).toEqual(
+      expect.arrayContaining([
+        'audit.read',
+        'organization.read',
+        'patient.read',
+        'report.read',
+      ]),
+    );
   });
 
   it('documents multipart and binary document operations', () => {
@@ -148,10 +621,12 @@ function createDocument(app: INestApplication) {
   );
 }
 
+type OpenApiMethod = 'get' | 'post' | 'put' | 'patch' | 'delete';
+
 function getRequestContent(
   document: OpenAPIObject,
   path: string,
-  method: 'get' | 'post',
+  method: OpenApiMethod,
 ) {
   const requestBody = getOperation(document, path, method).requestBody;
 
@@ -167,7 +642,7 @@ function getRequestContent(
 function getResponseContent(
   document: OpenAPIObject,
   path: string,
-  method: 'get' | 'post',
+  method: OpenApiMethod,
   status: string,
 ) {
   const response = getOperation(document, path, method).responses[status];
@@ -184,7 +659,7 @@ function getResponseContent(
 function getQueryParameterNames(
   document: OpenAPIObject,
   path: string,
-  method: 'get' | 'post',
+  method: OpenApiMethod,
 ) {
   return (
     getOperation(document, path, method)
@@ -195,10 +670,24 @@ function getQueryParameterNames(
   );
 }
 
+function getHeaderParameter(
+  document: OpenAPIObject,
+  path: string,
+  method: OpenApiMethod,
+  name: string,
+) {
+  return getOperation(document, path, method).parameters?.find(
+    (parameter) =>
+      !('$ref' in parameter) &&
+      parameter.in === 'header' &&
+      parameter.name === name,
+  );
+}
+
 function getOperation(
   document: OpenAPIObject,
   path: string,
-  method: 'get' | 'post',
+  method: OpenApiMethod,
 ) {
   const operation = document.paths[path]?.[method];
 

@@ -1,56 +1,70 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { FinancialTransactionType, Prisma, UserRole } from '@prisma/client';
-import { AuthenticatedUser } from '../auth/types/authenticated-user.type';
+import { FinancialTransactionType, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import {
+  CapabilityDecision,
+  OrganizationCapability,
+} from '../tenant-context/authorization/organization-capability';
+import { OrganizationPolicyService } from '../tenant-context/authorization/organization-policy.service';
+import type { ClinicalAccessScope } from '../tenant-context/clinical-access.types';
+import { TenantObservabilityService } from '../tenant-context/tenant-observability.service';
 import { CreateFinancialTransactionDto } from './dto/create-financial-transaction.dto';
 import { FindFinancialTransactionsQueryDto } from './dto/find-financial-transactions-query.dto';
 import { UpdateFinancialTransactionDto } from './dto/update-financial-transaction.dto';
 
+type FinanceScope = ClinicalAccessScope;
+
 @Injectable()
 export class FinancialTransactionsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly policy: OrganizationPolicyService,
+    private readonly observability: TenantObservabilityService,
+  ) {}
 
   async create(
-    user: AuthenticatedUser,
+    scope: FinanceScope,
     createFinancialTransactionDto: CreateFinancialTransactionDto,
   ) {
+    this.requireFinancialCapability(
+      scope,
+      OrganizationCapability.FINANCE_MANAGE,
+      'financial_transactions.create',
+    );
     const { patientId, appointmentId } = createFinancialTransactionDto;
 
     const patient = patientId
-      ? await this.getAccessiblePatientOrThrow(patientId, user)
+      ? await this.getTenantPatientOrThrow(patientId, scope)
       : null;
     const appointment = appointmentId
-      ? await this.getAccessibleAppointmentOrThrow(appointmentId, user)
+      ? await this.getTenantAppointmentOrThrow(appointmentId, scope)
       : null;
 
     this.ensureAppointmentMatchesPatient(patient?.id, appointment?.patientId);
 
-    const createdById = this.isAdmin(user)
-      ? (createFinancialTransactionDto.createdById ?? user.id)
-      : user.id;
-
-    if (this.isAdmin(user)) {
-      await this.ensureUserExists(createdById);
-    }
-
     return this.prisma.financialTransaction.create({
       data: {
-        ...createFinancialTransactionDto,
-        createdById,
+        ...this.withoutServerFields(createFinancialTransactionDto),
+        organizationId: scope.organizationId,
+        createdById: scope.userId,
       },
     });
   }
 
-  async findAll(
-    user: AuthenticatedUser,
-    query: FindFinancialTransactionsQueryDto,
-  ) {
+  async findAll(scope: FinanceScope, query: FindFinancialTransactionsQueryDto) {
+    this.requireFinancialCapability(
+      scope,
+      OrganizationCapability.FINANCE_READ,
+      'financial_transactions.find_all',
+    );
+
     return this.prisma.financialTransaction.findMany({
-      where: this.buildFindManyWhere(user, query),
+      where: this.buildFindManyWhere(scope, query),
       orderBy: {
         occurredAt: 'desc',
       },
@@ -58,11 +72,16 @@ export class FinancialTransactionsService {
   }
 
   async getSummary(
-    user: AuthenticatedUser,
+    scope: FinanceScope,
     query: FindFinancialTransactionsQueryDto,
   ) {
+    this.requireFinancialCapability(
+      scope,
+      OrganizationCapability.FINANCE_SUMMARY_READ,
+      'financial_transactions.summary',
+    );
     const transactions = await this.prisma.financialTransaction.groupBy({
-      where: this.buildFindManyWhere(user, query),
+      where: this.buildFindManyWhere(scope, query),
       by: ['type'],
       _sum: {
         amount: true,
@@ -110,76 +129,83 @@ export class FinancialTransactionsService {
     return summary;
   }
 
-  async findOne(user: AuthenticatedUser, id: string) {
-    return this.getAccessibleTransactionOrThrow(id, user);
+  async findOne(scope: FinanceScope, id: string) {
+    this.requireFinancialCapability(
+      scope,
+      OrganizationCapability.FINANCE_READ,
+      'financial_transactions.find_one',
+    );
+    return this.getTenantTransactionOrThrow(id, scope);
   }
 
   async update(
-    user: AuthenticatedUser,
+    scope: FinanceScope,
     id: string,
     updateFinancialTransactionDto: UpdateFinancialTransactionDto,
   ) {
-    const existingTransaction = await this.getAccessibleTransactionOrThrow(
+    this.requireFinancialCapability(
+      scope,
+      OrganizationCapability.FINANCE_MANAGE,
+      'financial_transactions.update',
+    );
+    const existingTransaction = await this.getTenantTransactionOrThrow(
       id,
-      user,
+      scope,
     );
 
-    const patientId = Object.hasOwn(updateFinancialTransactionDto, 'patientId')
+    const patientId = hasOwn(updateFinancialTransactionDto, 'patientId')
       ? (updateFinancialTransactionDto.patientId ?? null)
       : existingTransaction.patientId;
-    const appointmentId = Object.hasOwn(
-      updateFinancialTransactionDto,
-      'appointmentId',
-    )
+    const appointmentId = hasOwn(updateFinancialTransactionDto, 'appointmentId')
       ? (updateFinancialTransactionDto.appointmentId ?? null)
       : existingTransaction.appointmentId;
 
     const patient = patientId
-      ? await this.getAccessiblePatientOrThrow(patientId, user)
+      ? await this.getTenantPatientOrThrow(patientId, scope)
       : null;
     const appointment = appointmentId
-      ? await this.getAccessibleAppointmentOrThrow(appointmentId, user)
+      ? await this.getTenantAppointmentOrThrow(appointmentId, scope)
       : null;
 
     this.ensureAppointmentMatchesPatient(patient?.id, appointment?.patientId);
 
-    let createdById = existingTransaction.createdById;
-
-    if (this.isAdmin(user)) {
-      if (Object.hasOwn(updateFinancialTransactionDto, 'createdById')) {
-        createdById = updateFinancialTransactionDto.createdById ?? createdById;
-      }
-
-      await this.ensureUserExists(createdById);
-    } else {
-      createdById = existingTransaction.createdById;
-    }
-
-    return this.prisma.financialTransaction.update({
-      where: { id },
+    const result = await this.prisma.financialTransaction.updateMany({
+      where: { id, organizationId: scope.organizationId },
       data: {
-        ...updateFinancialTransactionDto,
-        createdById,
+        ...this.withoutServerFields(updateFinancialTransactionDto),
         patientId,
         appointmentId,
       },
     });
+
+    if (result.count !== 1) {
+      throw this.transactionNotFound();
+    }
+
+    return this.getTenantTransactionOrThrow(id, scope);
   }
 
-  async remove(user: AuthenticatedUser, id: string) {
-    await this.getAccessibleTransactionOrThrow(id, user);
+  async remove(scope: FinanceScope, id: string) {
+    const transaction = await this.getTenantTransactionOrThrow(id, scope);
+    this.requireFinancialCapability(
+      scope,
+      OrganizationCapability.FINANCE_MANAGE,
+      'financial_transactions.remove',
+    );
 
-    return this.prisma.financialTransaction.delete({
-      where: { id },
+    const result = await this.prisma.financialTransaction.deleteMany({
+      where: { id, organizationId: scope.organizationId },
     });
-  }
 
-  private isAdmin(user: AuthenticatedUser) {
-    return user.role === UserRole.ADMIN;
+    if (result.count !== 1) {
+      throw this.transactionNotFound();
+    }
+
+    return transaction;
   }
 
   private buildFindManyWhere(
-    user: AuthenticatedUser,
+    scope: FinanceScope,
     query: FindFinancialTransactionsQueryDto,
   ): Prisma.FinancialTransactionWhereInput {
     const {
@@ -205,101 +231,66 @@ export class FinancialTransactionsService {
     }
 
     return {
+      organizationId: scope.organizationId,
       ...(type ? { type } : {}),
       ...(status ? { status } : {}),
       ...(category ? { category } : {}),
       ...(paymentMethod ? { paymentMethod } : {}),
       ...(patientId ? { patientId } : {}),
       ...(appointmentId ? { appointmentId } : {}),
+      ...(createdById ? { createdById } : {}),
       ...(from || to ? { occurredAt } : {}),
-      ...(this.isAdmin(user)
-        ? createdById
-          ? { createdById }
-          : {}
-        : {
-            AND: [
-              {
-                OR: [
-                  { createdById: user.id },
-                  { patient: { psychologistId: user.id } },
-                  { appointment: { psychologistId: user.id } },
-                ],
-              },
-              ...(patientId ? [{ patient: { psychologistId: user.id } }] : []),
-              ...(appointmentId
-                ? [{ appointment: { psychologistId: user.id } }]
-                : []),
-              ...(createdById ? [{ createdById: user.id }] : []),
-            ],
-          }),
     };
   }
 
-  private async getAccessibleTransactionOrThrow(
-    id: string,
-    user: AuthenticatedUser,
-  ) {
-    const transaction = this.isAdmin(user)
-      ? await this.prisma.financialTransaction.findUnique({ where: { id } })
-      : await this.prisma.financialTransaction.findFirst({
-          where: {
-            id,
-            OR: [
-              { createdById: user.id },
-              { patient: { psychologistId: user.id } },
-              { appointment: { psychologistId: user.id } },
-            ],
-          },
-        });
+  private async getTenantTransactionOrThrow(id: string, scope: FinanceScope) {
+    const transaction = await this.prisma.financialTransaction.findFirst({
+      where: {
+        id,
+        organizationId: scope.organizationId,
+      },
+    });
 
     if (!transaction) {
-      throw new NotFoundException(
-        `Financial transaction with id "${id}" not found`,
-      );
+      throw this.transactionNotFound();
     }
 
     return transaction;
   }
 
-  private async getAccessiblePatientOrThrow(
+  private async getTenantPatientOrThrow(
     patientId: string,
-    user: AuthenticatedUser,
+    scope: FinanceScope,
   ) {
-    const patient = this.isAdmin(user)
-      ? await this.prisma.patient.findUnique({ where: { id: patientId } })
-      : await this.prisma.patient.findFirst({
-          where: {
-            id: patientId,
-            psychologistId: user.id,
-          },
-        });
+    const patient = await this.prisma.patient.findFirst({
+      where: {
+        id: patientId,
+        organizationId: scope.organizationId,
+      },
+      select: { id: true },
+    });
 
     if (!patient) {
-      throw new NotFoundException(`Patient with id "${patientId}" not found`);
+      throw new NotFoundException('Patient not found');
     }
 
     return patient;
   }
 
-  private async getAccessibleAppointmentOrThrow(
+  private async getTenantAppointmentOrThrow(
     appointmentId: string,
-    user: AuthenticatedUser,
+    scope: FinanceScope,
   ) {
-    const appointment = this.isAdmin(user)
-      ? await this.prisma.appointment.findUnique({
-          where: { id: appointmentId },
-        })
-      : await this.prisma.appointment.findFirst({
-          where: {
-            id: appointmentId,
-            psychologistId: user.id,
-          },
-        });
+    const appointment = await this.prisma.appointment.findFirst({
+      where: {
+        id: appointmentId,
+        organizationId: scope.organizationId,
+      },
+      select: { id: true, patientId: true },
+    });
 
     if (!appointment) {
-      throw new NotFoundException(
-        `Appointment with id "${appointmentId}" not found`,
-      );
+      throw new NotFoundException('Appointment not found');
     }
 
     return appointment;
@@ -320,14 +311,34 @@ export class FinancialTransactionsService {
     }
   }
 
-  private async ensureUserExists(userId: string) {
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      select: { id: true },
-    });
-
-    if (!user) {
-      throw new NotFoundException(`User with id "${userId}" not found`);
+  private requireFinancialCapability(
+    scope: FinanceScope,
+    capability: OrganizationCapability,
+    operation: string,
+  ) {
+    const decision = this.policy.decisionFor(scope, capability);
+    if (decision === CapabilityDecision.ALLOW) {
+      return;
     }
+
+    this.observability.capabilityDenied(scope, capability, operation);
+    throw new ForbiddenException('Organization capability is required');
   }
+
+  private withoutServerFields<T extends object>(
+    dto: T,
+  ): Omit<T, 'organizationId' | 'createdById'> {
+    const transactionData = { ...dto };
+    Reflect.deleteProperty(transactionData, 'organizationId');
+    Reflect.deleteProperty(transactionData, 'createdById');
+    return transactionData;
+  }
+
+  private transactionNotFound() {
+    return new NotFoundException('Financial transaction not found');
+  }
+}
+
+function hasOwn<T extends object>(value: T, property: PropertyKey) {
+  return Object.hasOwn(value, property);
 }

@@ -1,0 +1,155 @@
+name: Build certified Prisma migration artifact
+
+on:
+  workflow_dispatch:
+    inputs:
+      backend_sha:
+        description: Certified Backend commit SHA for the migration artifact
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      CERTIFIED_SHA: cd669fd3e6ef2c5193ae1532a41b797c42ac21ce
+      MIGRATION_SHA: 38EEFA71885273195857EF701A3C6F7015CB1A866C080E12E1CCE108C04B0460
+      IMAGE: ghcr.io/${{ github.repository_owner }}/psychology-app-prisma-migrate
+      TEST_DATABASE_URL: postgresql://artifact_test_user:artifact_test_password@127.0.0.1:5432/artifact_test_db?schema=public
+      DATABASE_URL: postgresql://artifact_test_user:artifact_test_password@127.0.0.1:5432/artifact_test_db?schema=public
+
+    services:
+      postgres:
+        image: postgres:16-bookworm
+        env:
+          POSTGRES_USER: artifact_test_user
+          POSTGRES_PASSWORD: artifact_test_password
+          POSTGRES_DB: artifact_test_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U artifact_test_user -d artifact_test_db"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Validate requested certified revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "${{ inputs.backend_sha }}" = "$CERTIFIED_SHA" ]]
+
+      - name: Check out workflow and build definition
+        uses: actions/checkout@v4
+
+      - name: Check out the certified migration source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.backend_sha }}
+          fetch-depth: 1
+          path: artifact-source
+
+      - name: Verify migration inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C artifact-source rev-parse HEAD)" = "$CERTIFIED_SHA"
+          test "$(find artifact-source/prisma/migrations -mindepth 1 -maxdepth 1 -type d | wc -l | tr -d ' ')" = 3
+          test "$(sha256sum artifact-source/prisma/migrations/20260717120000_add_saas_foundation/migration.sql | awk '{print toupper($1)}')" = "$MIGRATION_SHA"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Validate Prisma source
+        run: |
+          cd artifact-source
+          npm ci
+          npx prisma validate
+
+      - name: Build immutable migration image
+        id: image
+        shell: bash
+        run: |
+          set -euo pipefail
+          short_sha="${CERTIFIED_SHA:0:12}"
+          created="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          docker build \
+            --file Dockerfile.prisma-migrate \
+            --build-arg "VCS_REF=$CERTIFIED_SHA" \
+            --build-arg "SOURCE_URL=https://github.com/${GITHUB_REPOSITORY}" \
+            --build-arg "CREATED=$created" \
+            --tag "$IMAGE:$short_sha" \
+            --file "$GITHUB_WORKSPACE/Dockerfile.prisma-migrate" \
+            "$GITHUB_WORKSPACE/artifact-source"
+          echo "tag=$short_sha" >> "$GITHUB_OUTPUT"
+
+      - name: Verify image identity and contents
+        shell: bash
+        run: |
+          set -euo pipefail
+          image="$IMAGE:${{ steps.image.outputs.tag }}"
+          docker image inspect "$image" --format '{{json .Config.Labels}}' | grep -Fq "$CERTIFIED_SHA"
+          docker run --rm --entrypoint node "$image" --version
+          docker run --rm -e "DATABASE_URL=$TEST_DATABASE_URL" "$image" --version
+          docker run --rm --entrypoint sh "$image" -ceu '
+            test "$(find prisma/migrations -mindepth 1 -maxdepth 1 -type d | wc -l)" = 3
+            sha256sum prisma/migrations/20260717120000_add_saas_foundation/migration.sql
+            DATABASE_URL="postgresql://placeholder:placeholder@invalid:5432/placeholder?schema=public" ./node_modules/.bin/prisma validate
+          ' | tee image-verification.txt
+          grep -Fq "$MIGRATION_SHA" <(tr '[:lower:]' '[:upper:]' < image-verification.txt)
+
+      - name: Exercise deploy and idempotence on PostgreSQL 16
+        shell: bash
+        run: |
+          set -euo pipefail
+          image="$IMAGE:${{ steps.image.outputs.tag }}"
+          set +e
+          docker run --rm --network host -e "DATABASE_URL=$TEST_DATABASE_URL" "$image" migrate status
+          status_before="$?"
+          set -e
+          test "$status_before" -ne 0
+          docker run --rm --network host -e "DATABASE_URL=$TEST_DATABASE_URL" "$image" migrate deploy
+          docker run --rm --network host -e "DATABASE_URL=$TEST_DATABASE_URL" "$image" migrate status
+          docker run --rm --network host -e "DATABASE_URL=$TEST_DATABASE_URL" "$image" migrate deploy
+
+      - name: Publish immutable revision tag
+        id: publish
+        shell: bash
+        run: |
+          set -euo pipefail
+          image="$IMAGE:${{ steps.image.outputs.tag }}"
+          printf '%s' '${{ github.token }}' | docker login ghcr.io -u '${{ github.actor }}' --password-stdin
+          docker push "$image"
+          docker pull "$image"
+          reference="$(docker image inspect "$image" --format '{{index .RepoDigests 0}}')"
+          [[ "$reference" = "$IMAGE@sha256:"* ]]
+          digest="${reference#*@}"
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+
+      - name: Revalidate the published digest
+        shell: bash
+        run: |
+          set -euo pipefail
+          reference="$IMAGE@${{ steps.publish.outputs.digest }}"
+          docker pull "$reference"
+          docker image inspect "$reference" --format '{{json .Config.Labels}}' | grep -Fq "$CERTIFIED_SHA"
+          docker run --rm --entrypoint sh "$reference" -ceu '
+            test "$(find prisma/migrations -mindepth 1 -maxdepth 1 -type d | wc -l)" = 3
+            sha256sum prisma/migrations/20260717120000_add_saas_foundation/migration.sql
+            DATABASE_URL="postgresql://placeholder:placeholder@invalid:5432/placeholder?schema=public" ./node_modules/.bin/prisma validate
+          ' | tee digest-verification.txt
+          grep -Fq "$MIGRATION_SHA" <(tr '[:lower:]' '[:upper:]' < digest-verification.txt)
+          {
+            echo "## Certified Prisma migration artifact"
+            echo "- Commit: \`$CERTIFIED_SHA\`"
+            echo "- Image: \`$reference\`"
+          } >> "$GITHUB_STEP_SUMMARY"

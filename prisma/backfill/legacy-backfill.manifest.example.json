@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "organization": {
+    "slug": "legacy-example",
+    "legalName": "Legacy Psychology Practice Example",
+    "displayName": "Legacy Practice",
+    "status": "ACTIVE"
+  },
+  "owner": {
+    "userId": "00000000-0000-4000-8000-000000000001"
+  }
+}

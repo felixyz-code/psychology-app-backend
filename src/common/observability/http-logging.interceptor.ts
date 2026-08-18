@@ -21,7 +21,18 @@ export class HttpLoggingInterceptor implements NestInterceptor {
     const startedAt = Date.now();
     const requestId = this.requestContext.requestId ?? 'unavailable';
     const path = request.path;
-    const baseLog = { requestId, method: request.method, path };
+    const tenantContext = this.requestContext.tenantContext;
+    const baseLog = {
+      requestId,
+      method: request.method,
+      path,
+      ...(tenantContext && {
+        userId: tenantContext.userId,
+        organizationId: tenantContext.organizationId,
+        membershipId: tenantContext.membershipId,
+        tenantResolutionMode: tenantContext.resolutionMode,
+      }),
+    };
 
     return next.handle().pipe(
       tap(() =>

@@ -1,19 +1,68 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+  UnauthorizedException,
+  ForbiddenException,
+} from '@nestjs/common';
+import {
+  MembershipRole,
+  MembershipStatus,
+  OrganizationStatus,
+  UserRole,
+} from '@prisma/client';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
+import {
+  normalizeEmailIdentity,
+  trimEmailPresentation,
+} from '../common/identity/email-identity.util';
+import { TenantContext } from '../common/request-context/request-context.service';
 import { PrismaService } from '../prisma/prisma.service';
+import {
+  includesUniqueTarget,
+  isUniqueViolation,
+  serializableTransaction,
+} from '../prisma/prisma-transaction.util';
+import { TenantObservabilityService } from '../tenant-context/tenant-observability.service';
+import { CapabilityResolverService } from '../tenant-context/authorization/capability-resolver.service';
+import { projectAuthContextCapabilities } from '../tenant-context/authorization/capability-projection';
+import { AuthenticatedUser } from './types/authenticated-user.type';
+import { CreateFreelancerBootstrapDto } from './dto/create-freelancer-bootstrap.dto';
+import { UpdateAuthContextPreferenceDto } from './dto/auth-context-preference.dto';
+import { AuthContextStatus } from './dto/auth-context-response.dto';
 import { LoginDto } from './dto/login.dto';
+import { buildFreelancerBootstrapSlugCandidate } from './freelancer-bootstrap.util';
+
+const BCRYPT_HASH_ROUNDS = 10;
+const MAX_BOOTSTRAP_SLUG_ATTEMPTS = 5;
+const REGISTRATION_CONFLICT_MESSAGE = 'Registration could not be completed';
+
+class PreferenceEligibilityError extends Error {
+  constructor(
+    readonly reasonCode:
+      | 'INELIGIBLE_ORGANIZATION'
+      | 'INACTIVE_MEMBERSHIP'
+      | 'INACTIVE_ORGANIZATION',
+  ) {
+    super(reasonCode);
+    this.name = PreferenceEligibilityError.name;
+  }
+}
 
 @Injectable()
 export class AuthService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
+    private readonly observability: TenantObservabilityService,
+    private readonly capabilityResolver: CapabilityResolverService,
   ) {}
 
   async login(loginDto: LoginDto) {
+    const normalizedEmail = normalizeEmailIdentity(loginDto.email);
     const user = await this.prisma.user.findUnique({
-      where: { email: loginDto.email },
+      where: { normalizedEmail },
     });
 
     if (!user) {
@@ -29,21 +78,471 @@ export class AuthService {
       throw new UnauthorizedException('Invalid email or password');
     }
 
-    const accessToken = await this.jwtService.signAsync({
+    const accessToken = await this.signIdentityOnlyAccessToken(user);
+
+    return {
+      accessToken,
+      user: this.toPublicUser(user),
+    };
+  }
+
+  async freelancerBootstrap(
+    dto: CreateFreelancerBootstrapDto,
+    ipAddress: string,
+  ) {
+    const normalizedEmail = normalizeEmailIdentity(dto.email);
+    const email = trimEmailPresentation(dto.email);
+    const name = dto.name.trim();
+    const organizationName = dto.organizationName.trim();
+    const passwordHash = await bcrypt.hash(dto.password, BCRYPT_HASH_ROUNDS);
+
+    for (let attempt = 0; attempt < MAX_BOOTSTRAP_SLUG_ATTEMPTS; attempt += 1) {
+      const slug = buildFreelancerBootstrapSlugCandidate(
+        organizationName,
+        attempt,
+      );
+      try {
+        const result = await serializableTransaction(
+          this.prisma,
+          async (tx) => {
+            const existingUser = await tx.user.findUnique({
+              where: { normalizedEmail },
+              select: { id: true },
+            });
+            if (existingUser) {
+              throw new ConflictException(REGISTRATION_CONFLICT_MESSAGE);
+            }
+
+            const user = await tx.user.create({
+              data: {
+                name,
+                email,
+                normalizedEmail,
+                passwordHash,
+                role: UserRole.PSYCHOLOGIST,
+              },
+              select: {
+                id: true,
+                name: true,
+                email: true,
+                role: true,
+              },
+            });
+            const organization = await tx.organization.create({
+              data: {
+                slug,
+                legalName: organizationName,
+                displayName: organizationName,
+                status: OrganizationStatus.ACTIVE,
+              },
+              select: {
+                id: true,
+                slug: true,
+                legalName: true,
+                displayName: true,
+                status: true,
+                timezone: true,
+                locale: true,
+                currency: true,
+              },
+            });
+            const joinedAt = new Date();
+            const membership = await tx.organizationMembership.create({
+              data: {
+                organizationId: organization.id,
+                userId: user.id,
+                role: MembershipRole.OWNER,
+                status: MembershipStatus.ACTIVE,
+                joinedAt,
+              },
+              select: {
+                id: true,
+                organizationId: true,
+                userId: true,
+                role: true,
+                status: true,
+                joinedAt: true,
+              },
+            });
+
+            return {
+              user,
+              organization,
+              membership,
+            };
+          },
+        );
+
+        this.observability.freelancerBootstrapCompleted({
+          userId: result.user.id,
+          organizationId: result.organization.id,
+          membershipId: result.membership.id,
+        });
+        const accessToken = await this.signIdentityOnlyAccessToken(result.user);
+
+        return {
+          accessToken,
+          user: this.toPublicUser(result.user),
+          organization: result.organization,
+          membership: result.membership,
+        };
+      } catch (error) {
+        if (error instanceof ConflictException) {
+          this.observability.freelancerBootstrapDenied(
+            'REGISTRATION_CONFLICT',
+            ipAddress,
+          );
+          throw new ConflictException(REGISTRATION_CONFLICT_MESSAGE);
+        }
+        if (
+          includesUniqueTarget(error, 'slug') &&
+          attempt + 1 < MAX_BOOTSTRAP_SLUG_ATTEMPTS
+        ) {
+          continue;
+        }
+        if (
+          isUniqueViolation(error) &&
+          (includesUniqueTarget(error, 'normalizedEmail') ||
+            includesUniqueTarget(error, 'email'))
+        ) {
+          this.observability.freelancerBootstrapDenied(
+            'REGISTRATION_CONFLICT',
+            ipAddress,
+          );
+          throw new ConflictException(REGISTRATION_CONFLICT_MESSAGE);
+        }
+        throw error;
+      }
+    }
+
+    this.observability.freelancerBootstrapDenied('SLUG_CONFLICT', ipAddress);
+    throw new ConflictException(REGISTRATION_CONFLICT_MESSAGE);
+  }
+
+  async getTenantContext(
+    user: AuthenticatedUser,
+    tenantContext?: TenantContext,
+  ) {
+    const [preferenceState, memberships] = await Promise.all([
+      this.prisma.user.findUnique({
+        where: { id: user.id },
+        select: { preferredOrganizationId: true },
+      }),
+      this.prisma.organizationMembership.findMany({
+        where: {
+          userId: user.id,
+          status: {
+            in: [MembershipStatus.ACTIVE, MembershipStatus.SUSPENDED],
+          },
+        },
+        select: {
+          id: true,
+          userId: true,
+          role: true,
+          status: true,
+          createdAt: true,
+          updatedAt: true,
+          user: {
+            select: {
+              name: true,
+              email: true,
+            },
+          },
+          organization: {
+            select: { id: true, displayName: true, status: true },
+          },
+        },
+        orderBy: [
+          { organizationId: 'asc' },
+          { createdAt: 'desc' },
+          { id: 'asc' },
+        ],
+      }),
+    ]);
+
+    const selectableMemberships = memberships
+      .filter(
+        (membership) =>
+          membership.status === MembershipStatus.ACTIVE &&
+          membership.organization.status === OrganizationStatus.ACTIVE,
+      )
+      .map((membership) => ({
+        membershipId: membership.id,
+        organizationId: membership.organization.id,
+        organizationDisplayName: membership.organization.displayName,
+        organizationRole: membership.role,
+      }));
+    const preferredOrganizationId = this.sanitizePreferredOrganizationId(
+      preferenceState?.preferredOrganizationId,
+      selectableMemberships,
+    );
+    const baseResponse = {
+      schemaVersion: 1 as const,
+      tenantContext: null,
+      organization: null,
+      membership: null,
+      capabilities: [] as string[],
+      selectableMemberships,
+      preferredOrganizationId,
+    };
+
+    if (!tenantContext) {
+      return {
+        ...baseResponse,
+        status:
+          selectableMemberships.length > 1
+            ? AuthContextStatus.AMBIGUOUS_SELECTION
+            : AuthContextStatus.NO_ACTIVE_TENANT,
+        selectableMemberships:
+          selectableMemberships.length > 1 ? selectableMemberships : [],
+        preferredOrganizationId:
+          selectableMemberships.length > 1 ? preferredOrganizationId : null,
+      };
+    }
+
+    const currentMembership = memberships.find(
+      (membership) =>
+        membership.id === tenantContext.membershipId &&
+        membership.userId === user.id &&
+        membership.organization.id === tenantContext.organizationId,
+    );
+    if (!currentMembership) {
+      throw new ForbiddenException('Organization access denied');
+    }
+
+    const isSuspended =
+      currentMembership.organization.status === OrganizationStatus.SUSPENDED;
+    const isAdministrativeRole =
+      currentMembership.role === MembershipRole.OWNER ||
+      currentMembership.role === MembershipRole.ADMIN;
+
+    if (isSuspended && !isAdministrativeRole) {
+      return {
+        ...baseResponse,
+        status: AuthContextStatus.NO_ACTIVE_TENANT,
+        selectableMemberships: [],
+        preferredOrganizationId: null,
+      };
+    }
+
+    const status = isSuspended
+      ? AuthContextStatus.ADMIN_SUSPENDED_CONTEXT
+      : AuthContextStatus.ACTIVE_TENANT_READY;
+    const membership = {
+      id: currentMembership.id,
+      userId: currentMembership.userId,
+      displayName: currentMembership.user.name ?? null,
+      email: normalizeEmailIdentity(currentMembership.user.email),
+      role: currentMembership.role,
+      status: currentMembership.status,
+      createdAt: currentMembership.createdAt,
+      updatedAt: currentMembership.updatedAt,
+      isCurrentUser: currentMembership.userId === user.id,
+    };
+
+    return {
+      ...baseResponse,
+      status,
+      tenantContext: {
+        userId: tenantContext.userId,
+        organizationId: tenantContext.organizationId,
+        membershipId: tenantContext.membershipId,
+        organizationRole: tenantContext.organizationRole,
+        resolutionMode: tenantContext.resolutionMode,
+      },
+      organization: currentMembership.organization,
+      membership,
+      capabilities: projectAuthContextCapabilities(
+        currentMembership.role,
+        currentMembership.organization.status,
+        this.capabilityResolver,
+      ),
+    };
+  }
+
+  async updatePreferredOrganization(
+    user: AuthenticatedUser,
+    dto: UpdateAuthContextPreferenceDto,
+  ) {
+    if (dto.organizationId === null) {
+      return this.clearPreferredOrganization(user);
+    }
+
+    return this.setPreferredOrganization(user, dto.organizationId);
+  }
+
+  private signIdentityOnlyAccessToken(user: {
+    id: string;
+    name: string;
+    email: string;
+    role: UserRole;
+  }) {
+    return this.jwtService.signAsync({
       sub: user.id,
       name: user.name,
       email: user.email,
       role: user.role,
     });
+  }
+
+  private toPublicUser(user: {
+    id: string;
+    name: string;
+    email: string;
+    role: UserRole;
+  }) {
+    return {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+    };
+  }
+
+  private sanitizePreferredOrganizationId(
+    preferredOrganizationId: string | null | undefined,
+    selectableMemberships: ReadonlyArray<{ organizationId: string }>,
+  ) {
+    if (!preferredOrganizationId) {
+      return null;
+    }
+
+    return selectableMemberships.some(
+      (membership) => membership.organizationId === preferredOrganizationId,
+    )
+      ? preferredOrganizationId
+      : null;
+  }
+
+  private async clearPreferredOrganization(user: AuthenticatedUser) {
+    const result = await serializableTransaction(this.prisma, async (tx) => {
+      const currentUser = await tx.user.findUnique({
+        where: { id: user.id },
+        select: { preferredOrganizationId: true },
+      });
+
+      if (!currentUser) {
+        throw new UnauthorizedException('Unauthorized');
+      }
+
+      const updated = await tx.user.updateMany({
+        where: { id: user.id },
+        data: { preferredOrganizationId: null },
+      });
+
+      if (updated.count !== 1) {
+        throw new ConflictException('Concurrent operation conflict');
+      }
+
+      return {
+        preferredOrganizationId: null,
+        previousPreferredOrganizationId: currentUser.preferredOrganizationId,
+      };
+    });
+
+    this.observability.activeOrganizationPreferenceChanged(
+      'SUCCESS',
+      'PREFERENCE_CLEARED',
+      {
+        userId: user.id,
+        previousPreferredOrganizationId:
+          result.previousPreferredOrganizationId ?? undefined,
+      },
+    );
 
     return {
-      accessToken,
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-      },
+      preferredOrganizationId: result.preferredOrganizationId,
     };
+  }
+
+  private async setPreferredOrganization(
+    user: AuthenticatedUser,
+    organizationId: string,
+  ) {
+    try {
+      const result = await serializableTransaction(this.prisma, async (tx) => {
+        const [currentUser, membership] = await Promise.all([
+          tx.user.findUnique({
+            where: { id: user.id },
+            select: { preferredOrganizationId: true },
+          }),
+          tx.organizationMembership.findFirst({
+            where: {
+              userId: user.id,
+              organizationId,
+            },
+            select: {
+              id: true,
+              status: true,
+              organization: {
+                select: {
+                  status: true,
+                },
+              },
+            },
+            orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+          }),
+        ]);
+
+        if (!currentUser) {
+          throw new UnauthorizedException('Unauthorized');
+        }
+
+        if (!membership) {
+          throw new PreferenceEligibilityError('INELIGIBLE_ORGANIZATION');
+        }
+
+        if (membership.status !== MembershipStatus.ACTIVE) {
+          throw new PreferenceEligibilityError('INACTIVE_MEMBERSHIP');
+        }
+
+        if (membership.organization.status !== OrganizationStatus.ACTIVE) {
+          throw new PreferenceEligibilityError('INACTIVE_ORGANIZATION');
+        }
+
+        const updated = await tx.user.updateMany({
+          where: { id: user.id },
+          data: { preferredOrganizationId: organizationId },
+        });
+
+        if (updated.count !== 1) {
+          throw new ConflictException('Concurrent operation conflict');
+        }
+
+        return {
+          preferredOrganizationId: organizationId,
+          previousPreferredOrganizationId: currentUser.preferredOrganizationId,
+        };
+      });
+
+      this.observability.activeOrganizationPreferenceChanged(
+        'SUCCESS',
+        'PREFERENCE_UPDATED',
+        {
+          userId: user.id,
+          preferredOrganizationId: result.preferredOrganizationId,
+          previousPreferredOrganizationId:
+            result.previousPreferredOrganizationId ?? undefined,
+        },
+      );
+
+      return {
+        preferredOrganizationId: result.preferredOrganizationId,
+      };
+    } catch (error) {
+      if (error instanceof PreferenceEligibilityError) {
+        this.observability.activeOrganizationPreferenceChanged(
+          'DENY',
+          error.reasonCode,
+          {
+            userId: user.id,
+            preferredOrganizationId: organizationId,
+          },
+        );
+        throw new NotFoundException('Organization not found');
+      }
+
+      throw error;
+    }
   }
 }

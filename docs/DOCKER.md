@@ -284,6 +284,13 @@ only when its release is compatible with the already-applied schema. Restoring
 schema or data requires the verified backup and change procedure; neither
 `prisma db push` nor `prisma migrate resolve` is a rollback mechanism.
 
+The POST-GO-LIVE migration procedure uses the dedicated immutable image defined
+in `Dockerfile.prisma-migrate`, rather than a web runtime container. Its
+workflow and digest-based execution contract are documented in
+`PRISMA_MIGRATION_ARTIFACT.md`. The image defaults to `prisma --help`; an
+operator must explicitly request `migrate status` or `migrate deploy` in an
+approved phase.
+
 ## Backend and Infrastructure responsibilities
 
 Backend owns configuration validation, non-root container execution, graceful

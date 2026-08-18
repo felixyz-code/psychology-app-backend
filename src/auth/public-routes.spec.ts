@@ -13,6 +13,9 @@ function getHandlerMetadata(target: object, key: string): unknown {
 describe('public route metadata', () => {
   it('marks login, root, and health as public', () => {
     expect(getHandlerMetadata(AuthController.prototype, 'login')).toBe(true);
+    expect(
+      getHandlerMetadata(AuthController.prototype, 'freelancerBootstrap'),
+    ).toBe(true);
     expect(getHandlerMetadata(AppController.prototype, 'getHello')).toBe(true);
     expect(getHandlerMetadata(AppController.prototype, 'getHealth')).toBe(true);
   });

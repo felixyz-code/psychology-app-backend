@@ -29,24 +29,26 @@ describe('requireDemoSeedPassword', () => {
     expect(requireDemoSeedPassword(password)).toBe(password);
   });
 
-  it('validates the environment password before hashing or creating demo users', () => {
+  it('validates the local seed password before hashing or creating tenant users', () => {
     const passwordValidation = seedSource.indexOf(
-      'const demoPassword = requireDemoSeedPassword();',
+      'const demoPassword = requireDemoSeedPassword(',
     );
     const passwordHashing = seedSource.indexOf('bcrypt.hash(demoPassword, 10)');
-    const adminCreation = seedSource.indexOf('const admin = await upsertUser');
+    const tenantDataCreation = seedSource.indexOf(
+      'await seedTenantDevelopmentData(passwordHash);',
+    );
 
     expect(passwordValidation).toBeGreaterThan(-1);
     expect(passwordHashing).toBeGreaterThan(passwordValidation);
-    expect(adminCreation).toBeGreaterThan(passwordHashing);
+    expect(tenantDataCreation).toBeGreaterThan(passwordHashing);
   });
 
-  it('keeps both demo roles without a hardcoded or logged password fallback', () => {
-    expect(seedSource).toContain('role: UserRole.ADMIN');
-    expect(seedSource).toContain('role: UserRole.PSYCHOLOGIST');
-    expect(seedSource).not.toMatch(/DEFAULT_PASSWORD/);
+  it('keeps legacy user roles and does not log seed secrets', () => {
+    expect(seedSource).toContain('UserRole.ADMIN');
+    expect(seedSource).toContain('UserRole.PSYCHOLOGIST');
+    expect(seedSource).toContain('DEFAULT_LOCAL_PASSWORD');
     expect(seedSource).not.toMatch(
-      /console\.log\([^\n]*(demoPassword|demoPasswordHash|DATABASE_URL)/,
+      /console\.log\([^\n]*(demoPassword|demoPasswordHash|passwordHash|DATABASE_URL|DEFAULT_LOCAL_PASSWORD)/,
     );
   });
 });

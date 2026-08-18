@@ -36,9 +36,14 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { UserRole } from '@prisma/client';
 import type { Response } from 'express';
 import { memoryStorage } from 'multer';
+import { AuditLog } from '../audit-logs/decorators/audit-log.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import type { AuthenticatedUser } from '../auth/types/authenticated-user.type';
+import { CurrentTenant } from '../tenant-context/decorators/current-tenant.decorator';
+import { TenantRequired } from '../tenant-context/decorators/tenant-required.decorator';
+import type { ClinicalAccessScope } from '../tenant-context/clinical-access.types';
+import type { TenantContext } from '../tenant-context/tenant-context.types';
 import { CreateDocumentDto } from './dto/create-document.dto';
 import { UpdateDocumentDto } from './dto/update-document.dto';
 import { DocumentResponseDto } from './dto/document-response.dto';
@@ -54,6 +59,7 @@ import { DocumentsService } from './documents.service';
 @ApiForbiddenResponse({
   description: 'Authenticated user lacks a permitted role',
 })
+@TenantRequired()
 @Controller('documents')
 @Roles(UserRole.ADMIN, UserRole.PSYCHOLOGIST)
 @UsePipes(
@@ -66,6 +72,7 @@ export class DocumentsController {
   constructor(private readonly documentsService: DocumentsService) {}
 
   @Post('upload')
+  @AuditLog({ action: 'CLINICAL_DOCUMENT_UPLOAD', resourceType: 'Document' })
   @UseInterceptors(
     FileInterceptor('file', {
       storage: memoryStorage(),
@@ -122,15 +129,21 @@ export class DocumentsController {
     @Body() uploadDocumentDto: UploadDocumentDto,
     @UploadedFile() file: Express.Multer.File | undefined,
     @CurrentUser() user: AuthenticatedUser,
+    @CurrentTenant(true) tenant: TenantContext,
   ) {
     if (!file) {
       throw new BadRequestException('File is required');
     }
 
-    return this.documentsService.upload(uploadDocumentDto, file, user);
+    return this.documentsService.upload(
+      uploadDocumentDto,
+      file,
+      this.createScope(tenant, user),
+    );
   }
 
   @Post()
+  @AuditLog({ action: 'CLINICAL_DOCUMENT_CREATE', resourceType: 'Document' })
   @ApiOperation({ summary: 'Create document metadata' })
   @ApiBody({ type: CreateDocumentDto })
   @ApiCreatedResponse({
@@ -142,22 +155,31 @@ export class DocumentsController {
   create(
     @Body() createDocumentDto: CreateDocumentDto,
     @CurrentUser() user: AuthenticatedUser,
+    @CurrentTenant(true) tenant: TenantContext,
   ) {
-    return this.documentsService.create(createDocumentDto, user);
+    return this.documentsService.create(
+      createDocumentDto,
+      this.createScope(tenant, user),
+    );
   }
 
   @Get()
+  @AuditLog({ action: 'CLINICAL_DOCUMENT_READ', resourceType: 'Document' })
   @ApiOperation({ summary: 'List all documents metadata' })
   @ApiOkResponse({
     description: 'Documents retrieved successfully',
     type: DocumentResponseDto,
     isArray: true,
   })
-  findAll(@CurrentUser() user: AuthenticatedUser) {
-    return this.documentsService.findAll(user);
+  findAll(
+    @CurrentUser() user: AuthenticatedUser,
+    @CurrentTenant(true) tenant: TenantContext,
+  ) {
+    return this.documentsService.findAll(this.createScope(tenant, user));
   }
 
   @Get('case-file/:caseFileId')
+  @AuditLog({ action: 'CLINICAL_DOCUMENT_READ', resourceType: 'Document' })
   @ApiOperation({ summary: 'List documents by case file ID' })
   @ApiParam({
     name: 'caseFileId',
@@ -175,11 +197,16 @@ export class DocumentsController {
   findByCaseFileId(
     @Param('caseFileId', ParseUUIDPipe) caseFileId: string,
     @CurrentUser() user: AuthenticatedUser,
+    @CurrentTenant(true) tenant: TenantContext,
   ) {
-    return this.documentsService.findByCaseFileId(caseFileId, user);
+    return this.documentsService.findByCaseFileId(
+      caseFileId,
+      this.createScope(tenant, user),
+    );
   }
 
   @Get(':id/download')
+  @AuditLog({ action: 'CLINICAL_DOCUMENT_DOWNLOAD', resourceType: 'Document' })
   @ApiOperation({ summary: 'Download a document file by ID' })
   @ApiParam({
     name: 'id',
@@ -206,10 +233,14 @@ export class DocumentsController {
   async download(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser() user: AuthenticatedUser,
+    @CurrentTenant(true) tenant: TenantContext,
     @Res({ passthrough: true }) response: Response,
   ) {
     const { document, absoluteFilePath, mimeType } =
-      await this.documentsService.getDownloadFile(id, user);
+      await this.documentsService.getDownloadFile(
+        id,
+        this.createScope(tenant, user),
+      );
 
     response.setHeader('Content-Type', mimeType);
     response.setHeader(
@@ -221,6 +252,7 @@ export class DocumentsController {
   }
 
   @Get(':id/view')
+  @AuditLog({ action: 'CLINICAL_DOCUMENT_VIEW', resourceType: 'Document' })
   @ApiOperation({ summary: 'View a document file inline by ID' })
   @ApiParam({
     name: 'id',
@@ -246,10 +278,14 @@ export class DocumentsController {
   async view(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser() user: AuthenticatedUser,
+    @CurrentTenant(true) tenant: TenantContext,
     @Res({ passthrough: true }) response: Response,
   ) {
     const { document, absoluteFilePath, mimeType } =
-      await this.documentsService.getViewFile(id, user);
+      await this.documentsService.getViewFile(
+        id,
+        this.createScope(tenant, user),
+      );
 
     response.setHeader('Content-Type', mimeType);
     response.setHeader(
@@ -261,6 +297,7 @@ export class DocumentsController {
   }
 
   @Get(':id')
+  @AuditLog({ action: 'CLINICAL_DOCUMENT_READ', resourceType: 'Document' })
   @ApiOperation({ summary: 'Get document metadata by ID' })
   @ApiParam({
     name: 'id',
@@ -277,11 +314,13 @@ export class DocumentsController {
   findOne(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser() user: AuthenticatedUser,
+    @CurrentTenant(true) tenant: TenantContext,
   ) {
-    return this.documentsService.findOne(id, user);
+    return this.documentsService.findOne(id, this.createScope(tenant, user));
   }
 
   @Patch(':id')
+  @AuditLog({ action: 'CLINICAL_DOCUMENT_UPDATE', resourceType: 'Document' })
   @ApiOperation({ summary: 'Update document metadata' })
   @ApiParam({
     name: 'id',
@@ -300,11 +339,17 @@ export class DocumentsController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updateDocumentDto: UpdateDocumentDto,
     @CurrentUser() user: AuthenticatedUser,
+    @CurrentTenant(true) tenant: TenantContext,
   ) {
-    return this.documentsService.update(id, updateDocumentDto, user);
+    return this.documentsService.update(
+      id,
+      updateDocumentDto,
+      this.createScope(tenant, user),
+    );
   }
 
   @Delete(':id')
+  @AuditLog({ action: 'CLINICAL_DOCUMENT_DELETE', resourceType: 'Document' })
   @ApiOperation({ summary: 'Delete document metadata' })
   @ApiParam({
     name: 'id',
@@ -321,7 +366,22 @@ export class DocumentsController {
   remove(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser() user: AuthenticatedUser,
+    @CurrentTenant(true) tenant: TenantContext,
   ) {
-    return this.documentsService.remove(id, user);
+    return this.documentsService.remove(id, this.createScope(tenant, user));
+  }
+
+  private createScope(
+    tenant: TenantContext,
+    user: AuthenticatedUser,
+  ): ClinicalAccessScope {
+    return {
+      organizationId: tenant.organizationId,
+      membershipId: tenant.membershipId,
+      organizationRole: tenant.organizationRole,
+      userId: user.id,
+      legacyUserRole: tenant.legacyUserRole,
+      resolutionMode: tenant.resolutionMode,
+    };
   }
 }

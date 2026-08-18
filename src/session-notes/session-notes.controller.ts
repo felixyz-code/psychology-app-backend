@@ -24,9 +24,14 @@ import {
   ValidationPipe,
 } from '@nestjs/common';
 import { UserRole } from '@prisma/client';
+import { AuditLog } from '../audit-logs/decorators/audit-log.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import type { AuthenticatedUser } from '../auth/types/authenticated-user.type';
+import { CurrentTenant } from '../tenant-context/decorators/current-tenant.decorator';
+import { TenantRequired } from '../tenant-context/decorators/tenant-required.decorator';
+import type { ClinicalAccessScope } from '../tenant-context/clinical-access.types';
+import type { TenantContext } from '../tenant-context/tenant-context.types';
 import { CreateSessionNoteDto } from './dto/create-session-note.dto';
 import { UpdateSessionNoteDto } from './dto/update-session-note.dto';
 import { SessionNoteResponseDto } from './dto/session-note-response.dto';
@@ -40,6 +45,7 @@ import { SessionNotesService } from './session-notes.service';
 @ApiForbiddenResponse({
   description: 'Authenticated user lacks a permitted role',
 })
+@TenantRequired()
 @Controller('session-notes')
 @Roles(UserRole.ADMIN, UserRole.PSYCHOLOGIST)
 @UsePipes(
@@ -52,6 +58,7 @@ export class SessionNotesController {
   constructor(private readonly sessionNotesService: SessionNotesService) {}
 
   @Post()
+  @AuditLog({ action: 'CLINICAL_NOTE_CREATE', resourceType: 'SessionNote' })
   @ApiOperation({ summary: 'Create a session note' })
   @ApiBody({ type: CreateSessionNoteDto })
   @ApiCreatedResponse({
@@ -63,22 +70,31 @@ export class SessionNotesController {
   create(
     @Body() createSessionNoteDto: CreateSessionNoteDto,
     @CurrentUser() user: AuthenticatedUser,
+    @CurrentTenant(true) tenant: TenantContext,
   ) {
-    return this.sessionNotesService.create(createSessionNoteDto, user);
+    return this.sessionNotesService.create(
+      createSessionNoteDto,
+      this.createScope(tenant, user),
+    );
   }
 
   @Get()
+  @AuditLog({ action: 'CLINICAL_NOTE_READ', resourceType: 'SessionNote' })
   @ApiOperation({ summary: 'List all session notes' })
   @ApiOkResponse({
     description: 'Session notes retrieved successfully',
     type: SessionNoteResponseDto,
     isArray: true,
   })
-  findAll(@CurrentUser() user: AuthenticatedUser) {
-    return this.sessionNotesService.findAll(user);
+  findAll(
+    @CurrentUser() user: AuthenticatedUser,
+    @CurrentTenant(true) tenant: TenantContext,
+  ) {
+    return this.sessionNotesService.findAll(this.createScope(tenant, user));
   }
 
   @Get('case-file/:caseFileId')
+  @AuditLog({ action: 'CLINICAL_NOTE_READ', resourceType: 'SessionNote' })
   @ApiOperation({ summary: 'List session notes by case file ID' })
   @ApiParam({
     name: 'caseFileId',
@@ -96,11 +112,16 @@ export class SessionNotesController {
   findByCaseFileId(
     @Param('caseFileId', ParseUUIDPipe) caseFileId: string,
     @CurrentUser() user: AuthenticatedUser,
+    @CurrentTenant(true) tenant: TenantContext,
   ) {
-    return this.sessionNotesService.findByCaseFileId(caseFileId, user);
+    return this.sessionNotesService.findByCaseFileId(
+      caseFileId,
+      this.createScope(tenant, user),
+    );
   }
 
   @Get(':id')
+  @AuditLog({ action: 'CLINICAL_NOTE_READ', resourceType: 'SessionNote' })
   @ApiOperation({ summary: 'Get a session note by ID' })
   @ApiParam({
     name: 'id',
@@ -117,11 +138,13 @@ export class SessionNotesController {
   findOne(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser() user: AuthenticatedUser,
+    @CurrentTenant(true) tenant: TenantContext,
   ) {
-    return this.sessionNotesService.findOne(id, user);
+    return this.sessionNotesService.findOne(id, this.createScope(tenant, user));
   }
 
   @Patch(':id')
+  @AuditLog({ action: 'CLINICAL_NOTE_UPDATE', resourceType: 'SessionNote' })
   @ApiOperation({ summary: 'Update a session note' })
   @ApiParam({
     name: 'id',
@@ -140,11 +163,17 @@ export class SessionNotesController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updateSessionNoteDto: UpdateSessionNoteDto,
     @CurrentUser() user: AuthenticatedUser,
+    @CurrentTenant(true) tenant: TenantContext,
   ) {
-    return this.sessionNotesService.update(id, updateSessionNoteDto, user);
+    return this.sessionNotesService.update(
+      id,
+      updateSessionNoteDto,
+      this.createScope(tenant, user),
+    );
   }
 
   @Delete(':id')
+  @AuditLog({ action: 'CLINICAL_NOTE_DELETE', resourceType: 'SessionNote' })
   @ApiOperation({ summary: 'Delete a session note' })
   @ApiParam({
     name: 'id',
@@ -161,7 +190,22 @@ export class SessionNotesController {
   remove(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser() user: AuthenticatedUser,
+    @CurrentTenant(true) tenant: TenantContext,
   ) {
-    return this.sessionNotesService.remove(id, user);
+    return this.sessionNotesService.remove(id, this.createScope(tenant, user));
+  }
+
+  private createScope(
+    tenant: TenantContext,
+    user: AuthenticatedUser,
+  ): ClinicalAccessScope {
+    return {
+      organizationId: tenant.organizationId,
+      membershipId: tenant.membershipId,
+      organizationRole: tenant.organizationRole,
+      userId: user.id,
+      legacyUserRole: tenant.legacyUserRole,
+      resolutionMode: tenant.resolutionMode,
+    };
   }
 }

@@ -24,7 +24,7 @@ describe('HttpLoggingInterceptor', () => {
       ),
     );
 
-    expect(JSON.parse(log.mock.calls[0][0] as string)).toMatchObject({
+    expect(JSON.parse(log.mock.calls.at(-1)?.[0] as string)).toMatchObject({
       event: 'http_request',
       requestId: 'request_123',
       method: 'POST',
@@ -58,6 +58,33 @@ describe('HttpLoggingInterceptor', () => {
     expect(warn).not.toHaveBeenCalledWith(
       expect.stringContaining('JWT secret'),
     );
+  });
+
+  it('logs only approved tenant identifiers and never request bodies', async () => {
+    const log = jest.spyOn(Logger.prototype, 'log').mockImplementation();
+    log.mockClear();
+    await context.run('request_123', () => {
+      context.setTenantContext({
+        userId: 'user-id',
+        organizationId: 'organization-id',
+        membershipId: 'membership-id',
+        organizationRole: 'OWNER',
+        legacyUserRole: 'ADMIN',
+        resolutionMode: 'EXPLICIT' as never,
+      });
+      return lastValueFrom(
+        interceptor.intercept(createExecutionContext(), {
+          handle: () => of({}),
+        }),
+      );
+    });
+
+    expect(JSON.parse(log.mock.calls.at(-1)?.[0] as string)).toMatchObject({
+      userId: 'user-id',
+      organizationId: 'organization-id',
+      membershipId: 'membership-id',
+      tenantResolutionMode: 'EXPLICIT',
+    });
   });
 });
 

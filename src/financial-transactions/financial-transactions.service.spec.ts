@@ -1,180 +1,111 @@
-import { NotFoundException } from '@nestjs/common';
-import { FinancialTransactionType, UserRole } from '@prisma/client';
-import { AuthenticatedUser } from '../auth/types/authenticated-user.type';
+import {
+  BadRequestException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
+import {
+  FinancialTransactionType,
+  MembershipRole,
+  UserRole,
+} from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { TenantResolutionMode } from '../common/request-context/request-context.service';
+import {
+  CapabilityDecision,
+  OrganizationCapability,
+} from '../tenant-context/authorization/organization-capability';
+import { OrganizationPolicyService } from '../tenant-context/authorization/organization-policy.service';
+import type { ClinicalAccessScope } from '../tenant-context/clinical-access.types';
+import { TenantObservabilityService } from '../tenant-context/tenant-observability.service';
 import { FinancialTransactionsService } from './financial-transactions.service';
 
 type PrismaMock = {
   financialTransaction: {
     create: jest.Mock;
-    delete: jest.Mock;
+    deleteMany: jest.Mock;
     findFirst: jest.Mock;
     findMany: jest.Mock;
-    findUnique: jest.Mock;
     groupBy: jest.Mock;
-    update: jest.Mock;
+    updateMany: jest.Mock;
   };
-  patient: { findFirst: jest.Mock; findUnique: jest.Mock };
-  appointment: { findFirst: jest.Mock; findUnique: jest.Mock };
-  user: { findUnique: jest.Mock };
+  patient: { findFirst: jest.Mock };
+  appointment: { findFirst: jest.Mock };
 };
 
-const admin: AuthenticatedUser = {
-  id: 'admin-id',
-  name: 'Admin',
-  email: 'admin@example.test',
-  role: UserRole.ADMIN,
-};
-const psychologistA: AuthenticatedUser = {
-  id: 'psychologist-a-id',
-  name: 'Psychologist A',
-  email: 'a@example.test',
-  role: UserRole.PSYCHOLOGIST,
-};
-
-describe('FinancialTransactionsService ownership', () => {
+describe('FinancialTransactionsService tenant isolation', () => {
   let service: FinancialTransactionsService;
   let prisma: PrismaMock;
+  let policy: { decisionFor: jest.Mock };
+  let observability: { capabilityDenied: jest.Mock };
 
   beforeEach(() => {
     prisma = {
       financialTransaction: {
         create: jest.fn(),
-        delete: jest.fn(),
+        deleteMany: jest.fn(),
         findFirst: jest.fn(),
         findMany: jest.fn(),
-        findUnique: jest.fn(),
         groupBy: jest.fn(),
-        update: jest.fn(),
+        updateMany: jest.fn(),
       },
-      patient: { findFirst: jest.fn(), findUnique: jest.fn() },
-      appointment: { findFirst: jest.fn(), findUnique: jest.fn() },
-      user: { findUnique: jest.fn() },
+      patient: { findFirst: jest.fn() },
+      appointment: { findFirst: jest.fn() },
     };
+    policy = {
+      decisionFor: jest.fn((scope: ClinicalAccessScope, capability: string) =>
+        decisionFor(scope.organizationRole, capability),
+      ),
+    };
+    observability = { capabilityDenied: jest.fn() };
     service = new FinancialTransactionsService(
       prisma as unknown as PrismaService,
+      policy as unknown as OrganizationPolicyService,
+      observability as unknown as TenantObservabilityService,
     );
   });
 
-  const transaction = (overrides: Record<string, unknown> = {}) => ({
-    id: 'transaction-id',
-    createdById: psychologistA.id,
-    patientId: null,
-    appointmentId: null,
-    ...overrides,
-  });
-
-  it('uses the documented creator-or-owned-patient-or-owned-appointment visibility filter', async () => {
+  it('lists with an immutable organization predicate and supported filters', async () => {
     prisma.financialTransaction.findMany.mockResolvedValue([]);
 
-    await service.findAll(psychologistA, {});
+    await service.findAll(scope(MembershipRole.BILLING), {
+      patientId: 'patient-a-id',
+      createdById: 'user-a-id',
+    });
 
     expect(prisma.financialTransaction.findMany).toHaveBeenCalledWith({
       where: {
-        AND: [
-          {
-            OR: [
-              { createdById: psychologistA.id },
-              { patient: { psychologistId: psychologistA.id } },
-              { appointment: { psychologistId: psychologistA.id } },
-            ],
-          },
-        ],
+        organizationId: 'organization-a-id',
+        patientId: 'patient-a-id',
+        createdById: 'user-a-id',
       },
       orderBy: { occurredAt: 'desc' },
     });
   });
 
-  it('intersects requested patient and appointment filters with ownership instead of replacing it', async () => {
-    prisma.financialTransaction.findMany.mockResolvedValue([]);
+  it('creates general tenant-scoped transactions and derives createdById from scope', async () => {
+    prisma.financialTransaction.create.mockResolvedValue(transaction());
 
-    await service.findAll(psychologistA, {
-      patientId: 'patient-b-id',
-      appointmentId: 'appointment-b-id',
-    });
+    await service.create(scope(MembershipRole.BILLING, 'billing-a-id'), {
+      type: FinancialTransactionType.INCOME,
+      amount: 100,
+      concept: 'test',
+      occurredAt: new Date(),
+      createdById: 'forged-user-id',
+    } as never);
 
-    expect(prisma.financialTransaction.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: {
-          patientId: 'patient-b-id',
-          appointmentId: 'appointment-b-id',
-          AND: [
-            {
-              OR: [
-                { createdById: psychologistA.id },
-                { patient: { psychologistId: psychologistA.id } },
-                { appointment: { psychologistId: psychologistA.id } },
-              ],
-            },
-            { patient: { psychologistId: psychologistA.id } },
-            { appointment: { psychologistId: psychologistA.id } },
-          ],
-        },
-      }),
+    const createCall = firstMockArg<{ data: Record<string, unknown> }>(
+      prisma.financialTransaction.create,
     );
+    expect(createCall.data.organizationId).toBe('organization-a-id');
+    expect(createCall.data.createdById).toBe('billing-a-id');
+    expect(createCall.data.createdById).not.toBe('forged-user-id');
   });
 
-  it('allows a psychologist to read a transaction created by another user when it is linked to their patient', async () => {
-    prisma.financialTransaction.findFirst.mockResolvedValue(
-      transaction({
-        createdById: 'psychologist-b-id',
-        patientId: 'patient-a-id',
-      }),
-    );
-
-    await expect(
-      service.findOne(psychologistA, 'transaction-id'),
-    ).resolves.toMatchObject({ patientId: 'patient-a-id' });
-    expect(prisma.financialTransaction.findFirst).toHaveBeenCalledWith({
-      where: {
-        id: 'transaction-id',
-        OR: [
-          { createdById: psychologistA.id },
-          { patient: { psychologistId: psychologistA.id } },
-          { appointment: { psychologistId: psychologistA.id } },
-        ],
-      },
-    });
-  });
-
-  it('allows a psychologist to read a transaction created by another user when it is linked to their appointment', async () => {
-    prisma.financialTransaction.findFirst.mockResolvedValue(
-      transaction({
-        createdById: 'psychologist-b-id',
-        appointmentId: 'appointment-a-id',
-      }),
-    );
-
-    await expect(
-      service.findOne(psychologistA, 'transaction-id'),
-    ).resolves.toMatchObject({ appointmentId: 'appointment-a-id' });
-  });
-
-  it('allows a psychologist to read their own general transaction without relations', async () => {
-    prisma.financialTransaction.findFirst.mockResolvedValue(transaction());
-
-    await expect(
-      service.findOne(psychologistA, 'transaction-a-id'),
-    ).resolves.toMatchObject({ createdById: psychologistA.id });
-  });
-
-  it('returns 404 and does not mutate a transaction exclusively visible to psychologist B', async () => {
-    prisma.financialTransaction.findFirst.mockResolvedValue(null);
-
-    await expect(
-      service.update(psychologistA, 'transaction-b-id', { concept: 'changed' }),
-    ).rejects.toBeInstanceOf(NotFoundException);
-    await expect(
-      service.remove(psychologistA, 'transaction-b-id'),
-    ).rejects.toBeInstanceOf(NotFoundException);
-    expect(prisma.financialTransaction.update).not.toHaveBeenCalled();
-    expect(prisma.financialTransaction.delete).not.toHaveBeenCalled();
-  });
-
-  it('prevents creation under psychologist B patient or appointment and forces the creator to A', async () => {
+  it('rejects foreign patient or appointment relations before writing', async () => {
     prisma.patient.findFirst.mockResolvedValue(null);
+
     await expect(
-      service.create(psychologistA, {
+      service.create(scope(MembershipRole.BILLING), {
         type: FinancialTransactionType.INCOME,
         amount: 100,
         concept: 'test',
@@ -183,45 +114,71 @@ describe('FinancialTransactionsService ownership', () => {
       }),
     ).rejects.toBeInstanceOf(NotFoundException);
     expect(prisma.financialTransaction.create).not.toHaveBeenCalled();
+  });
 
+  it('rejects visible but incompatible patient and appointment relations', async () => {
     prisma.patient.findFirst.mockResolvedValue({ id: 'patient-a-id' });
-    prisma.appointment.findFirst.mockResolvedValue(null);
+    prisma.appointment.findFirst.mockResolvedValue({
+      id: 'appointment-a-id',
+      patientId: 'patient-other-id',
+    });
+
     await expect(
-      service.create(psychologistA, {
+      service.create(scope(MembershipRole.BILLING), {
         type: FinancialTransactionType.INCOME,
         amount: 100,
         concept: 'test',
         occurredAt: new Date(),
         patientId: 'patient-a-id',
-        appointmentId: 'appointment-b-id',
+        appointmentId: 'appointment-a-id',
       }),
-    ).rejects.toBeInstanceOf(NotFoundException);
+    ).rejects.toBeInstanceOf(BadRequestException);
     expect(prisma.financialTransaction.create).not.toHaveBeenCalled();
-
-    prisma.patient.findFirst.mockResolvedValue({ id: 'patient-a-id' });
-    prisma.appointment.findFirst.mockResolvedValue({
-      id: 'appointment-a-id',
-      patientId: 'patient-a-id',
-    });
-    prisma.financialTransaction.create.mockResolvedValue(transaction());
-    await service.create(psychologistA, {
-      type: FinancialTransactionType.INCOME,
-      amount: 100,
-      concept: 'test',
-      occurredAt: new Date(),
-      patientId: 'patient-a-id',
-      appointmentId: 'appointment-a-id',
-      createdById: 'psychologist-b-id',
-    });
-    expect(prisma.financialTransaction.create).toHaveBeenCalledTimes(1);
-    const transactionCreateCalls = prisma.financialTransaction.create.mock
-      .calls as unknown as [[{ data: { createdById: string } }]];
-    expect(transactionCreateCalls[0][0].data.createdById).toBe(
-      psychologistA.id,
-    );
   });
 
-  it('calculates summaries from the same visibility-filtered transaction query', async () => {
+  it('uses tenant-scoped direct reads, updates, and deletes', async () => {
+    prisma.financialTransaction.findFirst.mockResolvedValue(transaction());
+    prisma.financialTransaction.updateMany.mockResolvedValue({ count: 1 });
+    prisma.financialTransaction.deleteMany.mockResolvedValue({ count: 1 });
+
+    await service.findOne(scope(MembershipRole.BILLING), 'transaction-a-id');
+    await service.update(scope(MembershipRole.BILLING), 'transaction-a-id', {
+      concept: 'changed',
+    });
+    await service.remove(scope(MembershipRole.BILLING), 'transaction-a-id');
+
+    expect(prisma.financialTransaction.findFirst).toHaveBeenCalledWith({
+      where: {
+        id: 'transaction-a-id',
+        organizationId: 'organization-a-id',
+      },
+    });
+    expect(prisma.financialTransaction.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'transaction-a-id', organizationId: 'organization-a-id' },
+      }),
+    );
+    expect(prisma.financialTransaction.deleteMany).toHaveBeenCalledWith({
+      where: { id: 'transaction-a-id', organizationId: 'organization-a-id' },
+    });
+  });
+
+  it('returns 404 and has no mutation side effect for cross-tenant IDs', async () => {
+    prisma.financialTransaction.findFirst.mockResolvedValue(null);
+
+    await expect(
+      service.update(scope(MembershipRole.BILLING), 'transaction-b-id', {
+        concept: 'changed',
+      }),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    await expect(
+      service.remove(scope(MembershipRole.BILLING), 'transaction-b-id'),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    expect(prisma.financialTransaction.updateMany).not.toHaveBeenCalled();
+    expect(prisma.financialTransaction.deleteMany).not.toHaveBeenCalled();
+  });
+
+  it('uses finance.summary_read and tenant-scoped groupBy for summary', async () => {
     prisma.financialTransaction.groupBy.mockResolvedValue([
       {
         type: FinancialTransactionType.INCOME,
@@ -235,7 +192,9 @@ describe('FinancialTransactionsService ownership', () => {
       },
     ]);
 
-    await expect(service.getSummary(psychologistA, {})).resolves.toEqual({
+    await expect(
+      service.getSummary(scope(MembershipRole.BILLING), {}),
+    ).resolves.toEqual({
       incomeTotal: 100,
       expenseTotal: 25,
       adjustmentTotal: 0,
@@ -243,41 +202,75 @@ describe('FinancialTransactionsService ownership', () => {
       netTotal: 75,
       transactionCount: 2,
     });
-    const summaryQueryCalls = prisma.financialTransaction.groupBy.mock
-      .calls as unknown as [
-      [
-        {
-          where: { AND: unknown[] };
-          by: string[];
-          _sum: { amount: boolean };
-          _count: { _all: boolean };
-        },
-      ],
-    ];
-    const summaryQuery = summaryQueryCalls[0][0];
-    expect(summaryQuery.where.AND).toEqual(expect.any(Array));
-    expect(summaryQuery.by).toEqual(['type']);
-    expect(summaryQuery._sum).toEqual({ amount: true });
-    expect(summaryQuery._count).toEqual({ _all: true });
+    expect(policy.decisionFor).toHaveBeenCalledWith(
+      expect.any(Object),
+      OrganizationCapability.FINANCE_SUMMARY_READ,
+    );
+    expect(prisma.financialTransaction.groupBy).toHaveBeenCalledWith({
+      where: { organizationId: 'organization-a-id' },
+      by: ['type'],
+      _sum: { amount: true },
+      _count: { _all: true },
+    });
   });
 
-  it('keeps admin global: no ownership filter is added', async () => {
-    prisma.financialTransaction.findMany.mockResolvedValue([]);
-    prisma.financialTransaction.findUnique.mockResolvedValue(
-      transaction({ createdById: 'psychologist-b-id' }),
-    );
-
-    await service.findAll(admin, {});
+  it('denies non-financial roles without using report.read as a bypass', async () => {
     await expect(
-      service.findOne(admin, 'transaction-b-id'),
-    ).resolves.toBeDefined();
-
-    expect(prisma.financialTransaction.findMany).toHaveBeenCalledWith({
-      where: {},
-      orderBy: { occurredAt: 'desc' },
-    });
-    expect(prisma.financialTransaction.findUnique).toHaveBeenCalledWith({
-      where: { id: 'transaction-b-id' },
-    });
+      service.getSummary(scope(MembershipRole.RECEPTIONIST), {}),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(prisma.financialTransaction.groupBy).not.toHaveBeenCalled();
+    expect(observability.capabilityDenied).toHaveBeenCalledWith(
+      expect.any(Object),
+      OrganizationCapability.FINANCE_SUMMARY_READ,
+      'financial_transactions.summary',
+    );
   });
 });
+
+function decisionFor(role: MembershipRole, capability: string) {
+  if (role === MembershipRole.OWNER) {
+    return CapabilityDecision.ALLOW;
+  }
+
+  if (role === MembershipRole.ADMIN || role === MembershipRole.BILLING) {
+    return [
+      OrganizationCapability.FINANCE_READ,
+      OrganizationCapability.FINANCE_MANAGE,
+      OrganizationCapability.FINANCE_SUMMARY_READ,
+    ].includes(capability as OrganizationCapability)
+      ? CapabilityDecision.ALLOW
+      : CapabilityDecision.DENY;
+  }
+
+  return CapabilityDecision.DENY;
+}
+
+function scope(
+  organizationRole: MembershipRole,
+  userId = 'user-a-id',
+): ClinicalAccessScope {
+  return {
+    organizationId: 'organization-a-id',
+    membershipId: 'membership-a-id',
+    organizationRole,
+    userId,
+    legacyUserRole: UserRole.PSYCHOLOGIST,
+    resolutionMode: TenantResolutionMode.EXPLICIT,
+  };
+}
+
+function transaction(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'transaction-a-id',
+    organizationId: 'organization-a-id',
+    createdById: 'user-a-id',
+    patientId: null,
+    appointmentId: null,
+    ...overrides,
+  };
+}
+
+function firstMockArg<T>(mock: jest.Mock): T {
+  const [firstCall] = mock.mock.calls as [unknown[]];
+  return firstCall[0] as T;
+}

@@ -6,6 +6,13 @@
 
 This document defines the public REST API contract exposed by the backend.
 
+> POST-GO-LIVE.3.0 note: organization, membership, and invitation routes are
+> implemented in the current backend baseline. Their broader lifecycle,
+> ownership, and active-organization evolution is governed by
+> `POST_GO_LIVE_3_0_ORGANIZATION_MEMBERSHIP_ADMINISTRATION_CONTRACT.md`.
+> This document records the current API surface; it does not claim that every
+> future 3.x organization-domain operation is already implemented.
+
 Business rules are documented in PROJECT.md.
 
 Architecture is documented in ARCHITECTURE.md.
@@ -32,7 +39,7 @@ Current characteristics:
 * Swagger supports `Authorize` using Bearer Token.
 * All route IDs are UUIDs.
 * Clinical endpoints require JWT Bearer authentication.
-* Public endpoint: `POST /auth/login`
+* Public endpoints: `POST /auth/login`, `POST /auth/freelancer-bootstrap`
 
 ## Authentication
 
@@ -53,10 +60,17 @@ Current roles:
 
 General ownership behavior:
 
-* `ADMIN` has full access to all resources.
-* `PSYCHOLOGIST` can only access resources owned by them.
-* If a resource exists but does not belong to the authenticated `PSYCHOLOGIST`, the API returns `404 Not Found`.
-* For `PSYCHOLOGIST`, ownership fields sent in request bodies are ignored and replaced with the authenticated user ID when applicable.
+* Tenant-converted clinical modules require resolved tenant context, active
+  membership, active organization, explicit capability, active clinical
+  assignment, and the temporary legacy psychologist restriction.
+* `ADMIN` and `OWNER` do not bypass clinical assignment on tenant-converted
+  clinical content.
+* Cross-tenant or legacy-null tenant-converted clinical resources return
+  redacted `404 Not Found`.
+* Visible in-tenant clinical resources without assignment or capability return
+  `403 Forbidden`.
+* Legacy modules not yet converted keep their documented legacy ownership
+  behavior until their approved phase.
 
 ---
 
@@ -98,6 +112,92 @@ Public endpoint.
 * `401 Unauthorized` when email does not exist.
 * `401 Unauthorized` when password is invalid.
 
+## `POST /auth/freelancer-bootstrap`
+
+Creates one public freelancer account, one initial active organization, and
+one active owner membership in a single bootstrap flow.
+
+### Authentication
+
+Public endpoint.
+
+### Body
+
+```json
+{
+  "email": "string",
+  "password": "string",
+  "name": "string",
+  "organizationName": "string"
+}
+```
+
+### Runtime Rules
+
+* The server canonicalizes user identity as
+  `email.trim().toLocaleLowerCase('en-US')`.
+* The supported public-bootstrap email domain is ASCII-only. Requests with
+  non-ASCII email characters fail validation, and the migration fails closed
+  if legacy non-ASCII user emails require explicit remediation.
+* The server preserves `email` as presentation data and stores the canonical
+  identity in `User.normalizedEmail`.
+* The route is served only when
+  `PUBLIC_FREELANCER_BOOTSTRAP_ENABLED=true`; otherwise the backend returns a
+  safe `404 Not Found`.
+* The bootstrap runs as one serializable PostgreSQL transaction.
+* The transaction creates exactly one `User`, one `Organization` with
+  `status = ACTIVE`, and one `OrganizationMembership` with
+  `role = OWNER` and `status = ACTIVE`.
+* Route-scoped application throttling allows at most `5` attempts per
+  `15` minutes per client IP and at most `3` attempts per `15` minutes per
+  canonicalized email. This does not replace the required reverse-proxy or WAF
+  rate limiting before production exposure.
+* The bootstrap does not create invitations, does not accept or revoke
+  invitations automatically, and does not create a `PsychologistProfile`.
+* JWT issuance happens only after a successful commit.
+* The JWT remains identity-only and does not contain tenant, organization,
+  membership, or capability claims.
+
+### Response
+
+```json
+{
+  "accessToken": "string",
+  "user": {
+    "id": "uuid",
+    "name": "string",
+    "email": "string",
+    "role": "ADMIN | PSYCHOLOGIST"
+  },
+  "organization": {
+    "id": "uuid",
+    "slug": "string",
+    "legalName": "string",
+    "displayName": "string",
+    "status": "ACTIVE",
+    "timezone": "string",
+    "locale": "string",
+    "currency": "string"
+  },
+  "membership": {
+    "id": "uuid",
+    "organizationId": "uuid",
+    "userId": "uuid",
+    "role": "OWNER",
+    "status": "ACTIVE",
+    "joinedAt": "date-time"
+  }
+}
+```
+
+### Errors
+
+* `400 Bad Request` for invalid payloads.
+* `409 Conflict` when registration cannot be completed safely.
+* `429 Too Many Requests` when the route-scoped bootstrap throttle denies the
+  request.
+* `500 Internal Server Error` for unexpected server failures.
+
 ---
 
 # Root
@@ -135,6 +235,24 @@ Public endpoint.
 
 # Patients
 
+POST-GO-LIVE.2.1D1: Patients is tenant-required and tenant-aware. The server
+derives `organizationId`, membership, role and legacy user identity from the
+validated JWT plus tenant context. Patient DTOs do not accept `organizationId`
+or `psychologistId`.
+
+Patients access requires:
+
+* valid tenant context;
+* active membership and active organization;
+* explicit `patient.*` capability;
+* active same-tenant `PatientAssignment`;
+* temporary legacy `psychologistId === authenticated user id` restriction.
+
+Legacy patients with `organizationId = null` are excluded from lists, direct
+reads, updates, deletes and relationship traversal. Cross-tenant or otherwise
+inaccessible patient IDs return redacted `404`. Visible in-tenant actions
+without capability or assignment return `403`.
+
 ## `POST /patients`
 
 Creates a patient.
@@ -147,7 +265,6 @@ Bearer Token required.
 
 ```json
 {
-  "psychologistId": "uuid",
   "firstName": "string",
   "lastName": "string",
   "phoneNumber": "string | optional",
@@ -158,8 +275,14 @@ Bearer Token required.
 
 ### Ownership
 
-* `ADMIN` can use `psychologistId` from the request body.
-* `PSYCHOLOGIST` ignores `psychologistId` from the body and uses `user.id`.
+* Requires `patient.create`.
+* The backend assigns `organizationId` from the resolved tenant context.
+* The backend sets the temporary legacy `psychologistId` to the authenticated
+  user ID.
+* The backend creates an active same-tenant primary `PatientAssignment` for the
+  current membership.
+* A freelancer with one `OWNER` membership can create and self-assign patients
+  through this flow without accumulating roles.
 
 ---
 
@@ -173,8 +296,9 @@ Bearer Token required.
 
 ### Ownership
 
-* `ADMIN` sees all patients.
-* `PSYCHOLOGIST` only sees patients where `patient.psychologistId === user.id`.
+* Requires `patient.read`.
+* Returns only patients in the selected tenant that are assigned to the current
+  membership and still match the temporary legacy psychologist restriction.
 
 ---
 
@@ -192,8 +316,9 @@ Bearer Token required.
 
 ### Ownership
 
-* `ADMIN` can access any patient.
-* `PSYCHOLOGIST` can only access owned patients.
+* Requires `patient.read`.
+* Requires active same-tenant assignment and the temporary legacy psychologist
+  restriction.
 
 ---
 
@@ -224,9 +349,10 @@ Bearer Token required.
 
 ### Ownership
 
-* `ADMIN` can update any patient.
-* `PSYCHOLOGIST` can only update owned patients.
-* `PSYCHOLOGIST` cannot reassign ownership to another psychologist.
+* Requires `patient.update`.
+* Requires active same-tenant assignment and the temporary legacy psychologist
+  restriction.
+* Ownership fields in the request body are ignored.
 
 ---
 
@@ -244,12 +370,23 @@ Bearer Token required.
 
 ### Ownership
 
-* `ADMIN` can delete any patient.
-* `PSYCHOLOGIST` can only delete owned patients.
+* Requires `patient.delete`.
+* Requires active same-tenant assignment and the temporary legacy psychologist
+  restriction.
+* Current backend behavior remains physical deletion; same-tenant patient
+  assignments are removed before deleting the patient record to preserve
+  referential integrity.
 
 ---
 
 # Case Files
+
+POST-GO-LIVE.2.1D2: Case Files and Workspace are tenant-required and
+tenant-aware. Access requires valid tenant context, active membership, active
+organization, explicit `case_file.*` or `workspace.read` capability, active
+same-tenant `PatientAssignment`, and the temporary legacy psychologist
+restriction. Legacy case files with `organizationId = null` are excluded from
+lists, direct reads, relationship reads, updates and workspace projections.
 
 ## `POST /case-files`
 
@@ -271,9 +408,11 @@ Bearer Token required.
 
 ### Behavior
 
-* Validates that the patient exists.
-* Validates patient ownership for `PSYCHOLOGIST`.
-* Rejects creating a second case file for the same patient.
+* Requires `case_file.create`.
+* Validates that the patient exists in the selected tenant and is assigned to
+  the current membership.
+* The backend assigns `organizationId` from the resolved tenant context.
+* Rejects creating a second same-tenant case file for the same patient.
 
 ---
 
@@ -287,8 +426,8 @@ Bearer Token required.
 
 ### Ownership
 
-* `ADMIN` sees all case files.
-* `PSYCHOLOGIST` only sees case files from owned patients.
+* Requires `case_file.read`.
+* Returns only case files in the selected tenant for actively assigned patients.
 
 ---
 
@@ -306,8 +445,8 @@ Bearer Token required.
 
 ### Ownership
 
-* `ADMIN` can access any patient case file.
-* `PSYCHOLOGIST` can only access it if the patient belongs to them.
+* Requires `case_file.read`.
+* Requires active same-tenant assignment to the requested patient.
 
 ---
 
@@ -325,8 +464,8 @@ Bearer Token required.
 
 ### Ownership
 
-* `ADMIN` can access any case file.
-* `PSYCHOLOGIST` can only access case files from owned patients.
+* Requires `case_file.read`.
+* Requires active same-tenant assignment to the case file patient.
 
 ---
 
@@ -346,9 +485,11 @@ Bearer Token required.
 
 ### Ownership
 
-* `ADMIN` can access any case file workspace.
-* `PSYCHOLOGIST` can only access workspaces for case files from owned patients.
-* If the case file exists but is not accessible to the authenticated `PSYCHOLOGIST`, the API returns `404 Not Found`.
+* Requires `workspace.read`.
+* Requires active same-tenant assignment to the case file patient.
+* Included appointments, session notes and documents are constrained by
+  `organizationId`.
+* Cross-tenant or legacy-null workspaces return `404 Not Found`.
 
 ### Response
 
@@ -481,12 +622,19 @@ Bearer Token required.
 
 ### Ownership
 
-* `ADMIN` can update any case file.
-* `PSYCHOLOGIST` can only update case files from owned patients.
+* Requires `case_file.update`.
+* Requires active same-tenant assignment to the case file patient.
 
 ---
 
 # Session Notes
+
+POST-GO-LIVE.2.1D2: Session Notes are tenant-required and tenant-aware. Access
+requires valid tenant context, active membership, active organization, explicit
+`session_note.*` capability, active same-tenant `PatientAssignment`, and the
+temporary legacy psychologist restriction. Legacy notes with
+`organizationId = null` are excluded. The backend derives `organizationId` and
+`authorId`; request-provided server fields are ignored.
 
 ## `POST /session-notes`
 
@@ -510,9 +658,9 @@ Bearer Token required.
 
 ### Ownership
 
-* `ADMIN` can use `authorId` from the request body.
-* `PSYCHOLOGIST` must own the case file.
-* For `PSYCHOLOGIST`, `authorId` is replaced with `user.id`.
+* Requires `session_note.create`.
+* Requires active same-tenant assignment to the case file patient.
+* `authorId` is always replaced with the authenticated user ID.
 
 ---
 
@@ -526,8 +674,8 @@ Bearer Token required.
 
 ### Ownership
 
-* `ADMIN` sees all session notes.
-* `PSYCHOLOGIST` only sees notes from case files of owned patients.
+* Requires `session_note.read`.
+* Returns only notes for assigned case files in the selected tenant.
 
 ---
 
@@ -545,8 +693,8 @@ Bearer Token required.
 
 ### Ownership
 
-* `ADMIN` can access any case file notes.
-* `PSYCHOLOGIST` can only access notes if the case file belongs to one of their patients.
+* Requires `session_note.read`.
+* Requires active same-tenant assignment to the case file patient.
 
 ---
 
@@ -564,8 +712,8 @@ Bearer Token required.
 
 ### Ownership
 
-* `ADMIN` can access any note.
-* `PSYCHOLOGIST` can only access notes from case files of owned patients.
+* Requires `session_note.read`.
+* Requires active same-tenant assignment to the note's case file patient.
 
 ---
 
@@ -593,8 +741,8 @@ Bearer Token required.
 
 ### Ownership
 
-* `ADMIN` can update any note.
-* `PSYCHOLOGIST` can only update notes from case files of owned patients.
+* Requires `session_note.update`.
+* Requires active same-tenant assignment to the note's case file patient.
 
 ---
 
@@ -612,14 +760,20 @@ Bearer Token required.
 
 ### Ownership
 
-* `ADMIN` can delete any note.
-* `PSYCHOLOGIST` can only delete notes from case files of owned patients.
+* Requires `session_note.delete`.
+* Requires active same-tenant assignment to the note's case file patient.
 
 ---
 
 # Documents
 
 The `documents` module supports metadata management, physical file upload, secure download and inline preview.
+
+POST-GO-LIVE.2.1D2: Documents are tenant-required and tenant-aware. Access
+requires valid tenant context, active membership, active organization, explicit
+document capability, active same-tenant `PatientAssignment`, and the temporary
+legacy psychologist restriction. Legacy documents with `organizationId = null`
+are excluded. Blob routes authorize metadata before filesystem access.
 
 ## Allowed File Types
 
@@ -668,14 +822,13 @@ multipart/form-data
 * Preserves `fileName` with the original filename.
 * Stores `filePath` as a relative path.
 * Uses the structure `patients/{patientId}/{uuid}.{ext}`.
-* Sets `uploadedById` from the authenticated JWT user.
+* Sets `organizationId` and `uploadedById` from the validated request context.
 * Legacy clients may still send `uploadedById`, but the backend ignores it.
 
 ### Ownership
 
-* `ADMIN` can upload to any accessible case file.
-* `PSYCHOLOGIST` must own the case file.
-* For every role, `uploadedById` is replaced with `user.id`.
+* Requires `document.upload`.
+* Requires active same-tenant assignment to the case file patient.
 
 ---
 
@@ -701,9 +854,9 @@ Bearer Token required.
 
 ### Ownership
 
-* `ADMIN` can use `uploadedById` from the body.
-* `PSYCHOLOGIST` must own the case file.
-* For `PSYCHOLOGIST`, `uploadedById` is replaced with `user.id`.
+* Requires `document.upload`.
+* Requires active same-tenant assignment to the case file patient.
+* `uploadedById` is always replaced with the authenticated user ID.
 
 ### Note
 
@@ -721,8 +874,8 @@ Bearer Token required.
 
 ### Ownership
 
-* `ADMIN` sees all documents.
-* `PSYCHOLOGIST` only sees documents from case files of owned patients.
+* Requires `document.metadata_read`.
+* Returns only documents for assigned case files in the selected tenant.
 
 ---
 
@@ -740,8 +893,8 @@ Bearer Token required.
 
 ### Ownership
 
-* `ADMIN` can access any case file documents.
-* `PSYCHOLOGIST` can only access documents if the case file belongs to one of their patients.
+* Requires `document.metadata_read`.
+* Requires active same-tenant assignment to the case file patient.
 
 ---
 
@@ -759,8 +912,8 @@ Bearer Token required.
 
 ### Ownership
 
-* `ADMIN` can access any document.
-* `PSYCHOLOGIST` can only access documents from case files of owned patients.
+* Requires `document.metadata_read`.
+* Requires active same-tenant assignment to the document's case file patient.
 
 ---
 
@@ -779,9 +932,11 @@ Bearer Token required.
 ### Behavior
 
 * Finds document metadata by ID.
-* Validates ownership before accessing the filesystem.
+* Requires `document.download` and validates tenant assignment before accessing
+  the filesystem.
 * Validates that the physical file exists.
 * Resolves the file path from `UPLOADS_PATH` or `uploads`.
+* Confines the path to `patients/{patientId}/...` under the upload root.
 * Responds with `Content-Disposition: attachment`.
 * Uses the original `fileName` as download filename.
 * Uses `mimeType` as `Content-Type`.
@@ -804,9 +959,11 @@ Bearer Token required.
 ### Behavior
 
 * Finds document metadata by ID.
-* Validates ownership before accessing the filesystem.
+* Requires `document.download` and validates tenant assignment before accessing
+  the filesystem.
 * Validates that the physical file exists.
 * Resolves the file path from `UPLOADS_PATH` or `uploads`.
+* Confines the path to `patients/{patientId}/...` under the upload root.
 * Responds with `Content-Disposition: inline`.
 * Uses `mimeType` as `Content-Type`.
 * Blocks path traversal.
@@ -844,8 +1001,8 @@ Bearer Token required.
 
 ### Ownership
 
-* `ADMIN` can update any document.
-* `PSYCHOLOGIST` can only update documents from case files of owned patients.
+* Requires `document.update`.
+* Requires active same-tenant assignment to the document's case file patient.
 
 ---
 
@@ -863,17 +1020,25 @@ Bearer Token required.
 
 ### Behavior
 
-* Deletes only the database record.
-* Does not delete the physical file from disk.
+* Deletes the database record first.
+* Attempts sanitized best-effort physical cleanup after metadata deletion.
 
 ### Ownership
 
-* `ADMIN` can delete any document.
-* `PSYCHOLOGIST` can only delete documents from case files of owned patients.
+* Requires `document.delete`.
+* Requires active same-tenant assignment to the document's case file patient.
 
 ---
 
 # Appointments
+
+POST-GO-LIVE.2.1D3: Appointments are tenant-required and tenant-aware. The
+server derives `organizationId` from the resolved tenant context and legacy
+`organizationId = NULL` appointments are invisible to lists, details, and
+mutations. Scheduling fields are operational data; `notes` is clinical content.
+`RECEPTIONIST` can read and manage operational appointment fields but cannot
+read or mutate notes. `OWNER` and `ADMIN` do not receive notes by role alone;
+notes require clinical capability plus an active same-tenant assignment.
 
 ## `POST /appointments`
 
@@ -898,9 +1063,16 @@ Bearer Token required.
 
 ### Ownership
 
-* `ADMIN` can use `psychologistId` from the body.
-* `PSYCHOLOGIST` must own the patient.
-* For `PSYCHOLOGIST`, `psychologistId` is replaced with `user.id`.
+* Requires `appointment.manage`.
+* The related patient must belong to the selected organization.
+* The target professional must have an active membership in the selected
+  organization.
+* `PSYCHOLOGIST` can only create appointments for themself.
+* `RECEPTIONIST` can create operational appointments only when `notes` is not
+  provided.
+* `notes` requires clinical capability plus active same-tenant assignment.
+* Request payload `organizationId` is ignored if present; tenant scope is
+  server-derived.
 
 ---
 
@@ -914,8 +1086,13 @@ Bearer Token required.
 
 ### Ownership
 
-* `ADMIN` sees all appointments.
-* `PSYCHOLOGIST` only sees appointments where `appointment.psychologistId === user.id`.
+* Requires `appointment.read`.
+* Results always include `organizationId = selected tenant`.
+* `PSYCHOLOGIST` sees appointments where they are the scheduled professional
+  or where the patient is assigned to their membership.
+* `RECEPTIONIST`, `ADMIN`, and `OWNER` receive operational tenant appointments.
+* `notes` is omitted unless the actor also has clinical capability and active
+  same-tenant assignment to the patient.
 
 ---
 
@@ -933,8 +1110,10 @@ Bearer Token required.
 
 ### Ownership
 
-* `ADMIN` can access any patient's appointments.
-* `PSYCHOLOGIST` can only access appointments if the patient belongs to them.
+* Requires `appointment.read`.
+* The patient must belong to the selected organization.
+* `PSYCHOLOGIST` must have active same-tenant assignment for the patient route.
+* `notes` follows the clinical capability plus assignment rule.
 
 ---
 
@@ -952,8 +1131,10 @@ Bearer Token required.
 
 ### Ownership
 
-* `ADMIN` can access any appointment.
-* `PSYCHOLOGIST` can only access owned appointments.
+* Requires `appointment.read`.
+* The appointment must belong to the selected organization.
+* Cross-tenant and legacy-null appointment IDs return `404`.
+* `notes` follows the clinical capability plus assignment rule.
 
 ---
 
@@ -984,9 +1165,15 @@ Bearer Token required.
 
 ### Ownership
 
-* `ADMIN` can update any appointment.
-* `PSYCHOLOGIST` can only update owned appointments.
-* `PSYCHOLOGIST` cannot reassign ownership to another psychologist.
+* Requires `appointment.manage`.
+* The appointment must belong to the selected organization.
+* Any changed patient or professional must belong to the selected organization.
+* `PSYCHOLOGIST` cannot assign the appointment to another professional.
+* `RECEPTIONIST` can update operational fields only and receives `403` for
+  `notes`.
+* `notes` requires clinical capability plus active same-tenant assignment.
+* Request payload `organizationId` is ignored if present; tenant scope is
+  server-derived.
 
 ---
 
@@ -1004,12 +1191,20 @@ Bearer Token required.
 
 ### Ownership
 
-* `ADMIN` can delete any appointment.
-* `PSYCHOLOGIST` can only delete owned appointments.
+* Requires `appointment.manage`.
+* The appointment must belong to the selected organization.
+* Cross-tenant and legacy-null appointment IDs return `404`.
 
 ---
 
 # Financial Transactions
+
+POST-GO-LIVE.2.1D3: Financial Transactions and Financial Summary are
+tenant-required and tenant-aware. Financial access uses financial capabilities
+and `organizationId` predicates, not clinical assignment. The server derives
+`organizationId` and `createdById` from the validated request scope. Legacy
+`organizationId = NULL` transactions are invisible to lists, direct access,
+mutations, and summaries.
 
 ## `POST /financial-transactions`
 
@@ -1035,8 +1230,7 @@ Bearer Token required.
   "paymentMethod": "CASH | CARD | TRANSFER | CHECK | OTHER | optional",
   "notes": "string | optional",
   "patientId": "uuid | optional",
-  "appointmentId": "uuid | optional",
-  "createdById": "uuid | optional"
+  "appointmentId": "uuid | optional"
 }
 ```
 
@@ -1045,21 +1239,28 @@ Bearer Token required.
 * `amount` must be positive.
 * `type`, `amount`, `concept` and `occurredAt` are required.
 * Prisma applies defaults for `status`, `category` and `currency`.
-* If `patientId` is provided, the patient must exist.
-* If `appointmentId` is provided, the appointment must exist.
+* If `patientId` is provided, the patient must exist in the selected
+  organization.
+* If `appointmentId` is provided, the appointment must exist in the selected
+  organization.
 * If both are provided, the appointment must belong to the same patient.
-* If `createdById` is provided by `ADMIN`, the user must exist.
+* `createdById` is always derived from the authenticated user in the tenant
+  scope; client-provided values are not part of the public contract.
 
 ### Ownership
 
-* `ADMIN` can create transactions for any valid user, patient or appointment.
-* `PSYCHOLOGIST` ignores `createdById` from the body and always uses `user.id`.
-* `PSYCHOLOGIST` can only associate owned patients and owned appointments.
+* Requires `finance.manage`.
+* `OWNER`, `ADMIN`, and `BILLING` can create transactions inside the selected
+  organization.
+* Clinical assignment does not grant finance access.
+* Request payload `organizationId` is ignored if present; tenant scope is
+  server-derived.
 
 ### Errors
 
 * `400 Bad Request` for invalid payloads or mismatched `patientId` / `appointmentId`.
-* `404 Not Found` when a related patient, appointment or user does not exist or is not accessible.
+* `404 Not Found` when a related patient, appointment, or transaction does not
+  exist inside the selected tenant.
 
 ---
 
@@ -1073,11 +1274,10 @@ Bearer Token required.
 
 ### Ownership
 
-* `ADMIN` sees all transactions.
-* `PSYCHOLOGIST` sees transactions when:
-  * `createdById === user.id`, or
-  * the transaction belongs to an owned patient, or
-  * the transaction belongs to an owned appointment.
+* Requires `finance.read`.
+* Results always include `organizationId = selected tenant`.
+* `OWNER`, `ADMIN`, and `BILLING` can read tenant transactions.
+* Clinical assignment does not grant finance access.
 
 ### Query Params
 
@@ -1096,15 +1296,15 @@ Bearer Token required.
 * Date filters apply to `occurredAt`.
 * `from` maps to `gte`.
 * `to` maps to `lte`.
-* `ADMIN` may filter by any supported field.
-* `PSYCHOLOGIST` may only see owned records under the existing ownership rules.
-* If `PSYCHOLOGIST` sends `createdById`, the backend constrains it to `user.id`.
-* If `PSYCHOLOGIST` sends `patientId` or `appointmentId`, non-owned values return an empty result set instead of exposing resource existence.
+* Every filter is combined with the immutable selected-tenant predicate.
+* Foreign `patientId`, `appointmentId`, and `createdById` filters return an
+  empty list rather than broadening scope.
 
 ### Notes
 
 * This module now supports basic filtering.
-* Pagination, tax invoicing, bank reconciliation and advanced dashboards remain out of scope.
+* Pagination, tax invoicing, bank reconciliation and advanced dashboards remain
+  out of scope.
 
 ---
 
@@ -1130,7 +1330,10 @@ Bearer Token required.
 
 ### Ownership
 
-* Uses the same visibility and filter rules as `GET /financial-transactions`.
+* Requires `finance.summary_read`.
+* Uses the same tenant predicate and filter rules as
+  `GET /financial-transactions`.
+* `report.read` is not a substitute for `finance.summary_read`.
 
 ### Response
 
@@ -1150,7 +1353,8 @@ Bearer Token required.
 * The summary is calculated using `occurredAt`, not `createdAt`.
 * It includes every visible status unless `status` is explicitly filtered.
 * This is not tax invoicing, bank reconciliation or an advanced financial dashboard.
-* For `PSYCHOLOGIST`, non-owned `patientId` and `appointmentId` filters resolve to an empty summary instead of exposing resource existence.
+* Foreign `patientId`, `appointmentId`, and legacy-null rows do not contribute
+  to counts, sums, or balances.
 
 ---
 
@@ -1168,9 +1372,9 @@ Bearer Token required.
 
 ### Ownership
 
-* `ADMIN` can access any transaction.
-* `PSYCHOLOGIST` can only access transactions visible under the base ownership rules.
-* If the transaction exists but is not accessible, the API returns `404 Not Found`.
+* Requires `finance.read`.
+* The transaction must belong to the selected organization.
+* Cross-tenant and legacy-null transaction IDs return `404`.
 
 ---
 
@@ -1202,23 +1406,23 @@ Bearer Token required.
   "paymentMethod": "CASH | CARD | TRANSFER | CHECK | OTHER | optional",
   "notes": "string | optional",
   "patientId": "uuid | optional",
-  "appointmentId": "uuid | optional",
-  "createdById": "uuid | optional"
+  "appointmentId": "uuid | optional"
 }
 ```
 
 ### Behavior
 
 * Relational validations from creation also apply on update.
-* `ADMIN` may change `createdById` only to an existing user.
-* `PSYCHOLOGIST` cannot change ownership through `createdById`.
-* Reassignments remain conservative and must stay within accessible relations.
+* `createdById` and `organizationId` are server-owned and cannot be changed
+  through the request payload.
+* Reassignments remain conservative and must stay within tenant relations.
 
 ### Ownership
 
-* `ADMIN` can update any transaction.
-* `PSYCHOLOGIST` can only update transactions visible under the base ownership rules.
-* If the transaction exists but is not accessible, the API returns `404 Not Found`.
+* Requires `finance.manage`.
+* The transaction must belong to the selected organization.
+* Any changed patient or appointment must belong to the selected organization.
+* Cross-tenant and legacy-null transaction IDs return `404`.
 
 ### Errors
 
@@ -1245,9 +1449,9 @@ Bearer Token required.
 
 ### Ownership
 
-* `ADMIN` can delete any transaction.
-* `PSYCHOLOGIST` can only delete transactions visible under the base ownership rules.
-* If the transaction exists but is not accessible, the API returns `404 Not Found`.
+* Requires `finance.manage`.
+* The transaction must belong to the selected organization.
+* Cross-tenant and legacy-null transaction IDs return `404`.
 
 ### Notes
 
@@ -1263,8 +1467,111 @@ The following items should be reviewed in future backend sprints:
 * Add pagination contract for list endpoints.
 * Add search/filter query parameters.
 * Decide whether `POST /documents` should remain available.
-* Decide whether `DELETE /documents/:id` should also delete the physical file.
+* Decide whether document physical cleanup should remain best-effort or move to
+  an explicit storage lifecycle/audit workflow.
 * Decide whether `GET /` should remain a legacy greeting or be replaced by the health/status payload in a future release.
+
+## Tenant Context Selection
+
+Authenticated clients may send one `X-Organization-Id` header containing a UUID
+to select an organization for that request. It is a selection hint only: the
+server checks the authenticated user's `ACTIVE` membership and the
+organization's `ACTIVE` state in PostgreSQL. Empty, malformed, or repeated
+values return `400`; inaccessible, missing, inactive, or revoked selections
+return the same `403` response without revealing whether another organization
+exists.
+
+If no header is sent, a user with one eligible membership is resolved
+automatically. A user with several eligible memberships must make an explicit
+selection. Patients, Case Files, Workspace, Session Notes, Documents,
+Appointments, Financial Transactions, and Financial Summary now require a
+resolved context. Clinical modules continue to apply the temporary legacy
+psychologist ownership condition where documented.
+
+## POST-GO-LIVE.2.1D0 clinical and financial conversion contract
+
+`POST_GO_LIVE_2_1D0_TENANT_CONVERSION_CONTRACT.md` defines the conversion
+contract for Patients, Case Files, Workspace, Session Notes, Documents,
+Appointments, Financial Transactions, and Financial Summary during 2.1D.
+Patients were converted in D1. Case Files, Workspace, Session Notes, and
+Documents were converted in D2. Appointments, Financial Transactions, and
+Financial Summary were converted in D3.
+
+POST-GO-LIVE.2.1D4 locally certifies those converted endpoint contracts
+together through an integrated opt-in PostgreSQL E2E suite. D4 does not add
+routes, DTO fields, response fields, Prisma schema changes, migrations,
+frontend behavior, deployment steps, or production data actions.
+
+POST-GO-LIVE.2.1D5 publishes the tenant platform certification suite and
+readiness report for the converted clinical and financial endpoint contracts.
+D5 adds no routes, DTO fields, response fields, Prisma schema changes,
+migrations, frontend behavior, deployment steps, production data actions, or
+POST-GO-LIVE.3 work. POST-GO-LIVE.2.1D closure remains pending D5-R review,
+controlled merge, post-merge verification, and an explicit closure decision.
+
+For D1 through D3, converted DTOs must not accept `organizationId`; the server
+derives tenant scope from the validated request context. Clinical content will
+require explicit module capability plus assignment, so `OWNER` and `ADMIN` do
+not read unassigned clinical files by role alone. Financial endpoints will use
+financial capabilities and tenant predicates, not clinical assignment by
+itself. Legacy rows with `organizationId = NULL` remain outside tenant-aware
+lists, details, mutations, and summaries until a separate certified backfill.
+
+`X-Organization-Id` is optional on the Patients pilot only because a caller
+with exactly one eligible membership is resolved automatically. It is a
+selection hint, never authorization evidence, and its UUID value is never
+accepted through a DTO, body, query, or path parameter.
+
+### `GET /auth/context`
+
+Bearer Token required; tenant context is optional during bootstrap. The V1 response always includes `schemaVersion: 1`, `status`, nullable `tenantContext`, nullable `organization`, nullable `membership`, sorted unique `capabilities`, `selectableMemberships`, and `preferredOrganizationId`.
+
+The status is one of `ACTIVE_TENANT_READY`, `AMBIGUOUS_SELECTION`, `NO_ACTIVE_TENANT`, or `ADMIN_SUSPENDED_CONTEXT`. A resolved response contains the confirmed tenant, organization, membership, and projected capabilities. An ambiguous response contains all selectable active memberships for the authenticated user. A no-active response contains no tenant context and an empty selection list. An administrator with a suspended organization receives the suspended-context status and only the capabilities allowed by the contract.
+
+The endpoint never returns the historical `RESOLVED`, `UNRESOLVED`, or `LEGACY_COMPATIBILITY` statuses. `X-Organization-Id` is an optional UUID selection hint and is never authorization evidence.
+
+### `PUT /auth/context/preference`
+
+Bearer Token required; tenant context not required.
+
+Persists one nullable preferred organization UUID on the authenticated `User`
+strictly as UX metadata.
+
+### Body
+
+```json
+{
+  "organizationId": "uuid | null"
+}
+```
+
+### Behavior
+
+* The route requires explicit intent: missing `organizationId`, empty strings,
+  invalid UUIDs, and extra properties fail validation.
+* `organizationId = null` clears the persisted UX preference.
+* Non-null writes run inside a serializable PostgreSQL transaction and succeed
+  only when the caller currently has an `ACTIVE` membership in the target
+  `ACTIVE` organization.
+* The write never changes JWT contents, capabilities, membership state,
+  `TenantContextGuard`, or request-time tenant authority.
+* `X-Organization-Id` remains the only selection hint for tenant-required
+  requests.
+
+### Response
+
+```json
+{
+  "preferredOrganizationId": "uuid | null"
+}
+```
+
+### Errors
+
+* `400 Bad Request` for invalid payloads.
+* `401 Unauthorized` for missing or invalid JWT.
+* Redacted `404 Not Found` for inaccessible, missing, suspended, or otherwise
+  ineligible organizations.
 
 # References
 
@@ -1275,3 +1582,156 @@ ARCHITECTURE.md
 DATA_MODEL.md
 
 DOCKER.md
+
+---
+
+## POST-GO-LIVE.2.1C2 Organization APIs
+
+Authenticated organization routes are tenant-required except `GET /organizations`,
+which lists the caller's active memberships and administrative organization
+metadata, and recipient invitation accept/reject routes, which bind to the
+authenticated recipient instead of a tenant selection. `X-Organization-Id`
+remains a validated selector only. POST-GO-LIVE.3.1 adds dedicated
+organization identity and lifecycle administration on top of the pre-existing
+read, membership, and invitation surfaces. POST-GO-LIVE.3.2 hardens the
+membership runtime and historical lifecycle without adding direct
+`POST /memberships`.
+
+| Method | Route | Capability / policy |
+| --- | --- | --- |
+| GET | `/organizations` | caller active memberships; list may include `ACTIVE` and `SUSPENDED` organizations for administrative discoverability |
+| GET | `/organizations/current` | `organization.read`; route allows `ACTIVE` or `SUSPENDED` selected organization state |
+| GET | `/organizations/:organizationId` | `organization.read`; path must match selected tenant and route allows `ACTIVE` or `SUSPENDED` organization state |
+| PATCH | `/organizations/:organizationId` | `organization.manage` (OWNER); editable identity fields only |
+| PATCH | `/organizations/:organizationId/status` | `organization.manage` (OWNER); `ACTIVE <-> SUSPENDED` only |
+| GET | `/organizations/:organizationId/settings` | `organization.read`; `ACTIVE` and `SUSPENDED` selected organization state; returns `rowState`, nullable `updatedAt`, effective `defaultAppointmentDuration`, and nullable persisted duration |
+| PATCH | `/organizations/:organizationId/settings` | `organization.manage` (OWNER); requires exactly one of `expectedRowState: "ABSENT"` or canonical `expectedUpdatedAt`; duration is `null` or integer `1..1440`; `null` has an effective fallback of `60`, and an absent-row reset intentionally leaves the row absent |
+| GET | `/organizations/:organizationId/branding` | `organization.read`; `ACTIVE` and `SUSPENDED` selected organization state; returns `rowState`, nullable `updatedAt`, and nullable persisted `primaryColor` |
+| PATCH | `/organizations/:organizationId/branding` | `organization.manage` (OWNER); requires exactly one of `expectedRowState: "ABSENT"` or canonical `expectedUpdatedAt`; accepts only nullable `#RRGGBB` with bounded WCAG contrast validation; `null` selects the platform fallback |
+| GET | `/organizations/:organizationId/logo` | `organization.read`; `ACTIVE` and `SUSPENDED` selected organization state; returns explicit `ABSENT`/`PRESENT` metadata without storage identity |
+| GET | `/organizations/:organizationId/logo/content` | `organization.read`; protected PNG/JPEG stream only; private revalidated cache headers and opaque ETag; no public URL |
+| PUT | `/organizations/:organizationId/logo` | `organization.manage` (OWNER); multipart `file` plus exactly one of `expectedRowState: "ABSENT"` or `expectedUpdatedAt`; only validated PNG/JPEG up to 1 MiB and 64..2048 intrinsic pixels |
+| DELETE | `/organizations/:organizationId/logo` | `organization.manage` (OWNER); requires canonical `expectedUpdatedAt`; removes metadata before best-effort blob cleanup |
+| POST | `/organizations/:organizationId/ownership-transfer` | `ownership.transfer` (OWNER); dedicated owner handoff only |
+| GET | `/organizations/:organizationId/memberships` | `membership.read`; sanitized metadata, canonical `updatedAt`, and backend-owned target `allowedActions` |
+| PATCH | `/organizations/:organizationId/memberships/:membershipId/role` | owner/admin conditional; never OWNER grant; requires `expectedUpdatedAt` |
+| PATCH | `/organizations/:organizationId/memberships/:membershipId/status` | owner/admin conditional; requires `expectedUpdatedAt` |
+| DELETE | `/organizations/:organizationId/memberships/:membershipId` | owner/admin conditional; request body requires `expectedUpdatedAt` |
+| POST | `/organizations/:organizationId/memberships/leave` | self only; last active OWNER denied; requires `expectedUpdatedAt` |
+| GET/POST | `/organizations/:organizationId/invitations` | `invitation.read` / `invitation.create` |
+| POST | `/organizations/:organizationId/invitations/:invitationId/revoke` | `invitation.revoke` (OWNER) |
+| POST | `/organizations/:organizationId/invitations/:invitationId/resend` | `invitation.resend` (OWNER) |
+| POST | `/organization-invitations/:token/accept` | authenticated bound recipient |
+| POST | `/organization-invitations/:token/reject` | authenticated bound recipient |
+
+Invitation tokens are SHA-256 digested before persistence and are returned only
+once from creation or resend outside production. API responses and logs never
+expose a digest; invitation list responses expose sanitized invitation metadata
+including recipient email, role, timestamps, and derived `logicalStatus`, but
+never the token or `tokenDigest`.
+
+POST-GO-LIVE.3.4 ownership-transfer runtime rules:
+
+- `POST /organizations/:organizationId/ownership-transfer` requires JWT,
+  resolved tenant context, `X-Organization-Id`, and the dedicated
+  `ownership.transfer` capability; `organization.manage` is not reused.
+- The actor must still be the current `ACTIVE` `OWNER` membership for the
+  selected organization when the serializable transaction executes; a stale
+  actor that is no longer owner fails with conflict rather than silently
+  downgrading someone else.
+- The target must be another `ACTIVE` membership in the same selected
+  organization and must not already be `OWNER`.
+- The transfer runs as one serializable PostgreSQL transaction using
+  compare-and-set `updateMany()` mutations: target promotion to `OWNER`, actor
+  demotion to `ADMIN`, and a final active-owner invariant verification.
+- Suspended organizations remain fail-closed for the operation itself even
+  though the route opts into suspended-state tenant resolution to return a
+  deterministic `409` instead of a generic capability denial.
+- The response returns the same organization ID, the demoted source
+  membership, the promoted target membership, and a `transferredAt` timestamp.
+- Post-commit structured observability emits
+  `organization_ownership_transferred` with actor/source/target role metadata
+  only after the transaction commits successfully.
+
+POST-GO-LIVE.3.3 invitation administration runtime rules:
+
+- `GET /organizations/:organizationId/invitations` returns administrative
+  metadata only, ordered by `createdAt DESC, id DESC`, with
+  `logicalStatus = PENDING | ACCEPTED | REJECTED | REVOKED | EXPIRED` derived
+  from terminal timestamps and `expiresAt`.
+- `POST /organizations/:organizationId/invitations` rejects `OWNER`, reuses the
+  canonical invitation email normalization (`trim().toLocaleLowerCase('en-US')`)
+  across create/lookup/accept/reject/resend, materializes logically expired
+  duplicates before insert, and blocks known recipients that already have an
+  `INVITED`, `ACTIVE`, or `SUSPENDED` membership in that organization.
+- `POST /organizations/:organizationId/invitations/:invitationId/revoke`
+  performs administrative cancelation as `PENDING -> REVOKED` only; a logically
+  expired target materializes `EXPIRED` and returns conflict instead of
+  revoking.
+- `POST /organizations/:organizationId/invitations/:invitationId/resend`
+  performs replacement semantics: it revokes a pending invitation or
+  materializes an expired one, creates a new row with a new token digest and a
+  fresh seven-day TTL, and leaves the previous row in history.
+- `POST /organization-invitations/:token/accept` and
+  `POST /organization-invitations/:token/reject` both require JWT, skip tenant
+  selection, validate canonicalized recipient identity, and execute in
+  serializable transactions with conditional updates so concurrent terminal
+  replays fail safely.
+- Invitation resend invalidates the old token immediately because the original
+  row becomes terminal (`REVOKED` or `EXPIRED`) before the replacement row is
+  committed.
+
+POST-GO-LIVE.3.2 membership runtime rules:
+
+- `OrganizationMembership` historical re-entry now uses one new row per
+  re-entry period. A `REVOKED` row is never reactivated in place.
+- PostgreSQL now enforces at most one non-terminal membership
+  (`INVITED`, `ACTIVE`, `SUSPENDED`) per `organizationId + userId` through a
+  partial unique index; any number of `REVOKED` historical rows are allowed.
+- `GET /organizations/:organizationId/memberships` keeps the current
+  administrative behavior and lists only non-terminal rows. Historical
+  `REVOKED` rows remain preserved in the database but are not projected by the
+  current API. Each row includes canonical `updatedAt` plus a closed
+  `allowedActions` projection with `CHANGE_ROLE`, `SUSPEND`, `REACTIVATE`, and
+  `REMOVE` as applicable to the current actor and target. Mutations always
+  re-evaluate authorization independently of this UX projection.
+- `PATCH /organizations/:organizationId/memberships/:membershipId/role` never
+  grants `OWNER`, never degrades `OWNER`, rejects `REVOKED` targets, and keeps
+  `ADMIN` blocked from mutating themself or any `OWNER`.
+- `PATCH /organizations/:organizationId/memberships/:membershipId/status`
+  accepts only `ACTIVE` and `SUSPENDED` in the public DTO and therefore only
+  supports `ACTIVE -> SUSPENDED` and `SUSPENDED -> ACTIVE` through that route.
+- `DELETE /organizations/:organizationId/memberships/:membershipId` and
+  `POST /organizations/:organizationId/memberships/leave` both end in
+  historical `REVOKED` rows; neither route deletes the membership record.
+- Role, status, removal, and leave requests require the canonical
+  `expectedUpdatedAt` observed by the client. A mismatch returns `409` with
+  stable code `CONCURRENT_UPDATE`; successful canonical responses contain the
+  new `updatedAt`. Last-active-OWNER protection returns `409` with stable code
+  `LAST_OWNER_PROTECTED`.
+- Suspended organizations remain blocked from membership routes, and
+  `ADMIN_SUSPENDED_CONTEXT` does not project any `membership.*` capability.
+- Invitation acceptance now permits re-entry when the recipient has only
+  `REVOKED` history in that organization. If an `INVITED`, `ACTIVE`, or
+  `SUSPENDED` membership already exists for that `organizationId + userId`,
+  acceptance fails with conflict.
+- Tenant resolution and `GET /auth/context` ignore `REVOKED` history and never
+  authorize from `INVITED` or `SUSPENDED` memberships. Role and status changes
+  take effect on the next request without minting a new JWT.
+
+POST-GO-LIVE.3.1 organization-update DTOs allow only:
+
+- `legalName`
+- `displayName`
+- `slug`
+- `timezone`
+- `locale`
+- `currency`
+
+`status` remains server-owned and requires the dedicated
+`PATCH /organizations/:organizationId/status` operation. A suspended
+organization remains unreadable to ordinary tenant-aware business routes such
+as Patients, Case Files, Documents, Appointments, and Finance; only the
+organization administrative read/update/status routes opt into suspended-state
+resolution so an authorized `OWNER` can inspect and reactivate the tenant
+without minting a new JWT.

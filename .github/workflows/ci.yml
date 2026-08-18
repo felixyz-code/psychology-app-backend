@@ -75,6 +75,16 @@ jobs:
         env:
           RUN_HEALTH_INTEGRATION_TESTS: "true"
 
+      - name: Run organization configuration PostgreSQL E2E certification
+        run: npm run test:e2e -- --runInBand organization-configuration.e2e-spec.ts
+        env:
+          RUN_ORGANIZATION_CONFIGURATION_TESTS: "true"
+
+      - name: Run organization logo PostgreSQL and filesystem E2E certification
+        run: npm run test:e2e -- --runInBand organization-logo.e2e-spec.ts
+        env:
+          RUN_ORGANIZATION_LOGO_TESTS: "true"
+
       - name: Typecheck
         run: npm run typecheck
 

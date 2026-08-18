@@ -1,0 +1,131 @@
+# Tenant Security Test Contract
+
+## Gate
+
+Each converted module must satisfy this contract in unit, integration, and E2E tests before moving from Shadow to Enforced. Fixtures use two active organizations, distinct memberships and resources, and no PHI.
+
+| Case | Required assertion |
+| --- | --- |
+| Cross-tenant read | A cannot read B's direct ID; `404` |
+| Cross-tenant update/delete | No mutation occurs; `404` |
+| List and relationship traversal | Lists, includes, workspace projections, and child routes exclude B |
+| Document view/download | B metadata and file stream are never opened for A; `404` |
+| Export/report/dashboard | Aggregate contains only selected tenant; no B count, sum, or item |
+| Appointment relation attack | Foreign parent/professional gives `404`; visible incompatible pair gives `400` |
+| Financial relation attack | Foreign patient/appointment gives `404`; visible mismatch gives `400` |
+| Manipulated organization ID | DTO/body/query/path value cannot affect scope or create a link |
+| Inactive organization | Existing token/header cannot resolve; redacted `403` |
+| Suspended or revoked membership | Existing token/header cannot resolve; redacted `403` |
+| Pending invitation | Invitation alone cannot resolve; tenant-required route is `403` |
+| Multiple memberships | Missing selection is `409`; explicit switch isolates results |
+| Tenant switch | Same JWT with two valid headers has no state bleed |
+| Legacy null resource | Shadow records safe discrepancy; Enforced hides it and direct ID is `404` |
+| Capability denial | Visible in-tenant action is `403` without mutation |
+| Future platform exception | Explicit protocol, reason/audit event, narrow scope; no legacy ADMIN bypass |
+
+## Database, concurrency, and Shadow
+
+Integration tests cover scoped `findFirst`, `updateMany`, `deleteMany`, aggregate/groupBy, nested relation reads, and transaction relationship validation. Concurrent contexts prove `AsyncLocalStorage` does not leak tenant data. Database tests prove future constraints/backfill rehearsal without production databases or clinical records.
+
+Shadow telemetry may contain only module, operation, safe reason code, mode, and bounded technical identifiers/counters. It must not contain PHI, notes, document content, email, file path, authorization header, JWT, or raw request body.
+
+## POST-GO-LIVE.2.1D0 module-conversion gates
+
+`POST_GO_LIVE_2_1D0_TENANT_CONVERSION_CONTRACT.md` defines the complete D1
+through D4 gate list. Each converted clinical or financial module must cover at
+least: missing tenant context, invalid tenant context, actor without
+membership, suspended membership, inactive or suspended organization, missing
+capability, unknown capability, actor from another tenant, missing ID,
+cross-tenant ID, two-tenant lists, cross-tenant mutations, cross-tenant
+relations, missing assignment, assignment from another tenant, legacy
+`organizationId = NULL`, sanitized projections, and sanitized logs.
+
+Freelancer coverage must prove a single `OWNER` can operate through
+capabilities plus assignment without accumulated roles, including patient
+creation, self-assignment, workspace access, notes, documents, appointments,
+and finances. Document coverage must prove metadata authorization happens
+before any physical file access.
+Financial-summary coverage must prove all aggregates include `organizationId`
+and exclude legacy null rows.
+
+### POST-GO-LIVE.2.1D1 Patients coverage
+
+Patients certification covers tenant-required HTTP access, selected-tenant
+isolation, cross-tenant direct IDs, legacy `organizationId = NULL` direct IDs,
+body manipulation of `organizationId`/`psychologistId`, freelancer `OWNER`
+create plus self-assignment, assignment-required denials for otherwise visible
+patients, capability denials for non-clinical roles, suspended membership, and
+suspended organization. There is no Patients search, count, assign, or reassign
+endpoint in 2.1D1; those controls remain not applicable until such routes are
+approved.
+
+### POST-GO-LIVE.2.1D3 Scheduling and Financial coverage
+
+Scheduling and financial certification covers tenant-required HTTP access,
+cross-tenant and legacy-null direct IDs, tenant-scoped appointment lists,
+appointment mutation side effects, operational appointment projections,
+clinical-note denial for `RECEPTIONIST`, no appointment-note access for
+unassigned `ADMIN`, server-derived appointment and transaction organization,
+server-derived financial `createdById`, foreign patient/appointment relation
+denial, tenant-scoped transaction lists, tenant-scoped summary `groupBy`, and
+explicit `finance.summary_read` denial for non-financial roles.
+
+Financial summary coverage must continue to prove `report.read` is not a
+substitute for `finance.summary_read`, and that legacy null rows never
+contribute to counts, sums, or balances.
+
+### POST-GO-LIVE.2.1D4 integrated coverage
+
+D4 integrated certification covers the composed D1 through D3 tenant-aware
+contract in one disposable PostgreSQL database. The opt-in suite validates a
+freelancer `OWNER` creating and using a full clinical/financial workflow,
+multi-role separation, two-tenant list/detail/mutation behavior, legacy
+`organizationId = NULL` exclusion, clinical assignment denials, document
+metadata-before-blob authorization, appointment-note projection, server-owned
+financial `createdById`, tenant-scoped Financial Summary filters, tenant
+context errors, and sanitized observability.
+
+The D4 suite intentionally does not replace the D1, D2, D3, tenant PostgreSQL,
+or tenant HTTP opt-in suites. Those remain explicit certification gates for
+their narrower surfaces.
+
+### POST-GO-LIVE.2.1D5 tenant platform certification coverage
+
+D5 tenant platform certification is gated by
+`RUN_TENANT_PLATFORM_CERTIFICATION_TESTS=true`. It validates the final
+readiness package for tenant context resolution, suspended access denial,
+cross-tenant Patient redaction, clinical assignment, receptionist appointment
+notes projection, billing clinical denial, document blob isolation,
+server-owned Financial Transaction fields, tenant-scoped Financial Summary,
+legacy-null exclusion, unknown capability DENY, and representative OpenAPI
+server-owned request schemas.
+
+The D5 suite intentionally does not replace the D1, D2, D3, D4, tenant
+PostgreSQL, tenant HTTP, OpenAPI, or default regression gates. Those remain
+explicit certification inputs for D5-R review.
+
+## POST-GO-LIVE.2.1C0 future organization-domain gate
+
+Before any organization, membership, or invitation endpoint may be marked
+Enforced, its 2.1C2 tests must prove: scoped organization and membership reads;
+cross-tenant `404`; default-deny for every proposed capability; no OWNER grant;
+last-OWNER protection for remove, suspend, downgrade, and leave; recipient
+email/user binding; digest-only persistence and no token/email log output;
+duplicate pending invitation rejection; double acceptance; accept/revoke race;
+and serializable retries only for PostgreSQL serialization failures.
+
+The 2.1C1 migration tests must additionally prove the active-invitation partial
+unique index and the terminal-timestamp consistency constraint. Fixtures must
+use synthetic identifiers and `example.test` email addresses only.
+
+## POST-GO-LIVE.2.1C2 coverage
+
+Organization path scope uses a required resolved context and membership reads
+use sanitized projections. Invitation lifecycle mutations use serializable
+transactions, conditional updates and the 2.1C1 partial pending key. The
+implementation tests malformed tokens, cross-tenant paths, canonicalized
+recipient binding, ADMIN-to-OWNER denial, owner-only invitation
+revoke/resend, old-token invalidation after resend, and the required create/
+create, accept/accept, accept/reject, accept/revoke, accept/resend, and
+resend/resend PostgreSQL concurrency races. Integration certification remains
+required against the local `_test` PostgreSQL database.

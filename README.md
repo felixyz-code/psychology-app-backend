@@ -16,6 +16,7 @@ Backend API for managing authentication, patients, case files, session notes, do
 ## Main Features
 
 * JWT login
+* Public freelancer bootstrap
 * Role-based access
 * Ownership filtering
 * Patient management
@@ -44,6 +45,13 @@ docs/API.md
 docs/DOCKER.md
 docs/ROADMAP.md
 ```
+
+Current Phase 3 closeout references:
+
+* Functional baseline: `6c65a4d8956723071514c40ec6942ecc39c0dcd2`
+* Phase status: `PHASE 3 FUNCTIONAL WORK COMPLETE`
+* Formal closeout status: `PHASE 3 CLOSEOUT - REVIEW PENDING`
+* Closeout document: `docs/POST_GO_LIVE_3_PHASE_CLOSEOUT.md`
 
 ## Local Development
 
@@ -119,6 +127,12 @@ Swagger UI is available at:
 
 Use `POST /auth/login` to obtain a JWT and then use Swagger `Authorize` with Bearer Token.
 
+Swagger also documents the public self-bootstrap route
+`POST /auth/freelancer-bootstrap` for the independent freelancer baseline.
+The route is served only when
+`PUBLIC_FREELANCER_BOOTSTRAP_ENABLED=true`; it remains disabled by default
+until an environment enables it explicitly.
+
 ## Environment Variables
 
 The backend validates runtime configuration during startup. Errors mention the
@@ -134,6 +148,7 @@ UPLOADS_PATH="uploads"
 CORS_ORIGIN="http://localhost:4200,http://localhost:4201"
 SWAGGER_ENABLED="true"
 TRUST_PROXY_HOPS=0
+PUBLIC_FREELANCER_BOOTSTRAP_ENABLED="false"
 ```
 
 Required variables:
@@ -150,6 +165,7 @@ Optional variables:
 - `CORS_ORIGIN`: comma-separated allowed origins. Default: `http://localhost:4200,http://localhost:4201`; production requires an explicit value.
 - `SWAGGER_ENABLED`: `true` or `false`. Defaults to `false` in production and `true` otherwise. Production exposure requires an explicit `true`.
 - `TRUST_PROXY_HOPS`: number of explicitly trusted reverse-proxy hops (`0`, `1` or `2`). Default: `0`; do not enable it without an Infra-defined proxy topology.
+- `PUBLIC_FREELANCER_BOOTSTRAP_ENABLED`: enables the public freelancer bootstrap route. Default: `false`; set `true` explicitly only in approved environments.
 
 Do not use placeholder values from `.env.example` as real secrets.
 
@@ -178,6 +194,29 @@ Demo password:
 ChangeMe123!
 ```
 
+## Observability & Structured Logging
+
+The backend adopts high-performance asynchronous structured JSON logging powered by `nestjs-pino` and `pino-http`.
+
+Key characteristics:
+- **JSON Formatting**: Emits machine-parseable JSON logs to stdout in production, compatible with modern log collectors and Docker `json-file` log rotation.
+- **Trace & Request ID Correlation**: Assigns or propagates the `x-request-id` header across all incoming requests and child loggers (`req.id` / `requestId`).
+- **Health Probes**: Integrates `@nestjs/terminus` health checks for liveness (`/health`, `/health/live`) and readiness (`/health/ready`), verifying PostgreSQL database connectivity, heap/RSS memory limits, and `/app/uploads` disk space.
+
+### Privacy & Sensitive Field Redaction
+
+To prevent sensitive patient data, credentials, and tokens from leaking into logs:
+- **HTTP Header Redaction**: `authorization`, `cookie`, and `set-cookie` headers are automatically stripped.
+- **Payload Redaction**: Sensitive property keys (e.g., `password`, `currentPassword`, `newPassword`, `token`, `secret`, `creditCard`, `credentials`) are scrubbed before logging.
+
+## Administrative Audit & Traceability
+
+Administrative and multi-tenant lifecycle mutations are tracked via a dedicated audit architecture:
+
+- **Entity `AuditLog`**: Stores persistent immutable audit records in PostgreSQL (`timestamp`, `organizationId`, `userId`, `action`, `resourceType`, `resourceId`, `ipAddress`, `userAgent`, `details`).
+- **Decorator `@AuditLog({ action, resourceType })`**: Declaratively annotates controller mutation methods (organization creation, status transitions, role adjustments, invitation acceptance, and asset updates).
+- **Interceptor `AuditInterceptor`**: Automatically extracts the authenticated user ID, resolved organization context, client IP address, and sanitized payload details without blocking primary business logic execution.
+
 ## Project Notes
 
 This backend handles sensitive clinical information.
@@ -185,3 +224,4 @@ This backend handles sensitive clinical information.
 Do not expose passwords, JWTs, clinical notes or personal patient data in logs or error messages.
 
 End of document.
+
