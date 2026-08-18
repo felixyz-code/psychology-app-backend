@@ -4,7 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { EmployeeEligibilityStatus } from '@prisma/client';
+import { EmployeeEligibilityStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../../../../prisma/prisma.service';
 import { CreateEmployeeEligibilityDto } from '../dto/create-employee-eligibility.dto';
 import { BatchEmployeeEligibilityDto } from '../dto/batch-employee-eligibility.dto';
@@ -123,8 +123,9 @@ export class EmployeeEligibilityService {
         });
 
         results.importedCount++;
-      } catch (err: any) {
-        results.errors.push(`Error on ${normalizedEmail}: ${err.message}`);
+      } catch (err: unknown) {
+        const errorMsg = err instanceof Error ? err.message : String(err);
+        results.errors.push(`Error on ${normalizedEmail}: ${errorMsg}`);
       }
     }
 
@@ -136,7 +137,10 @@ export class EmployeeEligibilityService {
     agreementId: string,
     options?: { search?: string; department?: string },
   ) {
-    const where: any = { organizationId, agreementId };
+    const where: Prisma.EmployeeEligibilityWhereInput = {
+      organizationId,
+      agreementId,
+    };
 
     if (options?.department) {
       where.department = options.department;
