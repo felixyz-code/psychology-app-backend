@@ -3,10 +3,12 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { InstrumentVersionStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { InstrumentsService } from './instruments.service';
+import { ScoringEngineService } from './scoring/scoring-engine.service';
 
 describe('InstrumentsService', () => {
   let service: InstrumentsService;
   let prisma: PrismaService;
+  let scoringEngine: ScoringEngineService;
 
   const mockOrgId = '22000000-0000-4000-8000-000000000001';
   const mockInstrumentId = '11111111-1111-4000-8000-111111111111';
@@ -26,16 +28,22 @@ describe('InstrumentsService', () => {
     },
   };
 
+  const mockScoringEngine = {
+    calculate: jest.fn(),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         InstrumentsService,
         { provide: PrismaService, useValue: mockPrismaService },
+        { provide: ScoringEngineService, useValue: mockScoringEngine },
       ],
     }).compile();
 
     service = module.get<InstrumentsService>(InstrumentsService);
     prisma = module.get<PrismaService>(PrismaService);
+    scoringEngine = module.get<ScoringEngineService>(ScoringEngineService);
 
     jest.clearAllMocks();
   });
@@ -233,6 +241,41 @@ describe('InstrumentsService', () => {
           status: InstrumentVersionStatus.DEPRECATED,
         },
       });
+    });
+  });
+
+  describe('calculateScoreForVersion', () => {
+    it('should retrieve version and delegate computation to ScoringEngineService', async () => {
+      const mockVersion = {
+        id: mockVersionId,
+        definitionJson: { items: [] },
+        scoringSpecJson: { strata: [] },
+        instrument: { isSystem: true, organizationId: null },
+      };
+      mockPrismaService.instrumentVersion.findUnique.mockResolvedValue(
+        mockVersion,
+      );
+
+      const expectedScoringResult = {
+        rawScore: 10,
+        normalizedScore: 50,
+        isComplete: true,
+      };
+      mockScoringEngine.calculate.mockReturnValue(expectedScoringResult);
+
+      const responses = { Q1: 1 };
+      const res = await service.calculateScoreForVersion(
+        mockOrgId,
+        mockVersionId,
+        responses,
+      );
+
+      expect(res).toEqual(expectedScoringResult);
+      expect(scoringEngine.calculate).toHaveBeenCalledWith(
+        mockVersion.definitionJson,
+        mockVersion.scoringSpecJson,
+        responses,
+      );
     });
   });
 });

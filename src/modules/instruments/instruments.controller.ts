@@ -33,6 +33,7 @@ import type { TenantContext } from '../../tenant-context/tenant-context.types';
 import { CreateInstrumentVersionDto } from './dto/create-instrument-version.dto';
 import { CreateInstrumentDto } from './dto/create-instrument.dto';
 import { InstrumentsService } from './instruments.service';
+import type { AssessmentResponseMap } from './scoring/scoring.types';
 
 @ApiTags('clinical-instruments')
 @ApiBearerAuth('bearer')
@@ -176,6 +177,27 @@ export class InstrumentsController {
     return this.instrumentsService.publishVersion(
       tenant.organizationId,
       versionId,
+    );
+  }
+
+  @Post('versions/:versionId/calculate-score')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      'Calculate psychometric score for given responses using specific instrument version',
+  })
+  @ApiParam({ name: 'versionId', description: 'InstrumentVersion UUID' })
+  @ApiOkResponse({ description: 'Psychometric score calculated successfully' })
+  @ApiNotFoundResponse({ description: 'Version not found' })
+  calculateScore(
+    @CurrentTenant(true) tenant: TenantContext,
+    @Param('versionId', ParseUUIDPipe) versionId: string,
+    @Body() responses: Record<string, any>,
+  ) {
+    return this.instrumentsService.calculateScoreForVersion(
+      tenant.organizationId,
+      versionId,
+      responses as AssessmentResponseMap,
     );
   }
 }

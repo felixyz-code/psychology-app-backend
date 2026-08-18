@@ -8,10 +8,20 @@ import { InstrumentVersionStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateInstrumentVersionDto } from './dto/create-instrument-version.dto';
 import { CreateInstrumentDto } from './dto/create-instrument.dto';
+import { ScoringEngineService } from './scoring/scoring-engine.service';
+import {
+  AssessmentResponseMap,
+  InstrumentDefinition,
+  ScoringResult,
+  ScoringSpec,
+} from './scoring/scoring.types';
 
 @Injectable()
 export class InstrumentsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly scoringEngine: ScoringEngineService,
+  ) {}
 
   /**
    * List all instruments accessible to a tenant (Global System stock + Tenant custom)
@@ -234,5 +244,22 @@ export class InstrumentsService {
     }
 
     return version;
+  }
+
+  /**
+   * Calculate psychometric score for given responses using a specific instrument version
+   */
+  async calculateScoreForVersion(
+    organizationId: string | null,
+    versionId: string,
+    responses: AssessmentResponseMap,
+  ): Promise<ScoringResult> {
+    const version = await this.getVersionDetails(organizationId, versionId);
+
+    const definition =
+      version.definitionJson as unknown as InstrumentDefinition;
+    const scoringSpec = version.scoringSpecJson as unknown as ScoringSpec;
+
+    return this.scoringEngine.calculate(definition, scoringSpec, responses);
   }
 }
