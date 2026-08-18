@@ -39,6 +39,7 @@ import type { TenantContext } from '../../tenant-context/tenant-context.types';
 import { AssessmentsService } from './assessments.service';
 import { AssignAssessmentDto } from './dto/assign-assessment.dto';
 import { QueryAdministrationsDto } from './dto/query-administrations.dto';
+import { QueryLongitudinalDto } from './dto/query-longitudinal.dto';
 import { SaveResponsesDto } from './dto/save-responses.dto';
 
 @ApiTags('assessments')
@@ -289,4 +290,69 @@ export class AssessmentsController {
   ) {
     return this.assessmentsService.completeByAccessToken(accessToken, dto);
   }
+
+  @ApiBearerAuth('bearer')
+  @ApiUnauthorizedResponse({ description: 'Authentication is required' })
+  @ApiForbiddenResponse({ description: 'Forbidden tenant access' })
+  @ApiHeader({
+    name: 'X-Organization-Id',
+    required: false,
+    description: 'Optional UUID selection hint for tenant context.',
+  })
+  @Get('administrations/:id/report')
+  @ApiOperation({
+    summary:
+      'Generate full structured psychometric clinical report (NOM-004-SSA3-2012 / ITC compliant)',
+  })
+  @ApiParam({ name: 'id', description: 'Assessment administration UUID' })
+  @ApiOkResponse({
+    description: 'Structured clinical psychometric report generated successfully',
+  })
+  @ApiNotFoundResponse({
+    description: 'Assessment administration not found in tenant',
+  })
+  @ApiUnprocessableEntityResponse({
+    description: 'Assessment has not been completed yet — report requires finalized evaluation',
+  })
+  getReport(
+    @CurrentTenant(true) tenant: TenantContext,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.assessmentsService.getReport(tenant.organizationId, id);
+  }
+
+  @ApiBearerAuth('bearer')
+  @ApiUnauthorizedResponse({ description: 'Authentication is required' })
+  @ApiForbiddenResponse({ description: 'Forbidden tenant access' })
+  @ApiHeader({
+    name: 'X-Organization-Id',
+    required: false,
+    description: 'Optional UUID selection hint for tenant context.',
+  })
+  @Get('patients/:patientId/longitudinal')
+  @ApiOperation({
+    summary:
+      'Get longitudinal psychometric time series for a patient with clinical delta analysis',
+  })
+  @ApiParam({
+    name: 'patientId',
+    description: 'Patient UUID to retrieve longitudinal assessment series',
+  })
+  @ApiOkResponse({
+    description:
+      'Longitudinal psychometric series with MCiD deltas and trend summary returned',
+  })
+  @ApiNotFoundResponse({ description: 'Patient not found in tenant' })
+  getLongitudinal(
+    @CurrentTenant(true) tenant: TenantContext,
+    @Param('patientId', ParseUUIDPipe) patientId: string,
+    @Query() query: QueryLongitudinalDto,
+  ) {
+    return this.assessmentsService.getLongitudinalSeries(
+      tenant.organizationId,
+      patientId,
+      query,
+    );
+  }
 }
+
