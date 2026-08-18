@@ -502,4 +502,121 @@ export class AssessmentsService {
       },
     };
   }
+
+  async findByAccessToken(accessToken: string) {
+    const administration =
+      await this.prisma.assessmentAdministration.findUnique({
+        where: { accessToken },
+        include: {
+          patient: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+            },
+          },
+          instrumentVersion: {
+            include: {
+              instrument: {
+                select: {
+                  id: true,
+                  code: true,
+                  name: true,
+                  targetPopulation: true,
+                },
+              },
+            },
+          },
+          responses: {
+            orderBy: { createdAt: 'asc' },
+          },
+          result: true,
+        },
+      });
+
+    if (!administration) {
+      throw new NotFoundException(
+        'Assessment runner link invalid or not found',
+      );
+    }
+
+    if (
+      administration.status === AdministrationStatus.EXPIRED ||
+      (administration.expiresAt && new Date() > administration.expiresAt)
+    ) {
+      if (
+        administration.status !== AdministrationStatus.EXPIRED &&
+        administration.status !== AdministrationStatus.COMPLETED
+      ) {
+        await this.prisma.assessmentAdministration.update({
+          where: { id: administration.id },
+          data: { status: AdministrationStatus.EXPIRED },
+        });
+      }
+      throw new ConflictException(
+        'Assessment link has expired (ASSESSMENT_EXPIRED)',
+      );
+    }
+
+    return {
+      id: administration.id,
+      organizationId: administration.organizationId,
+      status: administration.status,
+      patient: {
+        id: administration.patient.id,
+        firstName: administration.patient.firstName,
+        lastName: administration.patient.lastName,
+      },
+      instrumentVersion: {
+        id: administration.instrumentVersion.id,
+        versionNumber: administration.instrumentVersion.versionNumber,
+        definitionJson: administration.instrumentVersion.definitionJson,
+        instrument: administration.instrumentVersion.instrument,
+      },
+      responses: administration.responses.map((r) => ({
+        id: r.id,
+        itemCode: r.itemCode,
+        responseValue: r.responseValue,
+        numericWeight: r.numericWeight,
+      })),
+      result: administration.result,
+      expiresAt: administration.expiresAt,
+      startedAt: administration.startedAt,
+      completedAt: administration.completedAt,
+    };
+  }
+
+  async saveResponsesByAccessToken(accessToken: string, dto: SaveResponsesDto) {
+    const administration =
+      await this.prisma.assessmentAdministration.findUnique({
+        where: { accessToken },
+      });
+
+    if (!administration) {
+      throw new NotFoundException(
+        'Assessment runner link invalid or not found',
+      );
+    }
+
+    return this.saveResponses(
+      administration.organizationId,
+      administration.id,
+      dto,
+    );
+  }
+
+  async completeByAccessToken(accessToken: string) {
+    const administration =
+      await this.prisma.assessmentAdministration.findUnique({
+        where: { accessToken },
+      });
+
+    if (!administration) {
+      throw new NotFoundException(
+        'Assessment runner link invalid or not found',
+      );
+    }
+
+    return this.complete(administration.organizationId, administration.id);
+  }
 }

@@ -34,6 +34,9 @@ describe('AssessmentsController', () => {
     findOne: jest.fn(),
     saveResponses: jest.fn(),
     complete: jest.fn(),
+    findByAccessToken: jest.fn(),
+    saveResponsesByAccessToken: jest.fn(),
+    completeByAccessToken: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -147,6 +150,55 @@ describe('AssessmentsController', () => {
         mockTenant.organizationId,
         'adm-1',
       );
+      expect(res.status).toBe(AdministrationStatus.COMPLETED);
+    });
+  });
+
+  describe('findPublicRunner', () => {
+    it('should call service.findByAccessToken with accessToken', async () => {
+      const mockToken = 'sec_eval_123';
+      mockAssessmentsService.findByAccessToken.mockResolvedValue({
+        id: 'adm-1',
+        status: AdministrationStatus.ASSIGNED,
+      });
+
+      const res = await controller.findPublicRunner(mockToken);
+
+      expect(service.findByAccessToken).toHaveBeenCalledWith(mockToken);
+      expect(res.id).toBe('adm-1');
+    });
+  });
+
+  describe('savePublicResponses', () => {
+    it('should call service.saveResponsesByAccessToken with accessToken and dto', async () => {
+      const mockToken = 'sec_eval_123';
+      const dto = { responses: { PHQ9_1: 2 } };
+      mockAssessmentsService.saveResponsesByAccessToken.mockResolvedValue({
+        status: AdministrationStatus.IN_PROGRESS,
+        savedCount: 1,
+      });
+
+      const res = await controller.savePublicResponses(mockToken, dto);
+
+      expect(service.saveResponsesByAccessToken).toHaveBeenCalledWith(
+        mockToken,
+        dto,
+      );
+      expect(res.status).toBe(AdministrationStatus.IN_PROGRESS);
+    });
+  });
+
+  describe('completePublic', () => {
+    it('should call service.completeByAccessToken with accessToken', async () => {
+      const mockToken = 'sec_eval_123';
+      mockAssessmentsService.completeByAccessToken.mockResolvedValue({
+        id: 'adm-1',
+        status: AdministrationStatus.COMPLETED,
+      });
+
+      const res = await controller.completePublic(mockToken);
+
+      expect(service.completeByAccessToken).toHaveBeenCalledWith(mockToken);
       expect(res.status).toBe(AdministrationStatus.COMPLETED);
     });
   });
