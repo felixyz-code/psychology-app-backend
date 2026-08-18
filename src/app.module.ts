@@ -33,6 +33,7 @@ import { BillingModule } from './billing/billing.module';
 import { BranchesModule } from './modules/enterprise/branches/branches.module';
 import { CorporateModule } from './modules/enterprise/corporate/corporate.module';
 import { InstrumentsModule } from './modules/instruments/instruments.module';
+import { AssessmentsModule } from './modules/assessments/assessments.module';
 
 @Module({
   imports: [
@@ -61,6 +62,7 @@ import { InstrumentsModule } from './modules/instruments/instruments.module';
     BranchesModule,
     CorporateModule,
     InstrumentsModule,
+    AssessmentsModule,
     PaefGovernanceModule,
   ],
   controllers: [AppController],
