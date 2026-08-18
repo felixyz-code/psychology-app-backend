@@ -40,17 +40,21 @@ describePersistence('Organization logo asset persistence', () => {
   });
 
   afterAll(async () => {
-    await prisma?.organization.deleteMany({
-      where: {
-        id: {
-          in: [
-            existingOrganizationId,
-            duplicateKeyOrganizationId,
-            cascadeOrganizationId,
-          ],
+    try {
+      await prisma?.organization.deleteMany({
+        where: {
+          id: {
+            in: [
+              existingOrganizationId,
+              duplicateKeyOrganizationId,
+              cascadeOrganizationId,
+            ],
+          },
         },
-      },
-    });
+      });
+    } catch {
+      // Ignore cleanup constraint errors on immutable audit logs
+    }
     await prisma?.$disconnect();
   });
 

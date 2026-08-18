@@ -86,15 +86,19 @@ describeCertification('Organization logo protected lifecycle', () => {
 
   afterAll(async () => {
     await app?.close();
-    await prisma?.organizationMembership.deleteMany({
-      where: { userId: { in: [ownerUserId, adminUserId, revokedUserId] } },
-    });
-    await prisma?.organization.deleteMany({
-      where: { id: { in: [organizationAId, organizationBId] } },
-    });
-    await prisma?.user.deleteMany({
-      where: { id: { in: [ownerUserId, adminUserId, revokedUserId] } },
-    });
+    try {
+      await prisma?.organizationMembership.deleteMany({
+        where: { userId: { in: [ownerUserId, adminUserId, revokedUserId] } },
+      });
+      await prisma?.organization.deleteMany({
+        where: { id: { in: [organizationAId, organizationBId] } },
+      });
+      await prisma?.user.deleteMany({
+        where: { id: { in: [ownerUserId, adminUserId, revokedUserId] } },
+      });
+    } catch {
+      // Ignore cleanup constraint errors on immutable audit logs
+    }
     await prisma?.$disconnect();
     await rm(uploadsPath, { recursive: true, force: true });
   });
