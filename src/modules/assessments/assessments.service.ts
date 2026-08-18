@@ -605,7 +605,7 @@ export class AssessmentsService {
     );
   }
 
-  async completeByAccessToken(accessToken: string) {
+  async completeByAccessToken(accessToken: string, dto?: SaveResponsesDto) {
     const administration =
       await this.prisma.assessmentAdministration.findUnique({
         where: { accessToken },
@@ -614,6 +614,32 @@ export class AssessmentsService {
     if (!administration) {
       throw new NotFoundException(
         'Assessment runner link invalid or not found',
+      );
+    }
+
+    if (
+      administration.status === AdministrationStatus.EXPIRED ||
+      (administration.expiresAt && new Date() > administration.expiresAt)
+    ) {
+      if (
+        administration.status !== AdministrationStatus.EXPIRED &&
+        administration.status !== AdministrationStatus.COMPLETED
+      ) {
+        await this.prisma.assessmentAdministration.update({
+          where: { id: administration.id },
+          data: { status: AdministrationStatus.EXPIRED },
+        });
+      }
+      throw new ConflictException(
+        'Assessment link has expired (ASSESSMENT_EXPIRED)',
+      );
+    }
+
+    if (dto && dto.responses && Object.keys(dto.responses).length > 0) {
+      await this.saveResponses(
+        administration.organizationId,
+        administration.id,
+        dto,
       );
     }
 

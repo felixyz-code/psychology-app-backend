@@ -444,5 +444,27 @@ describe('AssessmentsService', () => {
         service.completeByAccessToken('nonexistent'),
       ).rejects.toThrow(NotFoundException);
     });
+
+    it('should save responses if dto is provided before calling complete', async () => {
+      mockPrismaService.assessmentAdministration.findUnique.mockResolvedValue({
+        id: 'adm-123',
+        organizationId: 'org-1',
+        status: AdministrationStatus.ASSIGNED,
+      });
+
+      const saveSpy = jest
+        .spyOn(service, 'saveResponses')
+        .mockResolvedValue({} as any);
+      const completeSpy = jest
+        .spyOn(service, 'complete')
+        .mockResolvedValue({ status: AdministrationStatus.COMPLETED } as any);
+
+      const dto = { responses: { PHQ9_1: 2 } };
+      const res = await service.completeByAccessToken('token-123', dto);
+
+      expect(saveSpy).toHaveBeenCalledWith('org-1', 'adm-123', dto);
+      expect(completeSpy).toHaveBeenCalledWith('org-1', 'adm-123');
+      expect(res.status).toBe(AdministrationStatus.COMPLETED);
+    });
   });
 });

@@ -189,16 +189,20 @@ describe('AssessmentsController', () => {
   });
 
   describe('completePublic', () => {
-    it('should call service.completeByAccessToken with accessToken', async () => {
+    it('should call service.completeByAccessToken with accessToken and optional dto', async () => {
       const mockToken = 'sec_eval_123';
+      const dto = { responses: { PHQ9_1: 3 } };
       mockAssessmentsService.completeByAccessToken.mockResolvedValue({
         id: 'adm-1',
         status: AdministrationStatus.COMPLETED,
       });
 
-      const res = await controller.completePublic(mockToken);
+      const res = await controller.completePublic(mockToken, dto);
 
-      expect(service.completeByAccessToken).toHaveBeenCalledWith(mockToken);
+      expect(service.completeByAccessToken).toHaveBeenCalledWith(
+        mockToken,
+        dto,
+      );
       expect(res.status).toBe(AdministrationStatus.COMPLETED);
     });
   });

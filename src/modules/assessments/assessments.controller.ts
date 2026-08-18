@@ -14,6 +14,7 @@ import {
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
+  ApiBody,
   ApiConflictResponse,
   ApiCreatedResponse,
   ApiForbiddenResponse,
@@ -256,11 +257,17 @@ export class AssessmentsController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary:
-      'Public finalization of assessment by patient, triggering scoring engine calculation',
+      'Finalize evaluation from public runner by access token, calculate score and generate result',
   })
   @ApiParam({
     name: 'accessToken',
     description: 'Unique evaluation access token',
+  })
+  @ApiBody({
+    type: SaveResponsesDto,
+    required: false,
+    description:
+      'Optional responses snapshot to save atomically before calculating score',
   })
   @ApiOkResponse({
     description: 'Assessment completed and deterministic score calculated',
@@ -276,7 +283,10 @@ export class AssessmentsController {
     description:
       'Assessment is incomplete. Missing required items for psychometric scoring.',
   })
-  completePublic(@Param('accessToken') accessToken: string) {
-    return this.assessmentsService.completeByAccessToken(accessToken);
+  completePublic(
+    @Param('accessToken') accessToken: string,
+    @Body() dto?: SaveResponsesDto,
+  ) {
+    return this.assessmentsService.completeByAccessToken(accessToken, dto);
   }
 }
