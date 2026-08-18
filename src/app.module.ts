@@ -32,6 +32,7 @@ import { EntitlementsModule } from './entitlements/entitlements.module';
 import { BillingModule } from './billing/billing.module';
 import { BranchesModule } from './modules/enterprise/branches/branches.module';
 import { CorporateModule } from './modules/enterprise/corporate/corporate.module';
+import { InstrumentsModule } from './modules/instruments/instruments.module';
 
 @Module({
   imports: [
@@ -59,6 +60,7 @@ import { CorporateModule } from './modules/enterprise/corporate/corporate.module
     BillingModule,
     BranchesModule,
     CorporateModule,
+    InstrumentsModule,
     PaefGovernanceModule,
   ],
   controllers: [AppController],

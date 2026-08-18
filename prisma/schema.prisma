@@ -191,6 +191,7 @@ model Organization {
   benefitPools     BenefitPool[]
   employeeEligibilities EmployeeEligibility[]
   benefitDebitLogs BenefitDebitLog[]
+  instruments      Instrument[]
   createdAt        DateTime                 @default(now()) @db.Timestamptz(3)
   updatedAt        DateTime                 @updatedAt @db.Timestamptz(3)
 
@@ -781,6 +782,49 @@ model BenefitDebitLog {
   @@index([eligibilityId])
   @@index([appointmentId])
   @@map("benefit_debit_logs")
+}
+
+enum InstrumentVersionStatus {
+  DRAFT
+  PUBLISHED
+  DEPRECATED
+}
+
+model Instrument {
+  id               String              @id @default(uuid()) @db.Uuid
+  organizationId   String?             @map("organization_id") @db.Uuid
+  code             String              @db.VarChar(50)
+  name             String              @db.VarChar(150)
+  description      String?             @db.Text
+  targetPopulation String?             @map("target_population") @db.VarChar(150)
+  isSystem         Boolean             @default(false) @map("is_system")
+  createdAt        DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime            @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization     Organization?       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  versions         InstrumentVersion[]
+
+  @@unique([organizationId, code])
+  @@index([organizationId, isSystem])
+  @@index([code, isSystem])
+  @@map("instruments")
+}
+
+model InstrumentVersion {
+  id              String                  @id @default(uuid()) @db.Uuid
+  instrumentId    String                  @map("instrument_id") @db.Uuid
+  versionNumber   Int                     @default(1) @map("version_number")
+  status          InstrumentVersionStatus @default(DRAFT)
+  definitionJson  Json                    @map("definition_json")
+  scoringSpecJson Json                    @map("scoring_spec_json")
+  createdAt       DateTime                @default(now()) @map("created_at") @db.Timestamptz(3)
+  publishedAt     DateTime?               @map("published_at") @db.Timestamptz(3)
+
+  instrument      Instrument              @relation(fields: [instrumentId], references: [id], onDelete: Cascade)
+
+  @@unique([instrumentId, versionNumber])
+  @@index([instrumentId, status])
+  @@map("instrument_versions")
 }
 
 
