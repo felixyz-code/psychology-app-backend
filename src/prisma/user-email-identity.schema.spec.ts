@@ -16,11 +16,9 @@ const migration = readFileSync(
 
 describe('user email identity persistence schema contract', () => {
   it('adds a canonical normalizedEmail field to the live user schema', () => {
-    expect(schema).toContain(
-      'email                 String                   @unique @db.VarChar(255)',
-    );
-    expect(schema).toContain(
-      'normalizedEmail       String                   @unique @db.VarChar(255)',
+    expect(schema).toMatch(/email\s+String\s+@unique\s+@db\.VarChar\(255\)/);
+    expect(schema).toMatch(
+      /normalizedEmail\s+String\s+@unique\s+@db\.VarChar\(255\)/,
     );
   });
 

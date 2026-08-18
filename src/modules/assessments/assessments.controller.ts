@@ -29,6 +29,7 @@ import {
 import { OrganizationStatus } from '@prisma/client';
 import { AuditLog } from '../../audit-logs/decorators/audit-log.decorator';
 import { CurrentUser } from '../../auth/decorators/current-user.decorator';
+import { Public } from '../../auth/decorators/public.decorator';
 import type { AuthenticatedUser } from '../../auth/types/authenticated-user.type';
 import { AllowedOrganizationStatuses } from '../../tenant-context/decorators/allowed-organization-statuses.decorator';
 import { CurrentTenant } from '../../tenant-context/decorators/current-tenant.decorator';
@@ -40,14 +41,6 @@ import { QueryAdministrationsDto } from './dto/query-administrations.dto';
 import { SaveResponsesDto } from './dto/save-responses.dto';
 
 @ApiTags('assessments')
-@ApiBearerAuth('bearer')
-@ApiUnauthorizedResponse({ description: 'Authentication is required' })
-@ApiForbiddenResponse({ description: 'Forbidden tenant access' })
-@ApiHeader({
-  name: 'X-Organization-Id',
-  required: false,
-  description: 'Optional UUID selection hint for tenant context.',
-})
 @TenantRequired()
 @AllowedOrganizationStatuses(
   OrganizationStatus.ACTIVE,
@@ -58,6 +51,14 @@ import { SaveResponsesDto } from './dto/save-responses.dto';
 export class AssessmentsController {
   constructor(private readonly assessmentsService: AssessmentsService) {}
 
+  @ApiBearerAuth('bearer')
+  @ApiUnauthorizedResponse({ description: 'Authentication is required' })
+  @ApiForbiddenResponse({ description: 'Forbidden tenant access' })
+  @ApiHeader({
+    name: 'X-Organization-Id',
+    required: false,
+    description: 'Optional UUID selection hint for tenant context.',
+  })
   @Post('administrations')
   @HttpCode(HttpStatus.CREATED)
   @AuditLog({
@@ -81,6 +82,14 @@ export class AssessmentsController {
     return this.assessmentsService.assign(tenant.organizationId, user.id, dto);
   }
 
+  @ApiBearerAuth('bearer')
+  @ApiUnauthorizedResponse({ description: 'Authentication is required' })
+  @ApiForbiddenResponse({ description: 'Forbidden tenant access' })
+  @ApiHeader({
+    name: 'X-Organization-Id',
+    required: false,
+    description: 'Optional UUID selection hint for tenant context.',
+  })
   @Get('administrations')
   @ApiOperation({
     summary:
@@ -96,6 +105,14 @@ export class AssessmentsController {
     return this.assessmentsService.findAll(tenant.organizationId, query);
   }
 
+  @ApiBearerAuth('bearer')
+  @ApiUnauthorizedResponse({ description: 'Authentication is required' })
+  @ApiForbiddenResponse({ description: 'Forbidden tenant access' })
+  @ApiHeader({
+    name: 'X-Organization-Id',
+    required: false,
+    description: 'Optional UUID selection hint for tenant context.',
+  })
   @Get('administrations/:id')
   @ApiOperation({
     summary:
@@ -113,6 +130,14 @@ export class AssessmentsController {
     return this.assessmentsService.findOne(tenant.organizationId, id);
   }
 
+  @ApiBearerAuth('bearer')
+  @ApiUnauthorizedResponse({ description: 'Authentication is required' })
+  @ApiForbiddenResponse({ description: 'Forbidden tenant access' })
+  @ApiHeader({
+    name: 'X-Organization-Id',
+    required: false,
+    description: 'Optional UUID selection hint for tenant context.',
+  })
   @Patch('administrations/:id/responses')
   @HttpCode(HttpStatus.OK)
   @AuditLog({
@@ -142,6 +167,14 @@ export class AssessmentsController {
     );
   }
 
+  @ApiBearerAuth('bearer')
+  @ApiUnauthorizedResponse({ description: 'Authentication is required' })
+  @ApiForbiddenResponse({ description: 'Forbidden tenant access' })
+  @ApiHeader({
+    name: 'X-Organization-Id',
+    required: false,
+    description: 'Optional UUID selection hint for tenant context.',
+  })
   @Post('administrations/:id/complete')
   @HttpCode(HttpStatus.OK)
   @AuditLog({
@@ -170,5 +203,80 @@ export class AssessmentsController {
     @Param('id', ParseUUIDPipe) id: string,
   ) {
     return this.assessmentsService.complete(tenant.organizationId, id);
+  }
+
+  @Public()
+  @Get('public/runner/:accessToken')
+  @ApiOperation({
+    summary:
+      'Public remote runner endpoint to load assessment for patient by access token',
+  })
+  @ApiParam({
+    name: 'accessToken',
+    description: 'Unique evaluation access token',
+  })
+  @ApiOkResponse({
+    description: 'Assessment definition and previous responses retrieved',
+  })
+  @ApiNotFoundResponse({
+    description: 'Assessment runner link invalid or not found',
+  })
+  @ApiConflictResponse({ description: 'Assessment link has expired' })
+  findPublicRunner(@Param('accessToken') accessToken: string) {
+    return this.assessmentsService.findByAccessToken(accessToken);
+  }
+
+  @Public()
+  @Patch('public/runner/:accessToken/responses')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      'Public progressive auto-save of patient responses by access token',
+  })
+  @ApiParam({
+    name: 'accessToken',
+    description: 'Unique evaluation access token',
+  })
+  @ApiOkResponse({ description: 'Responses saved successfully' })
+  @ApiNotFoundResponse({
+    description: 'Assessment runner link invalid or not found',
+  })
+  @ApiConflictResponse({
+    description: 'Assessment is locked (completed, cancelled or expired)',
+  })
+  savePublicResponses(
+    @Param('accessToken') accessToken: string,
+    @Body() dto: SaveResponsesDto,
+  ) {
+    return this.assessmentsService.saveResponsesByAccessToken(accessToken, dto);
+  }
+
+  @Public()
+  @Post('public/runner/:accessToken/complete')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      'Public finalization of assessment by patient, triggering scoring engine calculation',
+  })
+  @ApiParam({
+    name: 'accessToken',
+    description: 'Unique evaluation access token',
+  })
+  @ApiOkResponse({
+    description: 'Assessment completed and deterministic score calculated',
+  })
+  @ApiNotFoundResponse({
+    description: 'Assessment runner link invalid or not found',
+  })
+  @ApiConflictResponse({
+    description:
+      'Assessment is already completed (ASSESSMENT_ALREADY_COMPLETED)',
+  })
+  @ApiUnprocessableEntityResponse({
+    description:
+      'Assessment is incomplete. Missing required items for psychometric scoring.',
+  })
+  completePublic(@Param('accessToken') accessToken: string) {
+    return this.assessmentsService.completeByAccessToken(accessToken);
   }
 }

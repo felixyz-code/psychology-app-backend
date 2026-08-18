@@ -38,6 +38,7 @@ describe('AssessmentsService', () => {
       count: jest.fn(),
       findMany: jest.fn(),
       findFirst: jest.fn(),
+      findUnique: jest.fn(),
       update: jest.fn(),
     },
     assessmentResponse: {
@@ -326,6 +327,122 @@ describe('AssessmentsService', () => {
       await expect(
         service.complete(mockOrgId, mockAdministrationId),
       ).rejects.toThrow(ConflictException);
+    });
+  });
+
+  describe('findByAccessToken', () => {
+    const mockToken = 'sec_eval_abcdef123456';
+
+    it('should return runner details for valid access token', async () => {
+      mockPrismaService.assessmentAdministration.findUnique.mockResolvedValue({
+        id: mockAdministrationId,
+        organizationId: mockOrgId,
+        status: AdministrationStatus.ASSIGNED,
+        accessToken: mockToken,
+        patient: { id: mockPatientId, firstName: 'Carlos', lastName: 'Gomez' },
+        instrumentVersion: {
+          id: mockVersionId,
+          versionNumber: 1,
+          definitionJson: { items: [{ code: 'PHQ9_1', prompt: 'Item 1' }] },
+          instrument: {
+            id: 'inst-1',
+            code: 'PHQ-9',
+            name: 'PHQ-9',
+            targetPopulation: 'Adults',
+          },
+        },
+        responses: [
+          {
+            id: 'resp-1',
+            itemCode: 'PHQ9_1',
+            responseValue: 2,
+            numericWeight: 2,
+          },
+        ],
+        result: null,
+        expiresAt: new Date(Date.now() + 86400000),
+        startedAt: null,
+        completedAt: null,
+      });
+
+      const result = await service.findByAccessToken(mockToken);
+
+      expect(result.id).toBe(mockAdministrationId);
+      expect(result.patient.firstName).toBe('Carlos');
+      expect(result.instrumentVersion.instrument.code).toBe('PHQ-9');
+      expect(result.responses).toHaveLength(1);
+    });
+
+    it('should throw NotFoundException if access token is not found', async () => {
+      mockPrismaService.assessmentAdministration.findUnique.mockResolvedValue(
+        null,
+      );
+
+      await expect(service.findByAccessToken('invalid_token')).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+
+    it('should throw ConflictException if access token has expired', async () => {
+      mockPrismaService.assessmentAdministration.findUnique.mockResolvedValue({
+        id: mockAdministrationId,
+        organizationId: mockOrgId,
+        status: AdministrationStatus.ASSIGNED,
+        accessToken: mockToken,
+        expiresAt: new Date(Date.now() - 86400000), // in the past
+      });
+
+      await expect(service.findByAccessToken(mockToken)).rejects.toThrow(
+        ConflictException,
+      );
+    });
+  });
+
+  describe('saveResponsesByAccessToken', () => {
+    const mockToken = 'sec_eval_abcdef123456';
+
+    it('should delegate to saveResponses for valid access token', async () => {
+      mockPrismaService.assessmentAdministration.findUnique.mockResolvedValue({
+        id: mockAdministrationId,
+        organizationId: mockOrgId,
+        status: AdministrationStatus.ASSIGNED,
+      });
+
+      mockPrismaService.assessmentAdministration.findFirst.mockResolvedValue({
+        id: mockAdministrationId,
+        organizationId: mockOrgId,
+        status: AdministrationStatus.ASSIGNED,
+      });
+
+      mockPrismaService.assessmentResponse.count.mockResolvedValue(1);
+
+      const result = await service.saveResponsesByAccessToken(mockToken, {
+        responses: { PHQ9_1: 2 },
+      });
+
+      expect(result.administrationId).toBe(mockAdministrationId);
+    });
+
+    it('should throw NotFoundException if token does not exist', async () => {
+      mockPrismaService.assessmentAdministration.findUnique.mockResolvedValue(
+        null,
+      );
+
+      await expect(
+        service.saveResponsesByAccessToken('nonexistent', { responses: {} }),
+      ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('completeByAccessToken', () => {
+    it('should throw NotFoundException if token does not exist', async () => {
+      mockPrismaService.assessmentAdministration.findUnique.mockResolvedValue(
+        null,
+      );
+
+      await expect(
+        service.completeByAccessToken('nonexistent'),
+      ).rejects.toThrow(NotFoundException);
     });
   });
 });
