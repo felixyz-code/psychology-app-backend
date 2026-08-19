@@ -34,6 +34,7 @@ import { BranchesModule } from './modules/enterprise/branches/branches.module';
 import { CorporateModule } from './modules/enterprise/corporate/corporate.module';
 import { InstrumentsModule } from './modules/instruments/instruments.module';
 import { AssessmentsModule } from './modules/assessments/assessments.module';
+import { UserProfileModule } from './user-profile/user-profile.module';
 
 @Module({
   imports: [
@@ -64,6 +65,7 @@ import { AssessmentsModule } from './modules/assessments/assessments.module';
     InstrumentsModule,
     AssessmentsModule,
     PaefGovernanceModule,
+    UserProfileModule,
   ],
   controllers: [AppController],
   providers: [

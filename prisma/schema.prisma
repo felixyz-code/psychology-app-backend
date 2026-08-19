@@ -236,13 +236,46 @@ model PsychologistProfile {
   userId           String                    @unique @db.Uuid
   professionalName String                    @db.VarChar(150)
   licenseNumber    String?                   @db.VarChar(100)
+  phone            String?                   @db.VarChar(30)
+  specialties      String[]                  @default([])
+  bio              String?                   @db.Text
   status           PsychologistProfileStatus @default(LEGACY_UNVERIFIED)
   verifiedAt       DateTime?                 @db.Timestamptz(3)
   user             User                      @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  avatarAsset      UserAvatarAsset?
+  signatureAsset   UserSignatureAsset?
   createdAt        DateTime                  @default(now()) @db.Timestamptz(3)
   updatedAt        DateTime                  @updatedAt @db.Timestamptz(3)
 
   @@map("psychologist_profiles")
+}
+
+model UserAvatarAsset {
+  userId      String              @id @db.Uuid
+  storageKey  String              @unique @db.Text
+  mimeType    String              @db.VarChar(100)
+  byteSize    Int                 @db.Integer
+  width       Int                 @db.Integer
+  height      Int                 @db.Integer
+  profile     PsychologistProfile @relation(fields: [userId], references: [userId], onDelete: Cascade, onUpdate: Cascade)
+  createdAt   DateTime            @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime            @updatedAt @db.Timestamptz(3)
+
+  @@map("user_avatar_assets")
+}
+
+model UserSignatureAsset {
+  userId      String              @id @db.Uuid
+  storageKey  String              @unique @db.Text
+  mimeType    String              @db.VarChar(100)
+  byteSize    Int                 @db.Integer
+  width       Int                 @db.Integer
+  height      Int                 @db.Integer
+  profile     PsychologistProfile @relation(fields: [userId], references: [userId], onDelete: Cascade, onUpdate: Cascade)
+  createdAt   DateTime            @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime            @updatedAt @db.Timestamptz(3)
+
+  @@map("user_signature_assets")
 }
 
 model OrganizationSettings {
