@@ -34,6 +34,10 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { AuthenticatedUser } from '../auth/types/authenticated-user.type';
 import { SkipTenantContext } from '../tenant-context/decorators/skip-tenant-context.decorator';
 import { UserAssetResponseDto } from './dto/user-asset-response.dto';
+import {
+  UpdateUserPreferencesDto,
+  UserPreferencesResponseDto,
+} from './dto/user-preferences.dto';
 import { UserProfileResponseDto } from './dto/user-profile-response.dto';
 import { UpdateUserProfileDto } from './dto/user-profile.dto';
 import { UserProfileService } from './user-profile.service';
@@ -50,6 +54,25 @@ import {
 @Controller('users/me')
 export class UserProfileController {
   constructor(private readonly userProfileService: UserProfileService) {}
+
+  @Get('preferences')
+  @ApiOperation({ summary: 'Get current authenticated user preferences' })
+  @ApiOkResponse({ type: UserPreferencesResponseDto })
+  getPreferences(@CurrentUser() user: AuthenticatedUser) {
+    return this.userProfileService.getPreferences(user.id);
+  }
+
+  @Patch('preferences')
+  @ApiOperation({ summary: 'Update user notification, timezone and localization preferences' })
+  @ApiBody({ type: UpdateUserPreferencesDto })
+  @ApiOkResponse({ type: UserPreferencesResponseDto })
+  @ApiBadRequestResponse({ description: 'Validation failed' })
+  updatePreferences(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: UpdateUserPreferencesDto,
+  ) {
+    return this.userProfileService.updatePreferences(user.id, dto);
+  }
 
   @Get('profile')
   @ApiOperation({ summary: 'Get current authenticated user profile' })

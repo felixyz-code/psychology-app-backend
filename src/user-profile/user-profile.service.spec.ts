@@ -27,6 +27,11 @@ describe('UserProfileService', () => {
       upsert: ReturnType<typeof jest.fn>;
       delete: ReturnType<typeof jest.fn>;
     };
+    userPreferences: {
+      findUnique: ReturnType<typeof jest.fn>;
+      create: ReturnType<typeof jest.fn>;
+      upsert: ReturnType<typeof jest.fn>;
+    };
   };
   let storage: {
     writeAvatar: ReturnType<typeof jest.fn>;
@@ -58,6 +63,11 @@ describe('UserProfileService', () => {
         findUnique: jest.fn(),
         upsert: jest.fn(),
         delete: jest.fn(),
+      },
+      userPreferences: {
+        findUnique: jest.fn(),
+        create: jest.fn(),
+        upsert: jest.fn(),
       },
     };
     storage = {
@@ -255,6 +265,115 @@ describe('UserProfileService', () => {
       });
       expect(storage.deleteSignatureFile).toHaveBeenCalledWith('old-signature.png');
       expect(result.rowState).toBe('ABSENT');
+    });
+  });
+
+  describe('preferences management', () => {
+    it('throws NotFoundException when user does not exist on getPreferences', async () => {
+      prisma.user.findUnique.mockResolvedValue(null);
+      await expect(service.getPreferences('non-existent')).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+
+    it('returns existing preferences if available', async () => {
+      prisma.user.findUnique.mockResolvedValue({
+        id: 'user-1',
+        preferences: {
+          userId: 'user-1',
+          emailNotifications: true,
+          inAppNotifications: true,
+          appointmentReminders: true,
+          reminderAdvanceMinutes: 30,
+          sessionDigest: false,
+          timeZone: 'America/Bogota',
+          timeFormat: 'TWENTY_FOUR_HOUR',
+          dateFormat: 'YYYY_MM_DD',
+          locale: 'es-CO',
+          weekStartsOn: 1,
+          createdAt: new Date('2026-08-19'),
+          updatedAt: new Date('2026-08-19'),
+        },
+      });
+
+      const result = await service.getPreferences('user-1');
+      expect(result.timeZone).toBe('America/Bogota');
+      expect(result.reminderAdvanceMinutes).toBe(30);
+      expect(result.timeFormat).toBe('TWENTY_FOUR_HOUR');
+    });
+
+    it('auto-provisions default preferences when user has none', async () => {
+      prisma.user.findUnique.mockResolvedValue({
+        id: 'user-1',
+        preferences: null,
+      });
+      prisma.userPreferences.create.mockResolvedValue({
+        userId: 'user-1',
+        emailNotifications: true,
+        inAppNotifications: true,
+        appointmentReminders: true,
+        reminderAdvanceMinutes: 60,
+        sessionDigest: true,
+        timeZone: 'America/Mexico_City',
+        timeFormat: 'TWELVE_HOUR',
+        dateFormat: 'DD_MM_YYYY',
+        locale: 'es-MX',
+        weekStartsOn: 1,
+        createdAt: new Date('2026-08-19'),
+        updatedAt: new Date('2026-08-19'),
+      });
+
+      const result = await service.getPreferences('user-1');
+      expect(prisma.userPreferences.create).toHaveBeenCalledWith({
+        data: { userId: 'user-1' },
+      });
+      expect(result.timeZone).toBe('America/Mexico_City');
+      expect(result.emailNotifications).toBe(true);
+    });
+
+    it('throws NotFoundException when updating non-existent user preferences', async () => {
+      prisma.user.findUnique.mockResolvedValue(null);
+      await expect(
+        service.updatePreferences('non-existent', { timeZone: 'America/Santiago' }),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('updates preferences via upsert successfully', async () => {
+      prisma.user.findUnique.mockResolvedValue({ id: 'user-1' });
+      prisma.userPreferences.upsert.mockResolvedValue({
+        userId: 'user-1',
+        emailNotifications: false,
+        inAppNotifications: true,
+        appointmentReminders: true,
+        reminderAdvanceMinutes: 120,
+        sessionDigest: true,
+        timeZone: 'America/Santiago',
+        timeFormat: 'TWENTY_FOUR_HOUR',
+        dateFormat: 'DD_MM_YYYY',
+        locale: 'es-CL',
+        weekStartsOn: 0,
+        createdAt: new Date('2026-08-19'),
+        updatedAt: new Date('2026-08-19'),
+      });
+
+      const result = await service.updatePreferences('user-1', {
+        emailNotifications: false,
+        reminderAdvanceMinutes: 120,
+        timeZone: 'America/Santiago',
+        timeFormat: 'TWENTY_FOUR_HOUR' as any,
+        locale: 'es-CL',
+        weekStartsOn: 0,
+      });
+
+      expect(prisma.userPreferences.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { userId: 'user-1' },
+        }),
+      );
+      expect(result.timeZone).toBe('America/Santiago');
+      expect(result.emailNotifications).toBe(false);
+      expect(result.reminderAdvanceMinutes).toBe(120);
+      expect(result.weekStartsOn).toBe(0);
     });
   });
 });

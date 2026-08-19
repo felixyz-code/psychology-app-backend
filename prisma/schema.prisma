@@ -133,6 +133,17 @@ enum EntitlementCategory {
   SUPPORT
 }
 
+enum UserTimeFormat {
+  TWELVE_HOUR
+  TWENTY_FOUR_HOUR
+}
+
+enum UserDateFormat {
+  DD_MM_YYYY
+  YYYY_MM_DD
+  MM_DD_YYYY
+}
+
 model User {
   id                              String                     @id @default(uuid()) @db.Uuid
   name                            String                     @db.VarChar(150)
@@ -151,6 +162,7 @@ model User {
   invitedOrganizationInvitations  OrganizationInvitation[]   @relation("OrganizationInvitationInvitedUser")
   acceptedOrganizationInvitations OrganizationInvitation[]   @relation("OrganizationInvitationAcceptedByUser")
   psychologistProfile             PsychologistProfile?
+  preferences                     UserPreferences?
   auditLogs                       AuditLog[]
   branchAccesses                  UserBranchAccess[]
   assessmentAdministrations       AssessmentAdministration[] @relation("ProfessionalAssessments")
@@ -276,6 +288,25 @@ model UserSignatureAsset {
   updatedAt   DateTime            @updatedAt @db.Timestamptz(3)
 
   @@map("user_signature_assets")
+}
+
+model UserPreferences {
+  userId                 String         @id @db.Uuid
+  emailNotifications     Boolean        @default(true)
+  inAppNotifications     Boolean        @default(true)
+  appointmentReminders   Boolean        @default(true)
+  reminderAdvanceMinutes Int            @default(60) @db.Integer
+  sessionDigest          Boolean        @default(true)
+  timeZone               String         @default("America/Mexico_City") @db.VarChar(100)
+  timeFormat             UserTimeFormat @default(TWELVE_HOUR)
+  dateFormat             UserDateFormat @default(DD_MM_YYYY)
+  locale                 String         @default("es-MX") @db.VarChar(20)
+  weekStartsOn           Int            @default(1) @db.SmallInt
+  user                   User           @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  createdAt              DateTime       @default(now()) @db.Timestamptz(3)
+  updatedAt              DateTime       @updatedAt @db.Timestamptz(3)
+
+  @@map("user_preferences")
 }
 
 model OrganizationSettings {

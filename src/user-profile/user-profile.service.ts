@@ -9,6 +9,10 @@ import {
   UserAssetResponseDto,
 } from './dto/user-asset-response.dto';
 import {
+  UpdateUserPreferencesDto,
+  UserPreferencesResponseDto,
+} from './dto/user-preferences.dto';
+import {
   UserProfileResponseDto,
 } from './dto/user-profile-response.dto';
 import { UpdateUserProfileDto } from './dto/user-profile.dto';
@@ -354,6 +358,115 @@ export class UserProfileService {
         },
       });
     }
+  }
+
+  async getPreferences(userId: string): Promise<UserPreferencesResponseDto> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: { preferences: true },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    if (user.preferences) {
+      return this.toPreferencesResponse(user.preferences);
+    }
+
+    const created = await this.prisma.userPreferences.create({
+      data: {
+        userId: user.id,
+      },
+    });
+
+    return this.toPreferencesResponse(created);
+  }
+
+  async updatePreferences(
+    userId: string,
+    dto: UpdateUserPreferencesDto,
+  ): Promise<UserPreferencesResponseDto> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    const updated = await this.prisma.userPreferences.upsert({
+      where: { userId },
+      create: {
+        userId,
+        ...(dto.emailNotifications !== undefined && {
+          emailNotifications: dto.emailNotifications,
+        }),
+        ...(dto.inAppNotifications !== undefined && {
+          inAppNotifications: dto.inAppNotifications,
+        }),
+        ...(dto.appointmentReminders !== undefined && {
+          appointmentReminders: dto.appointmentReminders,
+        }),
+        ...(dto.reminderAdvanceMinutes !== undefined && {
+          reminderAdvanceMinutes: dto.reminderAdvanceMinutes,
+        }),
+        ...(dto.sessionDigest !== undefined && {
+          sessionDigest: dto.sessionDigest,
+        }),
+        ...(dto.timeZone !== undefined && { timeZone: dto.timeZone }),
+        ...(dto.timeFormat !== undefined && { timeFormat: dto.timeFormat }),
+        ...(dto.dateFormat !== undefined && { dateFormat: dto.dateFormat }),
+        ...(dto.locale !== undefined && { locale: dto.locale }),
+        ...(dto.weekStartsOn !== undefined && {
+          weekStartsOn: dto.weekStartsOn,
+        }),
+      },
+      update: {
+        ...(dto.emailNotifications !== undefined && {
+          emailNotifications: dto.emailNotifications,
+        }),
+        ...(dto.inAppNotifications !== undefined && {
+          inAppNotifications: dto.inAppNotifications,
+        }),
+        ...(dto.appointmentReminders !== undefined && {
+          appointmentReminders: dto.appointmentReminders,
+        }),
+        ...(dto.reminderAdvanceMinutes !== undefined && {
+          reminderAdvanceMinutes: dto.reminderAdvanceMinutes,
+        }),
+        ...(dto.sessionDigest !== undefined && {
+          sessionDigest: dto.sessionDigest,
+        }),
+        ...(dto.timeZone !== undefined && { timeZone: dto.timeZone }),
+        ...(dto.timeFormat !== undefined && { timeFormat: dto.timeFormat }),
+        ...(dto.dateFormat !== undefined && { dateFormat: dto.dateFormat }),
+        ...(dto.locale !== undefined && { locale: dto.locale }),
+        ...(dto.weekStartsOn !== undefined && {
+          weekStartsOn: dto.weekStartsOn,
+        }),
+      },
+    });
+
+    return this.toPreferencesResponse(updated);
+  }
+
+  private toPreferencesResponse(prefs: any): UserPreferencesResponseDto {
+    return {
+      userId: prefs.userId,
+      emailNotifications: prefs.emailNotifications,
+      inAppNotifications: prefs.inAppNotifications,
+      appointmentReminders: prefs.appointmentReminders,
+      reminderAdvanceMinutes: prefs.reminderAdvanceMinutes,
+      sessionDigest: prefs.sessionDigest,
+      timeZone: prefs.timeZone,
+      timeFormat: prefs.timeFormat,
+      dateFormat: prefs.dateFormat,
+      locale: prefs.locale,
+      weekStartsOn: prefs.weekStartsOn,
+      createdAt: prefs.createdAt,
+      updatedAt: prefs.updatedAt,
+    };
   }
 
   private toProfileResponse(

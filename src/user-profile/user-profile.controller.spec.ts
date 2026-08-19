@@ -8,6 +8,8 @@ describe('UserProfileController', () => {
   let service: {
     getProfile: ReturnType<typeof jest.fn>;
     updateProfile: ReturnType<typeof jest.fn>;
+    getPreferences: ReturnType<typeof jest.fn>;
+    updatePreferences: ReturnType<typeof jest.fn>;
     getAvatarMetadata: ReturnType<typeof jest.fn>;
     getAvatarContent: ReturnType<typeof jest.fn>;
     uploadAvatar: ReturnType<typeof jest.fn>;
@@ -29,6 +31,8 @@ describe('UserProfileController', () => {
     service = {
       getProfile: jest.fn(),
       updateProfile: jest.fn(),
+      getPreferences: jest.fn(),
+      updatePreferences: jest.fn(),
       getAvatarMetadata: jest.fn(),
       getAvatarContent: jest.fn(),
       uploadAvatar: jest.fn(),
@@ -41,6 +45,33 @@ describe('UserProfileController', () => {
     controller = new UserProfileController(
       service as unknown as UserProfileService,
     );
+  });
+
+  it('delegates getPreferences to service', async () => {
+    service.getPreferences.mockResolvedValue({
+      timeZone: 'America/Mexico_City',
+      emailNotifications: true,
+    });
+    const result = await controller.getPreferences(mockUser);
+    expect(service.getPreferences).toHaveBeenCalledWith('user-1');
+    expect(result).toEqual({
+      timeZone: 'America/Mexico_City',
+      emailNotifications: true,
+    });
+  });
+
+  it('delegates updatePreferences to service', async () => {
+    const dto = { timeZone: 'America/Bogota', reminderAdvanceMinutes: 30 };
+    service.updatePreferences.mockResolvedValue({
+      timeZone: 'America/Bogota',
+      reminderAdvanceMinutes: 30,
+    });
+    const result = await controller.updatePreferences(mockUser, dto);
+    expect(service.updatePreferences).toHaveBeenCalledWith('user-1', dto);
+    expect(result).toEqual({
+      timeZone: 'America/Bogota',
+      reminderAdvanceMinutes: 30,
+    });
   });
 
   it('delegates getProfile to service', async () => {
