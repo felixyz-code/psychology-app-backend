@@ -1,4 +1,9 @@
-import { ConflictException, ForbiddenException } from '@nestjs/common';
+import {
+  ConflictException,
+  ForbiddenException,
+  NotFoundException,
+  UnprocessableEntityException,
+} from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { InstrumentVersionStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -19,6 +24,9 @@ describe('InstrumentsService', () => {
       findMany: jest.fn(),
       findFirst: jest.fn(),
       create: jest.fn(),
+    },
+    tenantInstrumentConfig: {
+      upsert: jest.fn(),
     },
     instrumentVersion: {
       create: jest.fn(),
@@ -52,59 +60,148 @@ describe('InstrumentsService', () => {
     expect(service).toBeDefined();
   });
 
-  describe('findAll', () => {
-    it('should query instruments accessible to the tenant (system + tenant custom)', async () => {
-      const mockResult = [
-        { id: '1', code: 'PHQ-9', isSystem: true, versions: [] },
+  describe('findClinicalCatalog', () => {
+    it('should return only published and tenant-enabled instruments', async () => {
+      const mockRaw = [
         {
-          id: '2',
-          code: 'CUSTOM-1',
+          id: 'inst-1',
+          code: 'PHQ-9',
+          isSystem: true,
+          tenantConfigs: [{ isEnabled: true }],
+          versions: [
+            { id: 'v1', versionNumber: 1, status: InstrumentVersionStatus.PUBLISHED },
+          ],
+        },
+        {
+          id: 'inst-2',
+          code: 'GAD-7',
+          isSystem: true,
+          tenantConfigs: [{ isEnabled: false }], // Disabled for this tenant
+          versions: [
+            { id: 'v2', versionNumber: 1, status: InstrumentVersionStatus.PUBLISHED },
+          ],
+        },
+        {
+          id: 'inst-3',
+          code: 'DRAFT-ONLY',
           isSystem: false,
-          organizationId: mockOrgId,
-          versions: [],
+          tenantConfigs: [],
+          versions: [], // No published versions
         },
       ];
-      mockPrismaService.instrument.findMany.mockResolvedValue(mockResult);
 
-      const res = await service.findAll(mockOrgId);
+      mockPrismaService.instrument.findMany.mockResolvedValue(mockRaw);
 
-      expect(res).toEqual(mockResult);
-      expect(prisma.instrument.findMany).toHaveBeenCalledWith({
-        where: {
-          OR: [{ isSystem: true }, { organizationId: mockOrgId }],
+      const result = await service.findClinicalCatalog(mockOrgId);
+
+      expect(result).toHaveLength(1);
+      expect(result[0].id).toBe('inst-1');
+      expect(result[0].isEnabled).toBe(true);
+    });
+  });
+
+  describe('findManagementCatalog', () => {
+    it('should return all stock and custom instruments with administration locks and toggles', async () => {
+      const mockRaw = [
+        {
+          id: 'inst-1',
+          code: 'PHQ-9',
+          isSystem: true,
+          tenantConfigs: [{ isEnabled: true }],
+          versions: [
+            {
+              id: 'v1',
+              versionNumber: 1,
+              status: InstrumentVersionStatus.PUBLISHED,
+              _count: { assessmentAdministrations: 5 },
+            },
+          ],
         },
-        include: expect.any(Object),
-        orderBy: expect.any(Array),
+      ];
+
+      mockPrismaService.instrument.findMany.mockResolvedValue(mockRaw);
+
+      const result = await service.findManagementCatalog(mockOrgId);
+
+      expect(result).toHaveLength(1);
+      expect(result[0].isEnabled).toBe(true);
+      expect(result[0].hasActiveAdministrations).toBe(true);
+      expect(result[0].versions[0].isLocked).toBe(true);
+    });
+  });
+
+  describe('toggleVisibility', () => {
+    it('should upsert tenantInstrumentConfig when instrument exists', async () => {
+      mockPrismaService.instrument.findFirst.mockResolvedValue({
+        id: mockInstrumentId,
+        isSystem: true,
       });
+
+      mockPrismaService.tenantInstrumentConfig.upsert.mockResolvedValue({
+        instrumentId: mockInstrumentId,
+        organizationId: mockOrgId,
+        isEnabled: false,
+        updatedAt: new Date(),
+      });
+
+      const res = await service.toggleVisibility(mockOrgId, mockInstrumentId, false);
+
+      expect(res.isEnabled).toBe(false);
+      expect(prisma.tenantInstrumentConfig.upsert).toHaveBeenCalledWith({
+        where: {
+          organizationId_instrumentId: {
+            organizationId: mockOrgId,
+            instrumentId: mockInstrumentId,
+          },
+        },
+        create: {
+          organizationId: mockOrgId,
+          instrumentId: mockInstrumentId,
+          isEnabled: false,
+        },
+        update: {
+          isEnabled: false,
+        },
+      });
+    });
+
+    it('should throw NotFoundException if instrument is not accessible', async () => {
+      mockPrismaService.instrument.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.toggleVisibility(mockOrgId, 'non-existent', true),
+      ).rejects.toThrow(NotFoundException);
     });
   });
 
   describe('create', () => {
-    it('should create a custom tenant instrument when code does not conflict', async () => {
+    it('should create a custom tenant instrument and enable visibility', async () => {
       mockPrismaService.instrument.findFirst.mockResolvedValue(null);
       const createdMock = {
         id: mockInstrumentId,
-        code: 'GAD-7-CUSTOM',
-        name: 'Escala Ansiedad Custom',
+        code: 'BAI-CUSTOM',
+        name: 'Inventario Ansiedad Beck Custom',
         organizationId: mockOrgId,
         isSystem: false,
       };
       mockPrismaService.instrument.create.mockResolvedValue(createdMock);
 
       const result = await service.create(mockOrgId, {
-        code: 'GAD-7-CUSTOM',
-        name: 'Escala Ansiedad Custom',
+        code: 'BAI-CUSTOM',
+        name: 'Inventario Ansiedad Beck Custom',
       });
 
       expect(result).toEqual(createdMock);
       expect(prisma.instrument.create).toHaveBeenCalledWith({
-        data: {
+        data: expect.objectContaining({
           organizationId: mockOrgId,
-          code: 'GAD-7-CUSTOM',
-          name: 'Escala Ansiedad Custom',
-          description: undefined,
-          targetPopulation: undefined,
+          code: 'BAI-CUSTOM',
+          name: 'Inventario Ansiedad Beck Custom',
           isSystem: false,
+        }),
+        include: {
+          versions: true,
+          tenantConfigs: true,
         },
       });
     });
@@ -121,7 +218,7 @@ describe('InstrumentsService', () => {
   });
 
   describe('createVersion', () => {
-    it('should create a new draft version with incremented version number', async () => {
+    it('should create a new draft version with incremented version number (vN+1)', async () => {
       mockPrismaService.instrument.findFirst.mockResolvedValue({
         id: mockInstrumentId,
         organizationId: mockOrgId,
@@ -164,11 +261,12 @@ describe('InstrumentsService', () => {
   });
 
   describe('updateDraftVersion & Immutability Enforcement', () => {
-    it('should update draft version when status is DRAFT', async () => {
+    it('should update draft version when status is DRAFT and has 0 administrations', async () => {
       mockPrismaService.instrumentVersion.findUnique.mockResolvedValue({
         id: mockVersionId,
         status: InstrumentVersionStatus.DRAFT,
         instrument: { organizationId: mockOrgId, isSystem: false },
+        _count: { assessmentAdministrations: 0 },
       });
       mockPrismaService.instrumentVersion.update.mockResolvedValue({
         id: mockVersionId,
@@ -198,6 +296,7 @@ describe('InstrumentsService', () => {
         id: mockVersionId,
         status: InstrumentVersionStatus.PUBLISHED,
         instrument: { organizationId: mockOrgId, isSystem: false },
+        _count: { assessmentAdministrations: 0 },
       });
 
       const dto = {
@@ -211,6 +310,24 @@ describe('InstrumentsService', () => {
 
       expect(prisma.instrumentVersion.update).not.toHaveBeenCalled();
     });
+
+    it('should THROW ForbiddenException when version has prior administrations', async () => {
+      mockPrismaService.instrumentVersion.findUnique.mockResolvedValue({
+        id: mockVersionId,
+        status: InstrumentVersionStatus.DRAFT,
+        instrument: { organizationId: mockOrgId, isSystem: false },
+        _count: { assessmentAdministrations: 2 },
+      });
+
+      const dto = {
+        definitionJson: { edit: true },
+        scoringSpecJson: { edit: true },
+      };
+
+      await expect(
+        service.updateDraftVersion(mockOrgId, mockVersionId, dto),
+      ).rejects.toThrow(ForbiddenException);
+    });
   });
 
   describe('publishVersion', () => {
@@ -219,6 +336,9 @@ describe('InstrumentsService', () => {
         id: mockVersionId,
         instrumentId: mockInstrumentId,
         status: InstrumentVersionStatus.DRAFT,
+        definitionJson: {
+          items: [{ code: 'Q1', prompt: 'Sample prompt' }],
+        },
         instrument: { organizationId: mockOrgId, isSystem: false },
       });
       mockPrismaService.instrumentVersion.updateMany.mockResolvedValue({
@@ -240,6 +360,41 @@ describe('InstrumentsService', () => {
         data: {
           status: InstrumentVersionStatus.DEPRECATED,
         },
+      });
+    });
+
+    it('should throw UnprocessableEntityException if instrument has 0 items', async () => {
+      mockPrismaService.instrumentVersion.findUnique.mockResolvedValue({
+        id: mockVersionId,
+        instrumentId: mockInstrumentId,
+        status: InstrumentVersionStatus.DRAFT,
+        definitionJson: { items: [] },
+        instrument: { organizationId: mockOrgId, isSystem: false },
+      });
+
+      await expect(
+        service.publishVersion(mockOrgId, mockVersionId),
+      ).rejects.toThrow(UnprocessableEntityException);
+    });
+  });
+
+  describe('deprecateVersion', () => {
+    it('should set version status to DEPRECATED', async () => {
+      mockPrismaService.instrumentVersion.findUnique.mockResolvedValue({
+        id: mockVersionId,
+        instrument: { organizationId: mockOrgId, isSystem: false },
+      });
+      mockPrismaService.instrumentVersion.update.mockResolvedValue({
+        id: mockVersionId,
+        status: InstrumentVersionStatus.DEPRECATED,
+      });
+
+      const res = await service.deprecateVersion(mockOrgId, mockVersionId);
+
+      expect(res.status).toBe(InstrumentVersionStatus.DEPRECATED);
+      expect(prisma.instrumentVersion.update).toHaveBeenCalledWith({
+        where: { id: mockVersionId },
+        data: { status: InstrumentVersionStatus.DEPRECATED },
       });
     });
   });

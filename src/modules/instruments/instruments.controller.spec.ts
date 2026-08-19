@@ -20,12 +20,16 @@ describe('InstrumentsController', () => {
 
   const mockService = {
     findAll: jest.fn(),
+    findClinicalCatalog: jest.fn(),
+    findManagementCatalog: jest.fn(),
     findOne: jest.fn(),
     create: jest.fn(),
+    toggleVisibility: jest.fn(),
     createVersion: jest.fn(),
     getVersionDetails: jest.fn(),
     updateDraftVersion: jest.fn(),
     publishVersion: jest.fn(),
+    deprecateVersion: jest.fn(),
     calculateScoreForVersion: jest.fn(),
   };
 
@@ -45,19 +49,31 @@ describe('InstrumentsController', () => {
     expect(controller).toBeDefined();
   });
 
-  describe('findAll', () => {
-    it('should delegate to service.findAll', async () => {
-      mockService.findAll.mockResolvedValue([]);
-      await controller.findAll(mockTenant);
-      expect(service.findAll).toHaveBeenCalledWith(mockTenant.organizationId);
+  describe('findClinicalCatalog', () => {
+    it('should delegate to service.findClinicalCatalog', async () => {
+      mockService.findClinicalCatalog.mockResolvedValue([]);
+      await controller.findClinicalCatalog(mockTenant);
+      expect(service.findClinicalCatalog).toHaveBeenCalledWith(
+        mockTenant.organizationId,
+      );
     });
   });
 
-  describe('create', () => {
+  describe('findManagementCatalog', () => {
+    it('should delegate to service.findManagementCatalog', async () => {
+      mockService.findManagementCatalog.mockResolvedValue([]);
+      await controller.findManagementCatalog(mockTenant);
+      expect(service.findManagementCatalog).toHaveBeenCalledWith(
+        mockTenant.organizationId,
+      );
+    });
+  });
+
+  describe('createManagementInstrument', () => {
     it('should delegate to service.create', async () => {
       const dto = { code: 'TEST', name: 'Test Instrument' };
       mockService.create.mockResolvedValue({ id: 'inst-1', ...dto });
-      await controller.create(mockTenant, dto);
+      await controller.createManagementInstrument(mockTenant, dto);
       expect(service.create).toHaveBeenCalledWith(
         mockTenant.organizationId,
         dto,
@@ -65,11 +81,23 @@ describe('InstrumentsController', () => {
     });
   });
 
-  describe('createVersion', () => {
+  describe('toggleVisibility', () => {
+    it('should delegate to service.toggleVisibility', async () => {
+      mockService.toggleVisibility.mockResolvedValue({ isEnabled: false });
+      await controller.toggleVisibility(mockTenant, 'inst-1', { isEnabled: false });
+      expect(service.toggleVisibility).toHaveBeenCalledWith(
+        mockTenant.organizationId,
+        'inst-1',
+        false,
+      );
+    });
+  });
+
+  describe('createManagementVersion', () => {
     it('should delegate to service.createVersion', async () => {
       const dto = { definitionJson: {}, scoringSpecJson: {} };
       mockService.createVersion.mockResolvedValue({ id: 'ver-1' });
-      await controller.createVersion(mockTenant, 'inst-1', dto);
+      await controller.createManagementVersion(mockTenant, 'inst-1', dto);
       expect(service.createVersion).toHaveBeenCalledWith(
         mockTenant.organizationId,
         'inst-1',
@@ -78,14 +106,41 @@ describe('InstrumentsController', () => {
     });
   });
 
-  describe('publishVersion', () => {
+  describe('putManagementDraftVersion', () => {
+    it('should delegate to service.updateDraftVersion', async () => {
+      const dto = { definitionJson: {}, scoringSpecJson: {} };
+      mockService.updateDraftVersion.mockResolvedValue({ id: 'ver-1' });
+      await controller.putManagementDraftVersion(mockTenant, 'ver-1', dto);
+      expect(service.updateDraftVersion).toHaveBeenCalledWith(
+        mockTenant.organizationId,
+        'ver-1',
+        dto,
+      );
+    });
+  });
+
+  describe('publishManagementVersion', () => {
     it('should delegate to service.publishVersion', async () => {
       mockService.publishVersion.mockResolvedValue({
         id: 'ver-1',
         status: 'PUBLISHED',
       });
-      await controller.publishVersion(mockTenant, 'ver-1');
+      await controller.publishManagementVersion(mockTenant, 'ver-1');
       expect(service.publishVersion).toHaveBeenCalledWith(
+        mockTenant.organizationId,
+        'ver-1',
+      );
+    });
+  });
+
+  describe('deprecateManagementVersion', () => {
+    it('should delegate to service.deprecateVersion', async () => {
+      mockService.deprecateVersion.mockResolvedValue({
+        id: 'ver-1',
+        status: 'DEPRECATED',
+      });
+      await controller.deprecateManagementVersion(mockTenant, 'ver-1');
+      expect(service.deprecateVersion).toHaveBeenCalledWith(
         mockTenant.organizationId,
         'ver-1',
       );

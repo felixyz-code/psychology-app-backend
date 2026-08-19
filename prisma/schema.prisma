@@ -194,6 +194,7 @@ model Organization {
   benefitDebitLogs          BenefitDebitLog[]
   instruments               Instrument[]
   assessmentAdministrations AssessmentAdministration[]
+  tenantInstrumentConfigs   TenantInstrumentConfig[]
   createdAt                 DateTime                   @default(now()) @db.Timestamptz(3)
   updatedAt                 DateTime                   @updatedAt @db.Timestamptz(3)
 
@@ -806,13 +807,31 @@ model Instrument {
   createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt        DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  organization Organization?       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  versions     InstrumentVersion[]
+  organization  Organization?            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  versions      InstrumentVersion[]
+  tenantConfigs TenantInstrumentConfig[]
 
   @@unique([organizationId, code])
   @@index([organizationId, isSystem])
   @@index([code, isSystem])
   @@map("instruments")
+}
+
+model TenantInstrumentConfig {
+  id             String       @id @default(uuid()) @db.Uuid
+  organizationId String       @map("organization_id") @db.Uuid
+  instrumentId   String       @map("instrument_id") @db.Uuid
+  isEnabled      Boolean      @default(true) @map("is_enabled")
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime     @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  instrument     Instrument   @relation(fields: [instrumentId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, instrumentId])
+  @@index([organizationId, isEnabled])
+  @@index([instrumentId])
+  @@map("tenant_instrument_configs")
 }
 
 model InstrumentVersion {
