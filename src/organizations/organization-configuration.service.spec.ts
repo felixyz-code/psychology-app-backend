@@ -164,4 +164,104 @@ describe('OrganizationConfigurationService', () => {
     });
     expect(observedUpdate?.where.updatedAt).toEqual(expectedUpdatedAt);
   });
+
+  it('returns branding with visualName, primaryColor, and accentColor', async () => {
+    const updatedAt = new Date('2026-08-18T10:00:00.000Z');
+    const service = new OrganizationConfigurationService({
+      organization: {
+        findFirst: jest.fn().mockResolvedValue({ id: tenant.organizationId }),
+      },
+      organizationBranding: {
+        findUnique: jest.fn().mockResolvedValue({
+          visualName: 'Centro Psicológico',
+          primaryColor: '#2563EB',
+          accentColor: '#0D9488',
+          updatedAt,
+        }),
+      },
+    } as never);
+
+    await expect(
+      service.getBranding(tenant.organizationId, tenant),
+    ).resolves.toEqual({
+      rowState: 'PRESENT',
+      updatedAt,
+      visualName: 'Centro Psicológico',
+      primaryColor: '#2563EB',
+      accentColor: '#0D9488',
+    });
+  });
+
+  it('creates branding with visualName, primaryColor, and accentColor when absent', async () => {
+    const updatedAt = new Date('2026-08-18T10:00:00.000Z');
+    const tx = {
+      organization: {
+        findFirst: jest.fn().mockResolvedValue({ id: tenant.organizationId }),
+      },
+      organizationBranding: {
+        findUnique: jest.fn().mockResolvedValue(null),
+        create: jest.fn().mockResolvedValue({
+          visualName: 'Centro Psicológico',
+          primaryColor: '#2563EB',
+          accentColor: '#0D9488',
+          updatedAt,
+        }),
+      },
+    };
+    const service = new OrganizationConfigurationService({
+      $transaction: jest.fn((work: (client: typeof tx) => Promise<unknown>) =>
+        work(tx),
+      ),
+    } as never);
+
+    await expect(
+      service.updateBranding(
+        tenant.organizationId,
+        {
+          visualName: 'Centro Psicológico',
+          primaryColor: '#2563EB',
+          accentColor: '#0D9488',
+          expectedRowState: 'ABSENT',
+        },
+        tenant,
+      ),
+    ).resolves.toEqual({
+      rowState: 'PRESENT',
+      updatedAt,
+      visualName: 'Centro Psicológico',
+      primaryColor: '#2563EB',
+      accentColor: '#0D9488',
+    });
+
+    expect(tx.organizationBranding.create).toHaveBeenCalledWith({
+      data: {
+        organizationId: tenant.organizationId,
+        visualName: 'Centro Psicológico',
+        primaryColor: '#2563EB',
+        accentColor: '#0D9488',
+      },
+      select: {
+        visualName: true,
+        primaryColor: true,
+        accentColor: true,
+        updatedAt: true,
+      },
+    });
+  });
+
+  it('rejects accentColor that fails WCAG contrast check', async () => {
+    const service = new OrganizationConfigurationService({} as never);
+
+    await expect(
+      service.updateBranding(
+        tenant.organizationId,
+        {
+          primaryColor: '#2563EB',
+          accentColor: '#FFFFFF', // fails contrast against white surface
+          expectedRowState: 'ABSENT',
+        },
+        tenant,
+      ),
+    ).rejects.toThrow('accentColor must have at least 3:1 contrast');
+  });
 });

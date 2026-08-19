@@ -170,6 +170,12 @@ model Organization {
   timezone                  String                     @default("UTC") @db.VarChar(100)
   locale                    String                     @default("es-MX") @db.VarChar(20)
   currency                  String                     @default("MXN") @db.Char(3)
+  tradeName                 String?                    @db.VarChar(150)
+  taxId                     String?                    @db.VarChar(50)
+  phone                     String?                    @db.VarChar(30)
+  email                     String?                    @db.VarChar(255)
+  website                   String?                    @db.VarChar(500)
+  address                   String?                    @db.Text
   memberships               OrganizationMembership[]
   invitations               OrganizationInvitation[]
   settings                  OrganizationSettings?
