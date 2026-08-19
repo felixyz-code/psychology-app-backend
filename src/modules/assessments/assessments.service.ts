@@ -85,11 +85,36 @@ export class AssessmentsService {
 
     const instrumentVersion = await this.prisma.instrumentVersion.findUnique({
       where: { id: dto.instrumentVersionId },
-      include: { instrument: true },
+      include: {
+        instrument: {
+          include: {
+            tenantConfigs: {
+              where: { organizationId },
+              select: { isEnabled: true },
+            },
+          },
+        },
+      },
     });
 
     if (!instrumentVersion) {
       throw new NotFoundException('Instrument version not found');
+    }
+
+    const isSystem = instrumentVersion.instrument.isSystem;
+    const isOwner =
+      instrumentVersion.instrument.organizationId === organizationId;
+    if (!isSystem && !isOwner) {
+      throw new NotFoundException(
+        'Instrument version not found in this organization',
+      );
+    }
+
+    const tenantConfig = instrumentVersion.instrument.tenantConfigs?.[0];
+    if (tenantConfig && tenantConfig.isEnabled === false) {
+      throw new BadRequestException(
+        'This clinical instrument is currently disabled for this organization',
+      );
     }
 
     if (instrumentVersion.status !== InstrumentVersionStatus.PUBLISHED) {

@@ -22,7 +22,7 @@ import {
   UserRole,
 } from '@prisma/client';
 import { seedCommercialCoreData } from './seed-commercial';
-import { seedPhq9StockInstrument } from './seeds/phq9-stock-seed';
+import { seedAllStockInstruments } from './seeds/stock-instruments-seed';
 
 const connectionString = process.env.DATABASE_URL;
 
@@ -2015,7 +2015,7 @@ async function main() {
 
   await resetTenantDevelopmentSeed();
   await seedTenantDevelopmentData(passwordHash);
-  await seedPhq9StockInstrument(prisma);
+  await seedAllStockInstruments(prisma);
 
   console.log('Tenant-aware development seed completed successfully.');
   console.log('Data set: synthetic local development fixtures only.');

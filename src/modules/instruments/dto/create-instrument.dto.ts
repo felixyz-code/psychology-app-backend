@@ -37,4 +37,13 @@ export class CreateInstrumentDto {
   @IsString()
   @MaxLength(150)
   targetPopulation?: string;
+
+  @ApiPropertyOptional({
+    description: 'Optional initial draft version definition and scoring spec',
+  })
+  @IsOptional()
+  initialDraft?: {
+    definitionJson: Record<string, any>;
+    scoringSpecJson: Record<string, any>;
+  };
 }

@@ -90,7 +90,13 @@ describe('AssessmentsService', () => {
       mockPrismaService.instrumentVersion.findUnique.mockResolvedValue({
         id: mockVersionId,
         status: InstrumentVersionStatus.PUBLISHED,
-        instrument: { id: 'inst-1', code: 'PHQ-9', name: 'PHQ-9' },
+        instrument: {
+          id: 'inst-1',
+          code: 'PHQ-9',
+          name: 'PHQ-9',
+          isSystem: true,
+          tenantConfigs: [],
+        },
       });
 
       mockPrismaService.assessmentAdministration.create.mockResolvedValue({
@@ -138,6 +144,13 @@ describe('AssessmentsService', () => {
       mockPrismaService.instrumentVersion.findUnique.mockResolvedValue({
         id: mockVersionId,
         status: InstrumentVersionStatus.DRAFT,
+        instrument: {
+          id: 'inst-1',
+          code: 'PHQ-9',
+          name: 'PHQ-9',
+          isSystem: true,
+          tenantConfigs: [],
+        },
       });
 
       await expect(

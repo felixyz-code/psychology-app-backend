@@ -102,6 +102,39 @@ describe('CapabilityResolverService', () => {
     ).toBe(CapabilityDecision.DENY);
   });
 
+  it('grants assessment template management capability to OWNER and ADMIN, conditional for PSYCHOLOGIST', () => {
+    expect(
+      resolver.resolve(
+        MembershipRole.OWNER,
+        OrganizationCapability.ASSESSMENT_TEMPLATE_MANAGE,
+      ),
+    ).toBe(CapabilityDecision.ALLOW);
+    expect(
+      resolver.resolve(
+        MembershipRole.ADMIN,
+        OrganizationCapability.ASSESSMENT_TEMPLATE_MANAGE,
+      ),
+    ).toBe(CapabilityDecision.ALLOW);
+    expect(
+      resolver.resolve(
+        MembershipRole.PSYCHOLOGIST,
+        OrganizationCapability.ASSESSMENT_TEMPLATE_MANAGE,
+      ),
+    ).toBe(CapabilityDecision.CONDITIONAL);
+    expect(
+      resolver.resolve(
+        MembershipRole.RECEPTIONIST,
+        OrganizationCapability.ASSESSMENT_TEMPLATE_MANAGE,
+      ),
+    ).toBe(CapabilityDecision.DENY);
+    expect(
+      resolver.resolve(
+        MembershipRole.BILLING,
+        OrganizationCapability.ASSESSMENT_TEMPLATE_MANAGE,
+      ),
+    ).toBe(CapabilityDecision.DENY);
+  });
+
   it('does not treat report.read as a financial summary substitute', () => {
     expect(
       resolver.resolve(
