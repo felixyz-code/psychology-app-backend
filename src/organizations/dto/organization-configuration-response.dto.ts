@@ -38,9 +38,26 @@ export class OrganizationBrandingResponseDto {
 
   @ApiProperty({
     nullable: true,
+    description: 'Visual display name for tenant branding; null if not set.',
+    example: 'Centro de Psicología Integral',
+  })
+  visualName: string | null;
+
+  @ApiProperty({
+    nullable: true,
     pattern: '^#[0-9A-F]{6}$',
     description:
-      'Persisted organization accent; null means use the platform fallback.',
+      'Persisted organization primary brand color; null means use the platform fallback.',
+    example: '#2563EB',
   })
   primaryColor: string | null;
+
+  @ApiProperty({
+    nullable: true,
+    pattern: '^#[0-9A-F]{6}$',
+    description:
+      'Persisted organization brand accent; null means use the platform fallback.',
+    example: '#0D9488',
+  })
+  accentColor: string | null;
 }

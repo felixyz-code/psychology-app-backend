@@ -161,7 +161,7 @@ export class OrganizationLogoController {
     description: 'Missing file, invalid precondition, or invalid image upload',
   })
   @ApiConflictResponse({ description: 'Stale or concurrent logo mutation' })
-  @ApiPayloadTooLargeResponse({ description: 'Logo exceeds 1 MiB' })
+  @ApiPayloadTooLargeResponse({ description: 'Logo exceeds 2 MiB' })
   async upload(
     @Param('organizationId', ParseUUIDPipe) organizationId: string,
     @Body() dto: LogoMutationPreconditionDto,

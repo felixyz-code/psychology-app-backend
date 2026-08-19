@@ -164,4 +164,77 @@ describe('OrganizationsService', () => {
     ).rejects.toBeInstanceOf(ConflictException);
     expect(observability.organizationDomainEvent).not.toHaveBeenCalled();
   });
+
+  it('updates institutional fields and persists changes', async () => {
+    const organization = {
+      id: tenant.organizationId,
+      slug: 'tenant-a',
+      legalName: 'Tenant A Legal',
+      displayName: 'Tenant A',
+      status: OrganizationStatus.ACTIVE,
+      timezone: 'UTC',
+      locale: 'es-MX',
+      currency: 'MXN',
+      tradeName: null,
+      taxId: null,
+      phone: null,
+      email: null,
+      website: null,
+      address: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    let updatePayload: unknown;
+    const tx = {
+      organization: {
+        findFirst: jest.fn().mockResolvedValue(organization),
+        updateMany: jest.fn((args: { data: unknown }) => {
+          updatePayload = args.data;
+          return Promise.resolve({ count: 1 });
+        }),
+        findUnique: jest.fn().mockResolvedValue({
+          ...organization,
+          tradeName: 'Centro Psicológico Alpha',
+          taxId: 'CPA123456789',
+          phone: '+525512345678',
+          email: 'contacto@alpha.com',
+          website: 'https://alpha.com',
+          address: 'Calle 1, CDMX',
+        }),
+      },
+    };
+    const observability = {
+      organizationDomainEvent: jest.fn(),
+    };
+    const prisma = {
+      $transaction: jest.fn((work: (client: typeof tx) => Promise<unknown>) =>
+        work(tx),
+      ),
+    } as never;
+    const service = new OrganizationsService(prisma, observability as never);
+
+    const result = await service.update(
+      tenant.organizationId,
+      {
+        tradeName: 'Centro Psicológico Alpha',
+        taxId: 'CPA123456789',
+        phone: '+525512345678',
+        email: 'contacto@alpha.com',
+        website: 'https://alpha.com',
+        address: 'Calle 1, CDMX',
+      },
+      tenant,
+    );
+
+    expect(updatePayload).toEqual({
+      tradeName: 'Centro Psicológico Alpha',
+      taxId: 'CPA123456789',
+      phone: '+525512345678',
+      email: 'contacto@alpha.com',
+      website: 'https://alpha.com',
+      address: 'Calle 1, CDMX',
+    });
+    expect(result.tradeName).toBe('Centro Psicológico Alpha');
+    expect(observability.organizationDomainEvent).toHaveBeenCalled();
+  });
 });

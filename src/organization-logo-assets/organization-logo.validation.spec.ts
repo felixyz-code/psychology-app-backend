@@ -76,7 +76,7 @@ describe('validateOrganizationLogo', () => {
     decode.mockRestore();
   });
 
-  it('rejects APNG animation control chunks and files larger than 1 MiB', () => {
+  it('rejects APNG animation control chunks and files larger than 2 MiB', () => {
     expect(() =>
       validateOrganizationLogo(file(createPng(64, 64, true))),
     ).toThrow('Animated PNG');
@@ -88,13 +88,13 @@ describe('validateOrganizationLogo', () => {
           'image/png',
         ),
       ),
-    ).toThrow('1 MiB');
+    ).toThrow('2 MiB');
   });
 
-  it('accepts a structurally valid PNG exactly at the 1 MiB byte limit', () => {
-    const exactlyOneMiB = createPngAtSize(64, 64, MAX_ORGANIZATION_LOGO_BYTES);
+  it('accepts a structurally valid PNG exactly at the 2 MiB byte limit', () => {
+    const exactlyTwoMiB = createPngAtSize(64, 64, MAX_ORGANIZATION_LOGO_BYTES);
 
-    expect(validateOrganizationLogo(file(exactlyOneMiB))).toMatchObject({
+    expect(validateOrganizationLogo(file(exactlyTwoMiB))).toMatchObject({
       byteSize: MAX_ORGANIZATION_LOGO_BYTES,
       width: 64,
       height: 64,

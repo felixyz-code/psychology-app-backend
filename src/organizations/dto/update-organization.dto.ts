@@ -1,5 +1,6 @@
 import { Transform } from 'class-transformer';
 import {
+  IsEmail,
   IsNotEmpty,
   IsOptional,
   IsString,
@@ -72,4 +73,52 @@ export class UpdateOrganizationDto {
   @Matches(CURRENCY_PATTERN)
   @MaxLength(3)
   currency?: string;
+
+  @ApiPropertyOptional({ example: 'Centro de Psicología Integral' })
+  @IsOptional()
+  @Transform(trimToUndefined)
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(150)
+  tradeName?: string;
+
+  @ApiPropertyOptional({ example: 'ABC123456789' })
+  @IsOptional()
+  @Transform(trimToUndefined)
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(50)
+  taxId?: string;
+
+  @ApiPropertyOptional({ example: '+52 55 1234 5678' })
+  @IsOptional()
+  @Transform(trimToUndefined)
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(30)
+  phone?: string;
+
+  @ApiPropertyOptional({ example: 'contacto@psicologia.com' })
+  @IsOptional()
+  @Transform(trimToUndefined)
+  @IsString()
+  @IsNotEmpty()
+  @IsEmail()
+  @MaxLength(255)
+  email?: string;
+
+  @ApiPropertyOptional({ example: 'https://psicologia.com' })
+  @IsOptional()
+  @Transform(trimToUndefined)
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(500)
+  website?: string;
+
+  @ApiPropertyOptional({ example: 'Av. Principal 123, Col. Centro, CDMX' })
+  @IsOptional()
+  @Transform(trimToUndefined)
+  @IsString()
+  @IsNotEmpty()
+  address?: string;
 }
