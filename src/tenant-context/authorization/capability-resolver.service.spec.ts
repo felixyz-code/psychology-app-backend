@@ -135,6 +135,45 @@ describe('CapabilityResolverService', () => {
     ).toBe(CapabilityDecision.DENY);
   });
 
+  it('grants audit.read capability to OWNER, ADMIN, and AUDITOR', () => {
+    expect(
+      resolver.resolve(
+        MembershipRole.OWNER,
+        OrganizationCapability.AUDIT_READ,
+      ),
+    ).toBe(CapabilityDecision.ALLOW);
+    expect(
+      resolver.resolve(
+        MembershipRole.ADMIN,
+        OrganizationCapability.AUDIT_READ,
+      ),
+    ).toBe(CapabilityDecision.ALLOW);
+    expect(
+      resolver.resolve(
+        MembershipRole.AUDITOR,
+        OrganizationCapability.AUDIT_READ,
+      ),
+    ).toBe(CapabilityDecision.ALLOW);
+    expect(
+      resolver.resolve(
+        MembershipRole.PSYCHOLOGIST,
+        OrganizationCapability.AUDIT_READ,
+      ),
+    ).toBe(CapabilityDecision.DENY);
+    expect(
+      resolver.resolve(
+        MembershipRole.RECEPTIONIST,
+        OrganizationCapability.AUDIT_READ,
+      ),
+    ).toBe(CapabilityDecision.DENY);
+    expect(
+      resolver.resolve(
+        MembershipRole.BILLING,
+        OrganizationCapability.AUDIT_READ,
+      ),
+    ).toBe(CapabilityDecision.DENY);
+  });
+
   it('does not treat report.read as a financial summary substitute', () => {
     expect(
       resolver.resolve(

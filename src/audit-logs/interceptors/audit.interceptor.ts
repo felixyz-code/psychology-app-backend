@@ -124,6 +124,7 @@ export class AuditInterceptor implements NestInterceptor {
             action: auditOptions.action,
             resourceType: auditOptions.resourceType,
             resourceId: resourceId ?? null,
+            severity: auditOptions.severity,
             ipAddress,
             userAgent,
             statusCode,

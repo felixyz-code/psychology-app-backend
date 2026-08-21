@@ -538,6 +538,14 @@ model PatientAssignment {
   @@map("patient_assignments")
 }
 
+enum AuditSeverity {
+  INFO
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
 model AuditLog {
   id              String        @id @default(uuid()) @db.Uuid
   timestamp       DateTime      @default(now()) @db.Timestamptz(3)
@@ -547,6 +555,7 @@ model AuditLog {
   action          String        @db.VarChar(100)
   resourceType    String        @db.VarChar(100)
   resourceId      String?       @db.VarChar(255)
+  severity        AuditSeverity @default(INFO)
   ipAddress       String?       @db.VarChar(100)
   userAgent       String?       @db.Text
   statusCode      Int?
@@ -558,6 +567,7 @@ model AuditLog {
   user            User?         @relation(fields: [userId], references: [id], onDelete: SetNull, onUpdate: Cascade)
 
   @@index([organizationId, timestamp])
+  @@index([organizationId, severity, timestamp])
   @@index([organizationId, branchId, timestamp])
   @@index([userId])
   @@index([resourceType, resourceId])
