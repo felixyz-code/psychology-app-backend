@@ -143,9 +143,14 @@ describeCertification('Organization logo protected lifecycle', () => {
         contentType: 'image/png',
       })
       .expect(403);
-    await upload(ownerToken, organizationAId, Buffer.alloc(1024 * 1024 + 1), {
-      expectedRowState: 'ABSENT',
-    }).expect(413);
+    await upload(
+      ownerToken,
+      organizationAId,
+      Buffer.concat([png(64, 64), Buffer.alloc(1024 * 1024 + 1)]),
+      {
+        expectedRowState: 'ABSENT',
+      },
+    ).expect(413);
     await request(app.getHttpServer())
       .put(`/organizations/${organizationAId}/logo`)
       .set('Authorization', ownerToken)
