@@ -44,19 +44,120 @@ describe('OpenAPI document', () => {
   it('documents every certified route and the Bearer security scheme', () => {
     const document = createDocument(app);
 
-    expect(Object.keys(document.paths)).toHaveLength(76);
+    expect(Object.keys(document.paths)).toHaveLength(119);
     expect(document.components?.securitySchemes?.bearer).toEqual({
       type: 'http',
       scheme: 'bearer',
       bearerFormat: 'JWT',
       description: 'Paste the JWT access token here',
     });
+    expect(document.paths['/appointments/availability'].get?.security).toEqual([
+      { bearer: [] },
+    ]);
+    expect(
+      document.paths['/appointments/{id}/reschedule'].post?.security,
+    ).toEqual([{ bearer: [] }]);
+    expect(document.paths['/schedule-blocks'].get?.security).toEqual([
+      { bearer: [] },
+    ]);
+    expect(document.paths['/schedule-blocks'].post?.security).toEqual([
+      { bearer: [] },
+    ]);
+    expect(document.paths['/schedule-blocks/{id}'].get?.security).toEqual([
+      { bearer: [] },
+    ]);
+    expect(document.paths['/schedule-blocks/{id}'].delete?.security).toEqual([
+      { bearer: [] },
+    ]);
+    expect(
+      document.paths['/case-files/{id}/attachments'].get?.security,
+    ).toEqual([{ bearer: [] }]);
+    expect(
+      document.paths['/case-files/{id}/attachments'].post?.security,
+    ).toEqual([{ bearer: [] }]);
+    expect(
+      document.paths['/case-files/{id}/attachments/{attachmentId}/download'].get
+        ?.security,
+    ).toEqual([{ bearer: [] }]);
+    expect(
+      document.paths['/case-files/{id}/attachments/{attachmentId}/view'].get
+        ?.security,
+    ).toEqual([{ bearer: [] }]);
+    expect(
+      document.paths['/case-files/{id}/attachments/{attachmentId}'].delete
+        ?.security,
+    ).toEqual([{ bearer: [] }]);
+    expect(document.paths['/case-files/{id}/pdf-data'].get?.security).toEqual([
+      { bearer: [] },
+    ]);
+    expect(
+      document.paths['/case-files/{id}/notes/{noteId}/pdf-data'].get?.security,
+    ).toEqual([{ bearer: [] }]);
+    expect(
+      document.paths['/case-files/{id}/consent-data'].get?.security,
+    ).toEqual([{ bearer: [] }]);
+    expect(
+      document.paths['/session-notes/{id}/pdf-data'].get?.security,
+    ).toEqual([{ bearer: [] }]);
+    expect(document.paths['/users/me/profile'].get?.security).toEqual([
+      { bearer: [] },
+    ]);
+    expect(document.paths['/users/me/preferences'].get?.security).toEqual([
+      { bearer: [] },
+    ]);
+    expect(document.paths['/users/me/preferences'].patch?.security).toEqual([
+      { bearer: [] },
+    ]);
+    expect(
+      document.paths['/assessments/administrations'].get?.security,
+    ).toEqual([{ bearer: [] }]);
+    expect(
+      document.paths['/assessments/administrations'].post?.security,
+    ).toEqual([{ bearer: [] }]);
+    expect(
+      document.paths['/assessments/administrations/{id}/responses'].patch
+        ?.security,
+    ).toEqual([{ bearer: [] }]);
+    expect(
+      document.paths['/assessments/administrations/{id}/complete'].post
+        ?.security,
+    ).toEqual([{ bearer: [] }]);
+    expect(
+      document.paths['/assessments/administrations/{id}/report'].get?.security,
+    ).toEqual([{ bearer: [] }]);
+    expect(
+      document.paths['/assessments/patients/{patientId}/longitudinal'].get
+        ?.security,
+    ).toEqual([{ bearer: [] }]);
+    expect(
+      document.paths['/assessments/public/runner/{accessToken}'].get?.security,
+    ).toBeUndefined();
+    expect(
+      document.paths['/assessments/public/runner/{accessToken}/responses'].patch
+        ?.security,
+    ).toBeUndefined();
+    expect(
+      document.paths['/assessments/public/runner/{accessToken}/complete'].post
+        ?.security,
+    ).toBeUndefined();
     expect(document.paths['/audit-logs'].get?.security).toEqual([
       { bearer: [] },
     ]);
     expect(document.paths['/audit-logs'].get?.responses).toHaveProperty('200');
     expect(document.paths['/audit-logs'].get?.responses).toHaveProperty('401');
     expect(document.paths['/audit-logs'].get?.responses).toHaveProperty('403');
+    expect(document.paths['/audit-logs/export'].get?.security).toEqual([
+      { bearer: [] },
+    ]);
+    expect(document.paths['/audit-logs/export'].get?.responses).toHaveProperty(
+      '200',
+    );
+    expect(document.paths['/audit-logs/export'].get?.responses).toHaveProperty(
+      '401',
+    );
+    expect(document.paths['/audit-logs/export'].get?.responses).toHaveProperty(
+      '403',
+    );
     expect(document.paths['/audit-logs/{id}'].get?.security).toEqual([
       { bearer: [] },
     ]);

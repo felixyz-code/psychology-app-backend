@@ -24,6 +24,9 @@ type PrismaMock = {
   };
   patient: { findFirst: jest.Mock };
   patientAssignment: { findFirst: jest.Mock };
+  user: { findUnique: jest.Mock };
+  organization: { findUnique: jest.Mock };
+  sessionNote: { findFirst: jest.Mock };
 };
 
 const scope: ClinicalAccessScope = {
@@ -58,6 +61,9 @@ describe('CaseFilesService D2 tenant-aware policy', () => {
       },
       patient: { findFirst: jest.fn() },
       patientAssignment: { findFirst: jest.fn() },
+      user: { findUnique: jest.fn() },
+      organization: { findUnique: jest.fn() },
+      sessionNote: { findFirst: jest.fn() },
     };
     clinicalPolicy = {
       requireCapability: jest.fn(),
@@ -261,6 +267,110 @@ describe('CaseFilesService D2 tenant-aware policy', () => {
       CaseFileWorkspaceTimelineEventType.APPOINTMENT_COMPLETED,
       CaseFileWorkspaceTimelineEventType.CASE_FILE_CREATED,
     ]);
+  });
+
+  describe('getClinicalPdfData & getConsentPdfData', () => {
+    const mockCaseFile = {
+      id: 'case-file-1',
+      patientId: 'patient-1',
+      diagnosis: 'F41.1 Trastorno de ansiedad generalizada',
+      treatmentPlan: 'Terapia cognitivo-conductual 12 sesiones',
+      createdAt: new Date('2026-01-10T10:00:00Z'),
+      updatedAt: new Date('2026-01-15T10:00:00Z'),
+      patient: {
+        id: 'patient-1',
+        firstName: 'Juan',
+        lastName: 'Pérez',
+        birthDate: new Date('1990-05-15T00:00:00Z'),
+        phoneNumber: '5551234567',
+        email: 'juan.perez@example.com',
+        psychologistId: 'psychologist-a-id',
+        appointments: [
+          {
+            id: 'appt-1',
+            scheduledAt: new Date('2026-02-01T16:00:00Z'),
+            durationMinutes: 50,
+            notes: 'Sesión inicial',
+          },
+        ],
+      },
+    };
+
+    const mockTherapist = {
+      id: 'psychologist-a-id',
+      name: 'Dra. María Psicóloga',
+      email: 'dra.maria@clinica.com',
+      psychologistProfile: {
+        professionalName: 'Dra. María Elena Ramos',
+        licenseNumber: 'CED-1234567',
+        specialties: ['Psicología Clínica', 'Terapia Breve'],
+        phone: '5559876543',
+        signatureAsset: null,
+      },
+    };
+
+    const mockOrganization = {
+      id: 'organization-a-id',
+      legalName: 'Psicología Integral S.A. de C.V.',
+      displayName: 'Centro PsiqueOS',
+      tradeName: 'PsiqueOS Polanco',
+      taxId: 'PSI123456ABC',
+      phone: '5550001122',
+      email: 'contacto@psiqueos.com',
+      address: 'Av. Paseo de la Reforma 100, CDMX',
+      branding: {
+        primaryColor: '#1976d2',
+        accentColor: '#42a5f5',
+      },
+      logoAsset: null,
+    };
+
+    it('compiles clinical pdf export payload for a case file note', async () => {
+      prisma.caseFile.findFirst.mockResolvedValue(mockCaseFile);
+      prisma.patientAssignment.findFirst.mockResolvedValue({ id: 'assign-1' });
+      prisma.sessionNote.findFirst.mockResolvedValue({
+        id: 'note-1',
+        sessionDate: new Date('2026-02-01T16:00:00Z'),
+        title: 'Sesión 1 - Evaluación',
+        content: 'Paciente refiere síntomas de ansiedad.',
+        authorId: 'psychologist-a-id',
+        createdAt: new Date('2026-02-01T17:00:00Z'),
+        updatedAt: new Date('2026-02-01T17:00:00Z'),
+      });
+      prisma.user.findUnique.mockResolvedValue(mockTherapist);
+      prisma.organization.findUnique.mockResolvedValue(mockOrganization);
+
+      const result = await service.getClinicalPdfData(
+        'case-file-1',
+        scope,
+        'note-1',
+      );
+
+      expect(result.documentType).toBe('NOM_004_EVOLUTION_NOTE');
+      expect(result.patient.fullName).toBe('Juan Pérez');
+      expect(result.patient.age).toBeGreaterThan(0);
+      expect(result.therapist.professionalName).toBe('Dra. María Elena Ramos');
+      expect(result.therapist.licenseNumber).toBe('CED-1234567');
+      expect(result.tenant.displayName).toBe('Centro PsiqueOS');
+      expect(result.sessionNote?.content).toBe(
+        'Paciente refiere síntomas de ansiedad.',
+      );
+      expect(result.appointment?.id).toBe('appt-1');
+    });
+
+    it('compiles informed consent export payload', async () => {
+      prisma.caseFile.findFirst.mockResolvedValue(mockCaseFile);
+      prisma.patientAssignment.findFirst.mockResolvedValue({ id: 'assign-1' });
+      prisma.user.findUnique.mockResolvedValue(mockTherapist);
+      prisma.organization.findUnique.mockResolvedValue(mockOrganization);
+
+      const result = await service.getConsentPdfData('case-file-1', scope);
+
+      expect(result.documentType).toBe('INFORMED_CONSENT');
+      expect(result.caseFile.id).toBe('case-file-1');
+      expect(result.patient.id).toBe('patient-1');
+      expect(result.therapist.id).toBe('psychologist-a-id');
+    });
   });
 });
 

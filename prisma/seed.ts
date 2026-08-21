@@ -22,6 +22,7 @@ import {
   UserRole,
 } from '@prisma/client';
 import { seedCommercialCoreData } from './seed-commercial';
+import { seedAllStockInstruments } from './seeds/stock-instruments-seed';
 
 const connectionString = process.env.DATABASE_URL;
 
@@ -1688,6 +1689,14 @@ function transaction(data: {
 async function resetTenantDevelopmentSeed() {
   await cleanupSeedDocumentFiles();
 
+  try {
+    await prisma.$executeRawUnsafe(
+      'ALTER TABLE audit_logs DISABLE TRIGGER trg_audit_logs_immutable;',
+    );
+  } catch (error) {
+    // Trigger may not exist in initial migrations
+  }
+
   const organizationIds = organizations.map(
     (seedOrganization) => seedOrganization.id,
   );
@@ -1702,6 +1711,15 @@ async function resetTenantDevelopmentSeed() {
   const appointmentIds = appointments.map(
     (seedAppointment) => seedAppointment.id as string,
   );
+
+  await prisma.auditLog.deleteMany({
+    where: {
+      OR: [
+        { organizationId: { in: organizationIds } },
+        { userId: { in: userIds } },
+      ],
+    },
+  });
 
   await prisma.$transaction([
     prisma.financialTransaction.deleteMany({
@@ -1848,6 +1866,14 @@ async function resetTenantDevelopmentSeed() {
       },
     }),
   ]);
+
+  try {
+    await prisma.$executeRawUnsafe(
+      'ALTER TABLE audit_logs ENABLE TRIGGER trg_audit_logs_immutable;',
+    );
+  } catch (error) {
+    // Trigger may not exist in initial migrations
+  }
 }
 
 async function cleanupSeedDocumentFiles() {
@@ -1989,6 +2015,7 @@ async function main() {
 
   await resetTenantDevelopmentSeed();
   await seedTenantDevelopmentData(passwordHash);
+  await seedAllStockInstruments(prisma);
 
   console.log('Tenant-aware development seed completed successfully.');
   console.log('Data set: synthetic local development fixtures only.');

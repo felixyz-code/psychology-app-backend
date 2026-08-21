@@ -97,7 +97,12 @@ export class OrganizationConfigurationService {
     return this.toBrandingResponse(
       await this.prisma.organizationBranding.findUnique({
         where: { organizationId },
-        select: { primaryColor: true, updatedAt: true },
+        select: {
+          visualName: true,
+          primaryColor: true,
+          accentColor: true,
+          updatedAt: true,
+        },
       }),
     );
   }
@@ -113,6 +118,25 @@ export class OrganizationConfigurationService {
         'primaryColor must have at least 3:1 contrast against approved light and dark surfaces',
       );
     }
+    if (dto.accentColor && !hasApprovedBrandAccentContrast(dto.accentColor)) {
+      throw new BadRequestException(
+        'accentColor must have at least 3:1 contrast against approved light and dark surfaces',
+      );
+    }
+    const mutationData: {
+      primaryColor: string | null;
+      visualName?: string | null;
+      accentColor?: string | null;
+    } = {
+      primaryColor: dto.primaryColor,
+    };
+    if (dto.visualName !== undefined) {
+      mutationData.visualName = dto.visualName;
+    }
+    if (dto.accentColor !== undefined) {
+      mutationData.accentColor = dto.accentColor;
+    }
+
     return this.runMutation(
       organizationId,
       dto,
@@ -121,10 +145,26 @@ export class OrganizationConfigurationService {
         if (dto.expectedRowState === 'ABSENT') {
           if (current)
             throw new ConflictException('Configuration row already exists');
-          if (dto.primaryColor === null) return null;
+          if (
+            dto.primaryColor === null &&
+            (dto.visualName === null || dto.visualName === undefined) &&
+            (dto.accentColor === null || dto.accentColor === undefined)
+          ) {
+            return null;
+          }
           return tx.organizationBranding.create({
-            data: { organizationId, primaryColor: dto.primaryColor },
-            select: { primaryColor: true, updatedAt: true },
+            data: {
+              organizationId,
+              primaryColor: dto.primaryColor,
+              visualName: dto.visualName ?? null,
+              accentColor: dto.accentColor ?? null,
+            },
+            select: {
+              visualName: true,
+              primaryColor: true,
+              accentColor: true,
+              updatedAt: true,
+            },
           });
         }
         if (!current)
@@ -134,18 +174,28 @@ export class OrganizationConfigurationService {
             organizationId,
             updatedAt: new Date(dto.expectedUpdatedAt as string),
           },
-          data: { primaryColor: dto.primaryColor },
+          data: mutationData,
         });
         if (updated.count !== 1)
           throw new ConflictException('Configuration changed concurrently');
         return tx.organizationBranding.findUnique({
           where: { organizationId },
-          select: { primaryColor: true, updatedAt: true },
+          select: {
+            visualName: true,
+            primaryColor: true,
+            accentColor: true,
+            updatedAt: true,
+          },
         });
       },
     ).then((row) =>
       this.toBrandingResponse(
-        row as { primaryColor: string | null; updatedAt: Date } | null,
+        row as {
+          visualName: string | null;
+          primaryColor: string | null;
+          accentColor: string | null;
+          updatedAt: Date;
+        } | null,
       ),
     );
   }
@@ -239,14 +289,21 @@ export class OrganizationConfigurationService {
   }
 
   private toBrandingResponse(
-    row: { primaryColor: string | null; updatedAt: Date } | null,
+    row: {
+      visualName?: string | null;
+      primaryColor: string | null;
+      accentColor?: string | null;
+      updatedAt: Date;
+    } | null,
   ): OrganizationBrandingResponseDto {
     return {
       rowState: row
         ? OrganizationConfigurationRowState.PRESENT
         : OrganizationConfigurationRowState.ABSENT,
       updatedAt: row?.updatedAt ?? null,
+      visualName: row?.visualName ?? null,
       primaryColor: row?.primaryColor ?? null,
+      accentColor: row?.accentColor ?? null,
     };
   }
 }

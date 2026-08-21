@@ -20,6 +20,7 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Query,
   UsePipes,
   ValidationPipe,
 } from '@nestjs/common';
@@ -35,6 +36,9 @@ import { AppointmentsService } from './appointments.service';
 import { CreateAppointmentDto } from './dto/create-appointment.dto';
 import { UpdateAppointmentDto } from './dto/update-appointment.dto';
 import { AppointmentResponseDto } from './dto/appointment-response.dto';
+import { RescheduleAppointmentDto } from './dto/reschedule-appointment.dto';
+import { AvailabilityQueryDto } from './dto/availability-query.dto';
+import { AvailabilityResponseDto } from './dto/availability-response.dto';
 
 @ApiTags('appointments')
 @ApiBearerAuth('bearer')
@@ -94,6 +98,26 @@ export class AppointmentsController {
     return this.appointmentsService.findAll(this.createScope(tenant, user));
   }
 
+  @Get('availability')
+  @ApiOperation({
+    summary: 'Calculate available appointment slots for a therapist',
+  })
+  @ApiOkResponse({
+    description: 'Calculated availability slots',
+    type: AvailabilityResponseDto,
+  })
+  @ApiBadRequestResponse({ description: 'Invalid date or parameters' })
+  getAvailability(
+    @Query() query: AvailabilityQueryDto,
+    @CurrentUser() user: AuthenticatedUser,
+    @CurrentTenant(true) tenant: TenantContext,
+  ) {
+    return this.appointmentsService.getAvailability(
+      query,
+      this.createScope(tenant, user),
+    );
+  }
+
   @Get('patient/:patientId')
   @ApiOperation({ summary: 'List appointments by patient ID' })
   @ApiParam({
@@ -116,6 +140,40 @@ export class AppointmentsController {
   ) {
     return this.appointmentsService.findByPatientId(
       patientId,
+      this.createScope(tenant, user),
+    );
+  }
+
+  @Post(':id/reschedule')
+  @AuditLog({
+    action: 'CLINICAL_APPOINTMENT_RESCHEDULED',
+    resourceType: 'Appointment',
+  })
+  @ApiOperation({
+    summary: 'Reschedule an appointment with overlap validation',
+  })
+  @ApiParam({
+    name: 'id',
+    description: 'Appointment ID',
+    format: 'uuid',
+    example: '550e8400-e29b-41d4-a716-446655440000',
+  })
+  @ApiBody({ type: RescheduleAppointmentDto })
+  @ApiOkResponse({
+    description: 'Appointment rescheduled successfully',
+    type: AppointmentResponseDto,
+  })
+  @ApiBadRequestResponse({ description: 'Time conflict or invalid payload' })
+  @ApiNotFoundResponse({ description: 'Appointment not found' })
+  reschedule(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() rescheduleDto: RescheduleAppointmentDto,
+    @CurrentUser() user: AuthenticatedUser,
+    @CurrentTenant(true) tenant: TenantContext,
+  ) {
+    return this.appointmentsService.reschedule(
+      id,
+      rescheduleDto,
       this.createScope(tenant, user),
     );
   }

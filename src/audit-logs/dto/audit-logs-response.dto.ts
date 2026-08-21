@@ -1,4 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { AuditSeverity } from '../audit-logs.types';
 
 export class AuditLogUserDto {
   @ApiProperty({ format: 'uuid' })
@@ -49,6 +50,12 @@ export class AuditLogEntryDto {
     example: '550e8400-e29b-41d4-a716-446655440000',
   })
   resourceId?: string | null;
+
+  @ApiProperty({
+    enum: AuditSeverity,
+    example: AuditSeverity.INFO,
+  })
+  severity: AuditSeverity;
 
   @ApiPropertyOptional({ nullable: true, example: '192.168.1.1' })
   ipAddress?: string | null;

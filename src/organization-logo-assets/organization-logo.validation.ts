@@ -3,7 +3,7 @@ import { imageSize } from 'image-size';
 import { extname } from 'node:path';
 import { decodeOrganizationLogo } from './organization-logo.decoder';
 
-export const MAX_ORGANIZATION_LOGO_BYTES = 1024 * 1024;
+export const MAX_ORGANIZATION_LOGO_BYTES = 2 * 1024 * 1024;
 const MIN_DIMENSION = 64;
 const MAX_DIMENSION = 2048;
 const PNG_SIGNATURE = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
@@ -24,7 +24,7 @@ export function validateOrganizationLogo(
   }
   if (file.buffer.byteLength > MAX_ORGANIZATION_LOGO_BYTES) {
     throw new PayloadTooLargeException(
-      'Organization logo exceeds the 1 MiB limit',
+      'Organization logo exceeds the 2 MiB limit',
     );
   }
 

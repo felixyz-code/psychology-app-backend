@@ -1,14 +1,22 @@
+import { existsSync, promises as fs } from 'node:fs';
 import {
   ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { AppointmentStatus, Prisma } from '@prisma/client';
+import { OrganizationLogoStorageService } from '../organization-logo-assets/organization-logo-storage.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { ClinicalAccessPolicyService } from '../tenant-context/clinical-access-policy.service';
 import type { ClinicalAccessScope } from '../tenant-context/clinical-access.types';
 import { OrganizationCapability } from '../tenant-context/authorization/organization-capability';
+import { UserProfileStorageService } from '../user-profile/user-profile-storage.service';
+import {
+  ClinicalDocumentType,
+  ClinicalPdfExportPayloadDto,
+} from './dto/clinical-pdf-data.dto';
 import {
   CaseFileWorkspaceTimelineEventType,
   CaseFileWorkspaceTimelineSourceType,
@@ -125,6 +133,10 @@ export class CaseFilesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly clinicalPolicy: ClinicalAccessPolicyService,
+    @Optional()
+    private readonly userProfileStorage?: UserProfileStorageService,
+    @Optional()
+    private readonly organizationLogoStorage?: OrganizationLogoStorageService,
   ) {}
 
   async create(
@@ -459,5 +471,245 @@ export class CaseFilesService {
     return timeline.sort(
       (left, right) => right.occurredAt.getTime() - left.occurredAt.getTime(),
     );
+  }
+
+  async getClinicalPdfData(
+    caseFileId: string,
+    scope: ClinicalAccessScope,
+    noteId?: string,
+    documentType: ClinicalDocumentType = ClinicalDocumentType.NOM_004_EVOLUTION_NOTE,
+  ): Promise<ClinicalPdfExportPayloadDto> {
+    this.clinicalPolicy.requireCapability(
+      scope,
+      OrganizationCapability.CASE_FILE_READ,
+      'case_files.pdf_data',
+    );
+
+    const caseFile = await this.prisma.caseFile.findFirst({
+      where: {
+        id: caseFileId,
+        organizationId: scope.organizationId,
+        patient: this.clinicalPolicy.tenantPatientWhere(scope),
+      },
+      include: {
+        patient: {
+          include: {
+            psychologist: true,
+            appointments: {
+              where: { organizationId: scope.organizationId },
+              orderBy: { scheduledAt: 'desc' },
+              take: 1,
+            },
+          },
+        },
+      },
+    });
+
+    if (!caseFile) {
+      throw this.caseFileNotFound();
+    }
+
+    await this.requireAssignment(caseFile.patientId, scope);
+
+    let sessionNoteRecord: {
+      id: string;
+      sessionDate: Date;
+      title: string | null;
+      content: string;
+      authorId: string;
+      createdAt: Date;
+      updatedAt: Date;
+    } | null = null;
+    let targetTherapistId = scope.userId;
+
+    if (noteId) {
+      const note = await this.prisma.sessionNote.findFirst({
+        where: {
+          id: noteId,
+          caseFileId,
+          organizationId: scope.organizationId,
+        },
+      });
+
+      if (!note) {
+        throw new NotFoundException('Session note not found');
+      }
+
+      sessionNoteRecord = note;
+      targetTherapistId = note.authorId;
+    } else if (caseFile.patient.psychologistId) {
+      targetTherapistId = caseFile.patient.psychologistId;
+    }
+
+    // Retrieve therapist profile and signature asset
+    const therapistUser = await this.prisma.user.findUnique({
+      where: { id: targetTherapistId },
+      include: {
+        psychologistProfile: {
+          include: {
+            signatureAsset: true,
+          },
+        },
+      },
+    });
+
+    let signatureDataUri: string | null = null;
+    if (
+      therapistUser?.psychologistProfile?.signatureAsset &&
+      this.userProfileStorage
+    ) {
+      const sigAsset = therapistUser.psychologistProfile.signatureAsset;
+      signatureDataUri = await this.loadAssetDataUri(
+        () =>
+          this.userProfileStorage!.resolveSignaturePath(sigAsset.storageKey),
+        sigAsset.mimeType,
+      );
+    }
+
+    // Retrieve tenant details, branding and logo asset
+    const organization = await this.prisma.organization.findUnique({
+      where: { id: scope.organizationId },
+      include: {
+        branding: true,
+        logoAsset: true,
+      },
+    });
+
+    let logoDataUri: string | null = null;
+    if (organization?.logoAsset && this.organizationLogoStorage) {
+      const logoAsset = organization.logoAsset;
+      logoDataUri = await this.loadAssetDataUri(
+        () =>
+          this.organizationLogoStorage!.resolveExistingFile(
+            organization.id,
+            logoAsset.storageKey,
+          ),
+        logoAsset.mimeType,
+      );
+    }
+
+    const patient = caseFile.patient;
+    const profile = therapistUser?.psychologistProfile;
+    const latestAppointment = patient.appointments[0];
+
+    const patientBirthDate = patient.birthDate
+      ? new Date(patient.birthDate)
+      : null;
+
+    return {
+      documentType,
+      generatedAt: new Date().toISOString(),
+      tenant: {
+        organizationId: organization?.id ?? scope.organizationId,
+        legalName: organization?.legalName ?? 'Centro Psicológico',
+        displayName:
+          organization?.displayName ??
+          organization?.legalName ??
+          'Clínica de Psicología',
+        tradeName: organization?.tradeName ?? null,
+        taxId: organization?.taxId ?? null,
+        phone: organization?.phone ?? null,
+        email: organization?.email ?? null,
+        address: organization?.address ?? null,
+        primaryColor: organization?.branding?.primaryColor ?? null,
+        accentColor: organization?.branding?.accentColor ?? null,
+        logoDataUri,
+      },
+      therapist: {
+        id: therapistUser?.id ?? scope.userId,
+        name: therapistUser?.name ?? 'Especialista',
+        professionalName:
+          profile?.professionalName ??
+          therapistUser?.name ??
+          'Especialista en Psicología',
+        licenseNumber: profile?.licenseNumber ?? null,
+        specialties: profile?.specialties ?? [],
+        phone: profile?.phone ?? null,
+        email: therapistUser?.email ?? null,
+        signatureDataUri,
+      },
+      patient: {
+        id: patient.id,
+        fullName: `${patient.firstName} ${patient.lastName}`.trim(),
+        firstName: patient.firstName,
+        lastName: patient.lastName,
+        birthDate: patient.birthDate
+          ? patient.birthDate.toISOString().split('T')[0]
+          : null,
+        age: this.calculateAge(patientBirthDate),
+        phoneNumber: patient.phoneNumber ?? null,
+        email: patient.email ?? null,
+      },
+      caseFile: {
+        id: caseFile.id,
+        diagnosis: caseFile.diagnosis ?? null,
+        treatmentPlan: caseFile.treatmentPlan ?? null,
+        createdAt: caseFile.createdAt.toISOString(),
+        updatedAt: caseFile.updatedAt.toISOString(),
+      },
+      sessionNote: sessionNoteRecord
+        ? {
+            id: sessionNoteRecord.id,
+            sessionDate: sessionNoteRecord.sessionDate.toISOString(),
+            title: sessionNoteRecord.title ?? null,
+            content: sessionNoteRecord.content,
+            createdAt: sessionNoteRecord.createdAt.toISOString(),
+            updatedAt: sessionNoteRecord.updatedAt.toISOString(),
+          }
+        : null,
+      appointment: latestAppointment
+        ? {
+            id: latestAppointment.id,
+            scheduledAt: latestAppointment.scheduledAt.toISOString(),
+            durationMinutes: latestAppointment.durationMinutes,
+            notes: latestAppointment.notes ?? null,
+          }
+        : null,
+    };
+  }
+
+  async getConsentPdfData(
+    caseFileId: string,
+    scope: ClinicalAccessScope,
+  ): Promise<ClinicalPdfExportPayloadDto> {
+    return this.getClinicalPdfData(
+      caseFileId,
+      scope,
+      undefined,
+      ClinicalDocumentType.INFORMED_CONSENT,
+    );
+  }
+
+  private async loadAssetDataUri(
+    resolver: () => Promise<string>,
+    mimeType?: string,
+  ): Promise<string | null> {
+    try {
+      const absolutePath = await resolver();
+      if (!absolutePath || !existsSync(absolutePath)) {
+        return null;
+      }
+      const buffer = await fs.readFile(absolutePath);
+      const resolvedMime = mimeType || 'image/png';
+      return `data:${resolvedMime};base64,${buffer.toString('base64')}`;
+    } catch {
+      return null;
+    }
+  }
+
+  private calculateAge(birthDate: Date | null): number | null {
+    if (!birthDate || Number.isNaN(birthDate.getTime())) {
+      return null;
+    }
+    const today = new Date();
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+    if (
+      monthDiff < 0 ||
+      (monthDiff === 0 && today.getDate() < birthDate.getDate())
+    ) {
+      age--;
+    }
+    return age >= 0 ? age : null;
   }
 }

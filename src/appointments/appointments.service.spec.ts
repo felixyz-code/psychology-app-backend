@@ -19,6 +19,12 @@ type PrismaMock = {
     findMany: jest.Mock;
     updateMany: jest.Mock;
   };
+  scheduleBlock: {
+    findFirst: jest.Mock;
+    findMany: jest.Mock;
+    create: jest.Mock;
+    delete: jest.Mock;
+  };
   organizationMembership: { findFirst: jest.Mock };
   patient: { findFirst: jest.Mock };
   patientAssignment: { findFirst: jest.Mock };
@@ -36,8 +42,14 @@ describe('AppointmentsService tenant isolation and notes policy', () => {
         create: jest.fn(),
         deleteMany: jest.fn(),
         findFirst: jest.fn(),
-        findMany: jest.fn(),
+        findMany: jest.fn().mockResolvedValue([]),
         updateMany: jest.fn(),
+      },
+      scheduleBlock: {
+        findFirst: jest.fn().mockResolvedValue(null),
+        findMany: jest.fn().mockResolvedValue([]),
+        create: jest.fn(),
+        delete: jest.fn(),
       },
       organizationMembership: { findFirst: jest.fn() },
       patient: { findFirst: jest.fn() },
@@ -257,15 +269,156 @@ describe('AppointmentsService tenant isolation and notes policy', () => {
     expect(prisma.appointment.deleteMany).not.toHaveBeenCalled();
   });
 
-  it('does not keep legacy ADMIN global lookup semantics', async () => {
-    prisma.appointment.findFirst.mockResolvedValue(appointment());
-
-    await service.findOne('appointment-a-id', scope(MembershipRole.ADMIN));
-
-    expect(prisma.appointment.findFirst).toHaveBeenCalledWith({
-      where: { id: 'appointment-a-id', organizationId: 'organization-a-id' },
-      include: { patient: { select: { id: true, psychologistId: true } } },
+  it('reschedules an appointment successfully when no conflict exists', async () => {
+    const existing = appointment();
+    prisma.appointment.findFirst.mockResolvedValue(existing);
+    prisma.appointment.findMany.mockResolvedValue([]);
+    prisma.scheduleBlock.findFirst.mockResolvedValue(null);
+    prisma.appointment.updateMany.mockResolvedValue({ count: 1 });
+    prisma.patientAssignment.findFirst.mockResolvedValue({
+      id: 'assignment-id',
     });
+
+    const result = await service.reschedule(
+      'appointment-a-id',
+      {
+        scheduledAt: '2026-08-25T16:00:00.000Z',
+        durationMinutes: 60,
+        reason: 'Patient request',
+      },
+      scope(MembershipRole.ADMIN),
+    );
+
+    expect(prisma.appointment.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: 'appointment-a-id',
+        organizationId: 'organization-a-id',
+      },
+      data: expect.objectContaining({
+        durationMinutes: 60,
+        notes: expect.stringContaining('Patient request'),
+      }),
+    });
+    expect(result).toBeDefined();
+  });
+
+  it('rejects reschedule when conflicting appointment exists', async () => {
+    const existing = appointment({
+      scheduledAt: new Date('2026-08-25T10:00:00.000Z'),
+    });
+    prisma.appointment.findFirst.mockResolvedValue(existing);
+    prisma.appointment.findMany.mockResolvedValue([
+      {
+        id: 'appointment-other-id',
+        scheduledAt: new Date('2026-08-25T16:00:00.000Z'),
+        durationMinutes: 60,
+      },
+    ]);
+
+    await expect(
+      service.reschedule(
+        'appointment-a-id',
+        {
+          scheduledAt: '2026-08-25T16:30:00.000Z',
+          durationMinutes: 60,
+        },
+        scope(MembershipRole.ADMIN),
+      ),
+    ).rejects.toThrow(
+      'Existe un conflicto de horario con otra cita ya programada.',
+    );
+  });
+
+  it('rejects reschedule when conflicting schedule block exists', async () => {
+    const existing = appointment({
+      scheduledAt: new Date('2026-08-25T10:00:00.000Z'),
+    });
+    prisma.appointment.findFirst.mockResolvedValue(existing);
+    prisma.appointment.findMany.mockResolvedValue([]);
+    prisma.scheduleBlock.findFirst.mockResolvedValue({
+      id: 'block-1',
+      title: 'Training Session',
+      startTime: new Date('2026-08-25T14:00:00.000Z'),
+      endTime: new Date('2026-08-25T17:00:00.000Z'),
+    });
+
+    await expect(
+      service.reschedule(
+        'appointment-a-id',
+        {
+          scheduledAt: '2026-08-25T15:00:00.000Z',
+          durationMinutes: 60,
+        },
+        scope(MembershipRole.ADMIN),
+      ),
+    ).rejects.toThrow(
+      'El horario seleccionado coincide con un bloqueo de agenda del terapeuta.',
+    );
+  });
+
+  it('rejects reschedule when appointment is not in SCHEDULED status', async () => {
+    const existing = appointment({
+      status: 'COMPLETED',
+    });
+    prisma.appointment.findFirst.mockResolvedValue(existing);
+
+    await expect(
+      service.reschedule(
+        'appointment-a-id',
+        {
+          scheduledAt: '2026-08-25T15:00:00.000Z',
+          durationMinutes: 60,
+        },
+        scope(MembershipRole.ADMIN),
+      ),
+    ).rejects.toThrow(
+      'La cita no se encuentra en un estado que permita su reprogramación.',
+    );
+  });
+
+  it('calculates availability slots accounting for appointments and schedule blocks', async () => {
+    prisma.organizationMembership.findFirst.mockResolvedValue({ id: 'mem-1' });
+    prisma.appointment.findMany.mockResolvedValue([
+      {
+        id: 'appt-1',
+        scheduledAt: new Date('2026-08-25T09:00:00.000Z'),
+        durationMinutes: 60,
+      },
+    ]);
+    prisma.scheduleBlock.findMany.mockResolvedValue([
+      {
+        id: 'block-1',
+        title: 'Team Meeting',
+        startTime: new Date('2026-08-25T11:00:00.000Z'),
+        endTime: new Date('2026-08-25T12:00:00.000Z'),
+      },
+    ]);
+
+    const availability = await service.getAvailability(
+      {
+        therapistId: 'psychologist-a-id',
+        date: '2026-08-25',
+        durationMinutes: 60,
+        startHour: 8,
+        endHour: 13,
+      },
+      scope(MembershipRole.ADMIN),
+    );
+
+    expect(availability.slots.length).toBe(5);
+    // 08:00 - Available
+    expect(availability.slots[0].available).toBe(true);
+    // 09:00 - Appointment
+    expect(availability.slots[1].available).toBe(false);
+    expect(availability.slots[1].conflictType).toBe('APPOINTMENT');
+    // 10:00 - Available
+    expect(availability.slots[2].available).toBe(true);
+    // 11:00 - Schedule Block
+    expect(availability.slots[3].available).toBe(false);
+    expect(availability.slots[3].conflictType).toBe('SCHEDULE_BLOCK');
+    expect(availability.slots[3].title).toBe('Team Meeting');
+    // 12:00 - Available
+    expect(availability.slots[4].available).toBe(true);
   });
 });
 

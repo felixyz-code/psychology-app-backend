@@ -2,6 +2,8 @@ import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
   IsDateString,
+  IsEnum,
+  IsIn,
   IsInt,
   IsOptional,
   IsString,
@@ -9,8 +11,17 @@ import {
   Max,
   Min,
 } from 'class-validator';
+import { AuditSeverity } from '../audit-logs.types';
 
 export class AuditLogsQueryDto {
+  @ApiPropertyOptional({
+    description: 'Filter by Tenant/Organization UUID',
+    format: 'uuid',
+  })
+  @IsOptional()
+  @IsUUID()
+  tenantId?: string;
+
   @ApiPropertyOptional({
     description: 'Filter by Branch UUID',
     format: 'uuid',
@@ -26,6 +37,15 @@ export class AuditLogsQueryDto {
   @IsOptional()
   @IsUUID()
   userId?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Filter by Resource (matches either resourceType or resourceId)',
+    example: 'Patient',
+  })
+  @IsOptional()
+  @IsString()
+  resource?: string;
 
   @ApiPropertyOptional({
     description:
@@ -53,12 +73,37 @@ export class AuditLogsQueryDto {
   action?: string;
 
   @ApiPropertyOptional({
+    description: 'Filter by Severity Level',
+    enum: AuditSeverity,
+    example: AuditSeverity.INFO,
+  })
+  @IsOptional()
+  @IsEnum(AuditSeverity)
+  severity?: AuditSeverity;
+
+  @ApiPropertyOptional({
+    description: 'Filter events on or after ISO Date (alias of from)',
+    example: '2026-08-01T00:00:00.000Z',
+  })
+  @IsOptional()
+  @IsDateString()
+  startDate?: string;
+
+  @ApiPropertyOptional({
     description: 'Filter events on or after ISO Date',
     example: '2026-08-01T00:00:00.000Z',
   })
   @IsOptional()
   @IsDateString()
   from?: string;
+
+  @ApiPropertyOptional({
+    description: 'Filter events on or before ISO Date (alias of to)',
+    example: '2026-08-31T23:59:59.999Z',
+  })
+  @IsOptional()
+  @IsDateString()
+  endDate?: string;
 
   @ApiPropertyOptional({
     description: 'Filter events on or before ISO Date',
@@ -77,14 +122,23 @@ export class AuditLogsQueryDto {
   search?: string;
 
   @ApiPropertyOptional({
-    description: 'Page size limit (1-100)',
+    description: 'Export format for export endpoint',
+    enum: ['csv', 'json'],
+    default: 'csv',
+  })
+  @IsOptional()
+  @IsIn(['csv', 'json'])
+  format?: 'csv' | 'json';
+
+  @ApiPropertyOptional({
+    description: 'Page size limit (1-500)',
     default: 50,
   })
   @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(1)
-  @Max(100)
+  @Max(500)
   limit?: number = 50;
 
   @ApiPropertyOptional({

@@ -84,4 +84,33 @@ describe('AuditLog schema contract and migration', () => {
     expect(sub83Migration).toContain('BEFORE UPDATE OR DELETE ON "audit_logs"');
     expect(sub83Migration).toContain("USING ERRCODE = '55000'");
   });
+
+  it('verifies the subphase 10.5 audit severity enum and composite index', () => {
+    expect(schema).toContain('enum AuditSeverity {');
+    expect(schema).toContain('INFO');
+    expect(schema).toContain('LOW');
+    expect(schema).toContain('MEDIUM');
+    expect(schema).toContain('HIGH');
+    expect(schema).toContain('CRITICAL');
+    expect(schema).toContain('severity        AuditSeverity @default(INFO)');
+    expect(schema).toContain('@@index([organizationId, severity, timestamp])');
+
+    const subphase105Dir = readdirSync(migrationsDir).find((dir) =>
+      dir.includes('add_audit_severity'),
+    );
+    expect(subphase105Dir).toBeDefined();
+
+    const sub105Migration = readFileSync(
+      resolve(migrationsDir, subphase105Dir!, 'migration.sql'),
+      'utf8',
+    );
+
+    expect(sub105Migration).toContain('CREATE TYPE "AuditSeverity" AS ENUM');
+    expect(sub105Migration).toContain(
+      'ALTER TABLE "audit_logs" ADD COLUMN "severity" "AuditSeverity" NOT NULL DEFAULT \'INFO\'',
+    );
+    expect(sub105Migration).toContain(
+      'CREATE INDEX "audit_logs_organizationId_severity_timestamp_idx"',
+    );
+  });
 });

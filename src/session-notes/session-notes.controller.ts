@@ -35,6 +35,7 @@ import type { TenantContext } from '../tenant-context/tenant-context.types';
 import { CreateSessionNoteDto } from './dto/create-session-note.dto';
 import { UpdateSessionNoteDto } from './dto/update-session-note.dto';
 import { SessionNoteResponseDto } from './dto/session-note-response.dto';
+import { ClinicalPdfExportPayloadDto } from '../case-files/dto/clinical-pdf-data.dto';
 import { SessionNotesService } from './session-notes.service';
 
 @ApiTags('session-notes')
@@ -141,6 +142,32 @@ export class SessionNotesController {
     @CurrentTenant(true) tenant: TenantContext,
   ) {
     return this.sessionNotesService.findOne(id, this.createScope(tenant, user));
+  }
+
+  @Get(':id/pdf-data')
+  @AuditLog({ action: 'CLINICAL_DOCUMENT_EXPORT', resourceType: 'SessionNote' })
+  @ApiOperation({ summary: 'Get NOM-004 evolution note PDF export payload' })
+  @ApiParam({
+    name: 'id',
+    description: 'Session note ID',
+    format: 'uuid',
+    example: '550e8400-e29b-41d4-a716-446655440000',
+  })
+  @ApiOkResponse({
+    description: 'Evolution note PDF export payload retrieved successfully',
+    type: ClinicalPdfExportPayloadDto,
+  })
+  @ApiBadRequestResponse({ description: 'Invalid session note ID' })
+  @ApiNotFoundResponse({ description: 'Session note not found' })
+  getPdfData(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @CurrentTenant(true) tenant: TenantContext,
+  ) {
+    return this.sessionNotesService.getPdfData(
+      id,
+      this.createScope(tenant, user),
+    );
   }
 
   @Patch(':id')
