@@ -8,6 +8,6 @@ import { UserProfileStorageService } from './user-profile-storage.service';
   imports: [PrismaModule],
   controllers: [UserProfileController],
   providers: [UserProfileService, UserProfileStorageService],
-  exports: [UserProfileService],
+  exports: [UserProfileService, UserProfileStorageService],
 })
 export class UserProfileModule {}

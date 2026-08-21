@@ -44,13 +44,25 @@ describe('OpenAPI document', () => {
   it('documents every certified route and the Bearer security scheme', () => {
     const document = createDocument(app);
 
-    expect(Object.keys(document.paths)).toHaveLength(107);
+    expect(Object.keys(document.paths)).toHaveLength(111);
     expect(document.components?.securitySchemes?.bearer).toEqual({
       type: 'http',
       scheme: 'bearer',
       bearerFormat: 'JWT',
       description: 'Paste the JWT access token here',
     });
+    expect(document.paths['/case-files/{id}/pdf-data'].get?.security).toEqual([
+      { bearer: [] },
+    ]);
+    expect(
+      document.paths['/case-files/{id}/notes/{noteId}/pdf-data'].get?.security,
+    ).toEqual([{ bearer: [] }]);
+    expect(
+      document.paths['/case-files/{id}/consent-data'].get?.security,
+    ).toEqual([{ bearer: [] }]);
+    expect(
+      document.paths['/session-notes/{id}/pdf-data'].get?.security,
+    ).toEqual([{ bearer: [] }]);
     expect(document.paths['/users/me/profile'].get?.security).toEqual([
       { bearer: [] },
     ]);
