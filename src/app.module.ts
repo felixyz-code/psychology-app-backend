@@ -35,6 +35,7 @@ import { CorporateModule } from './modules/enterprise/corporate/corporate.module
 import { InstrumentsModule } from './modules/instruments/instruments.module';
 import { AssessmentsModule } from './modules/assessments/assessments.module';
 import { UserProfileModule } from './user-profile/user-profile.module';
+import { ScheduleBlocksModule } from './schedule-blocks/schedule-blocks.module';
 
 @Module({
   imports: [
@@ -51,6 +52,7 @@ import { UserProfileModule } from './user-profile/user-profile.module';
     SessionNotesModule,
     DocumentsModule,
     AppointmentsModule,
+    ScheduleBlocksModule,
     FinancialTransactionsModule,
     HealthModule,
     TenantContextModule,
