@@ -2,8 +2,10 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { CaseFilesService } from '../case-files/case-files.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { ClinicalAccessPolicyService } from '../tenant-context/clinical-access-policy.service';
 import type { ClinicalAccessScope } from '../tenant-context/clinical-access.types';
@@ -16,6 +18,8 @@ export class SessionNotesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly clinicalPolicy: ClinicalAccessPolicyService,
+    @Optional()
+    private readonly caseFilesService?: CaseFilesService,
   ) {}
 
   async create(
@@ -244,6 +248,26 @@ export class SessionNotesService {
     Reflect.deleteProperty(noteData, 'organizationId');
     Reflect.deleteProperty(noteData, 'authorId');
     return noteData;
+  }
+
+  async getPdfData(id: string, scope: ClinicalAccessScope) {
+    const sessionNote = await this.getVisibleSessionNoteOrThrow(id, scope);
+    this.clinicalPolicy.requireCapability(
+      scope,
+      OrganizationCapability.SESSION_NOTE_READ,
+      'session_notes.pdf_data',
+    );
+    await this.requireAssignment(sessionNote.caseFile.patientId, scope);
+
+    if (!this.caseFilesService) {
+      throw new NotFoundException('Case files service not configured');
+    }
+
+    return this.caseFilesService.getClinicalPdfData(
+      sessionNote.caseFileId,
+      scope,
+      id,
+    );
   }
 
   private sessionNoteNotFound() {

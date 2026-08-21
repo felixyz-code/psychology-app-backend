@@ -37,6 +37,7 @@ import { CaseFileWorkspaceResponseDto } from './dto/case-file-workspace-response
 import { CreateCaseFileDto } from './dto/create-case-file.dto';
 import { UpdateCaseFileDto } from './dto/update-case-file.dto';
 import { CaseFileResponseDto } from './dto/case-file-response.dto';
+import { ClinicalPdfExportPayloadDto } from './dto/clinical-pdf-data.dto';
 
 @ApiTags('case-files')
 @ApiBearerAuth('bearer')
@@ -197,6 +198,92 @@ export class CaseFilesController {
     return this.caseFilesService.update(
       id,
       updateCaseFileDto,
+      this.createScope(tenant, user),
+    );
+  }
+
+  @Get(':id/pdf-data')
+  @AuditLog({ action: 'CLINICAL_CASE_FILE_READ', resourceType: 'CaseFile' })
+  @ApiOperation({ summary: 'Get clinical PDF export payload for case file' })
+  @ApiParam({
+    name: 'id',
+    description: 'Case file ID',
+    format: 'uuid',
+    example: '550e8400-e29b-41d4-a716-446655440000',
+  })
+  @ApiOkResponse({
+    description: 'Clinical PDF export payload retrieved successfully',
+    type: ClinicalPdfExportPayloadDto,
+  })
+  @ApiBadRequestResponse({ description: 'Invalid case file ID' })
+  @ApiNotFoundResponse({ description: 'Case file not found' })
+  getPdfData(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @CurrentTenant(true) tenant: TenantContext,
+  ) {
+    return this.caseFilesService.getClinicalPdfData(
+      id,
+      this.createScope(tenant, user),
+    );
+  }
+
+  @Get(':id/notes/:noteId/pdf-data')
+  @AuditLog({ action: 'CLINICAL_NOTE_READ', resourceType: 'SessionNote' })
+  @ApiOperation({ summary: 'Get NOM-004 evolution note PDF export payload' })
+  @ApiParam({
+    name: 'id',
+    description: 'Case file ID',
+    format: 'uuid',
+    example: '550e8400-e29b-41d4-a716-446655440000',
+  })
+  @ApiParam({
+    name: 'noteId',
+    description: 'Session note ID',
+    format: 'uuid',
+    example: '550e8400-e29b-41d4-a716-446655440000',
+  })
+  @ApiOkResponse({
+    description: 'Evolution note PDF export payload retrieved successfully',
+    type: ClinicalPdfExportPayloadDto,
+  })
+  @ApiBadRequestResponse({ description: 'Invalid case file ID or note ID' })
+  @ApiNotFoundResponse({ description: 'Case file or session note not found' })
+  getNotePdfData(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('noteId', ParseUUIDPipe) noteId: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @CurrentTenant(true) tenant: TenantContext,
+  ) {
+    return this.caseFilesService.getClinicalPdfData(
+      id,
+      this.createScope(tenant, user),
+      noteId,
+    );
+  }
+
+  @Get(':id/consent-data')
+  @AuditLog({ action: 'CLINICAL_CASE_FILE_READ', resourceType: 'CaseFile' })
+  @ApiOperation({ summary: 'Get informed consent PDF export payload' })
+  @ApiParam({
+    name: 'id',
+    description: 'Case file ID',
+    format: 'uuid',
+    example: '550e8400-e29b-41d4-a716-446655440000',
+  })
+  @ApiOkResponse({
+    description: 'Informed consent export payload retrieved successfully',
+    type: ClinicalPdfExportPayloadDto,
+  })
+  @ApiBadRequestResponse({ description: 'Invalid case file ID' })
+  @ApiNotFoundResponse({ description: 'Case file not found' })
+  getConsentData(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @CurrentTenant(true) tenant: TenantContext,
+  ) {
+    return this.caseFilesService.getConsentPdfData(
+      id,
       this.createScope(tenant, user),
     );
   }
