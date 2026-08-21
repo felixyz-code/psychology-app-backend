@@ -146,7 +146,7 @@ describeCertification('Organization logo protected lifecycle', () => {
     await upload(
       ownerToken,
       organizationAId,
-      Buffer.concat([png(64, 64), Buffer.alloc(1024 * 1024 + 1)]),
+      Buffer.alloc(2 * 1024 * 1024 + 1),
       {
         expectedRowState: 'ABSENT',
       },
