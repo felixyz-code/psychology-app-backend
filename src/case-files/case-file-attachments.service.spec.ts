@@ -1,4 +1,4 @@
-import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { AttachmentCategory } from '@prisma/client';
 import { AppConfigService } from '../config/configuration';
 import { PrismaService } from '../prisma/prisma.service';
@@ -30,9 +30,9 @@ describe('CaseFileAttachmentsService', () => {
   const scope: ClinicalAccessScope = {
     organizationId: 'org-id',
     membershipId: 'membership-id',
-    organizationRole: 'PSYCHOLOGIST' as any,
+    organizationRole: 'PSYCHOLOGIST',
     userId: 'user-id',
-    legacyUserRole: 'PSYCHOLOGIST' as any,
+    legacyUserRole: 'PSYCHOLOGIST',
     resolutionMode: 'EXPLICIT' as any,
   };
 

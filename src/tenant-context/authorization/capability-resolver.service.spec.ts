@@ -137,16 +137,10 @@ describe('CapabilityResolverService', () => {
 
   it('grants audit.read capability to OWNER, ADMIN, and AUDITOR', () => {
     expect(
-      resolver.resolve(
-        MembershipRole.OWNER,
-        OrganizationCapability.AUDIT_READ,
-      ),
+      resolver.resolve(MembershipRole.OWNER, OrganizationCapability.AUDIT_READ),
     ).toBe(CapabilityDecision.ALLOW);
     expect(
-      resolver.resolve(
-        MembershipRole.ADMIN,
-        OrganizationCapability.AUDIT_READ,
-      ),
+      resolver.resolve(MembershipRole.ADMIN, OrganizationCapability.AUDIT_READ),
     ).toBe(CapabilityDecision.ALLOW);
     expect(
       resolver.resolve(

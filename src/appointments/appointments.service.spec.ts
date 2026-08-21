@@ -275,7 +275,9 @@ describe('AppointmentsService tenant isolation and notes policy', () => {
     prisma.appointment.findMany.mockResolvedValue([]);
     prisma.scheduleBlock.findFirst.mockResolvedValue(null);
     prisma.appointment.updateMany.mockResolvedValue({ count: 1 });
-    prisma.patientAssignment.findFirst.mockResolvedValue({ id: 'assignment-id' });
+    prisma.patientAssignment.findFirst.mockResolvedValue({
+      id: 'assignment-id',
+    });
 
     const result = await service.reschedule(
       'appointment-a-id',
@@ -322,7 +324,9 @@ describe('AppointmentsService tenant isolation and notes policy', () => {
         },
         scope(MembershipRole.ADMIN),
       ),
-    ).rejects.toThrow('Existe un conflicto de horario con otra cita ya programada.');
+    ).rejects.toThrow(
+      'Existe un conflicto de horario con otra cita ya programada.',
+    );
   });
 
   it('rejects reschedule when conflicting schedule block exists', async () => {
@@ -347,7 +351,9 @@ describe('AppointmentsService tenant isolation and notes policy', () => {
         },
         scope(MembershipRole.ADMIN),
       ),
-    ).rejects.toThrow('El horario seleccionado coincide con un bloqueo de agenda del terapeuta.');
+    ).rejects.toThrow(
+      'El horario seleccionado coincide con un bloqueo de agenda del terapeuta.',
+    );
   });
 
   it('rejects reschedule when appointment is not in SCHEDULED status', async () => {
@@ -365,7 +371,9 @@ describe('AppointmentsService tenant isolation and notes policy', () => {
         },
         scope(MembershipRole.ADMIN),
       ),
-    ).rejects.toThrow('La cita no se encuentra en un estado que permita su reprogramación.');
+    ).rejects.toThrow(
+      'La cita no se encuentra en un estado que permita su reprogramación.',
+    );
   });
 
   it('calculates availability slots accounting for appointments and schedule blocks', async () => {

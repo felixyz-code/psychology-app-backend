@@ -225,7 +225,9 @@ describe('SessionNotesService D2 tenant-aware policy', () => {
       );
 
       prisma.sessionNote.findFirst.mockResolvedValue(noteWithRelation());
-      prisma.patientAssignment.findFirst.mockResolvedValue({ id: 'assignment-id' });
+      prisma.patientAssignment.findFirst.mockResolvedValue({
+        id: 'assignment-id',
+      });
 
       const result = await customService.getPdfData('note-id', scope);
 

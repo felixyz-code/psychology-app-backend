@@ -114,12 +114,7 @@ export class CaseFileAttachmentsController {
       properties: {
         category: {
           type: 'string',
-          enum: [
-            'ESTUDIO_PREVIO',
-            'REPORTE_ESCOLAR',
-            'IDENTIFICACION',
-            'OTRO',
-          ],
+          enum: ['ESTUDIO_PREVIO', 'REPORTE_ESCOLAR', 'IDENTIFICACION', 'OTRO'],
           default: 'OTRO',
         },
         notes: {

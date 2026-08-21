@@ -84,7 +84,9 @@ describe('InstrumentsController', () => {
   describe('toggleVisibility', () => {
     it('should delegate to service.toggleVisibility', async () => {
       mockService.toggleVisibility.mockResolvedValue({ isEnabled: false });
-      await controller.toggleVisibility(mockTenant, 'inst-1', { isEnabled: false });
+      await controller.toggleVisibility(mockTenant, 'inst-1', {
+        isEnabled: false,
+      });
       expect(service.toggleVisibility).toHaveBeenCalledWith(
         mockTenant.organizationId,
         'inst-1',

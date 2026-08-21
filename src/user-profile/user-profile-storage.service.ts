@@ -1,7 +1,7 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { randomBytes } from 'node:crypto';
-import { existsSync, promises as fs } from 'node:fs';
-import { isAbsolute, join, normalize, resolve } from 'node:path';
+import { promises as fs } from 'node:fs';
+import { join, normalize, resolve } from 'node:path';
 
 @Injectable()
 export class UserProfileStorageService {
@@ -17,7 +17,11 @@ export class UserProfileStorageService {
     this.signatureDir = join(baseDir, 'signatures');
   }
 
-  async writeAvatar(userId: string, buffer: Buffer, extension: string): Promise<string> {
+  async writeAvatar(
+    userId: string,
+    buffer: Buffer,
+    extension: string,
+  ): Promise<string> {
     await fs.mkdir(this.avatarDir, { recursive: true });
     const storageKey = `${userId}-${Date.now()}-${randomBytes(8).toString('hex')}.${extension}`;
     const absolutePath = join(this.avatarDir, storageKey);
@@ -25,7 +29,11 @@ export class UserProfileStorageService {
     return storageKey;
   }
 
-  async writeSignature(userId: string, buffer: Buffer, extension: string): Promise<string> {
+  async writeSignature(
+    userId: string,
+    buffer: Buffer,
+    extension: string,
+  ): Promise<string> {
     await fs.mkdir(this.signatureDir, { recursive: true });
     const storageKey = `${userId}-${Date.now()}-${randomBytes(8).toString('hex')}.${extension}`;
     const absolutePath = join(this.signatureDir, storageKey);
@@ -35,24 +43,34 @@ export class UserProfileStorageService {
 
   async resolveAvatarPath(storageKey: string): Promise<string> {
     const target = normalize(join(this.avatarDir, storageKey));
-    if (!target.startsWith(this.avatarDir) || !existsSync(target)) {
+    try {
+      if (!target.startsWith(this.avatarDir)) {
+        throw new NotFoundException('Avatar asset not found');
+      }
+      await fs.access(target);
+      return target;
+    } catch {
       throw new NotFoundException('Avatar asset not found');
     }
-    return target;
   }
 
   async resolveSignaturePath(storageKey: string): Promise<string> {
     const target = normalize(join(this.signatureDir, storageKey));
-    if (!target.startsWith(this.signatureDir) || !existsSync(target)) {
+    try {
+      if (!target.startsWith(this.signatureDir)) {
+        throw new NotFoundException('Signature asset not found');
+      }
+      await fs.access(target);
+      return target;
+    } catch {
       throw new NotFoundException('Signature asset not found');
     }
-    return target;
   }
 
   async deleteAvatarFile(storageKey: string): Promise<void> {
     try {
       const target = normalize(join(this.avatarDir, storageKey));
-      if (target.startsWith(this.avatarDir) && existsSync(target)) {
+      if (target.startsWith(this.avatarDir)) {
         await fs.unlink(target);
       }
     } catch (error) {
@@ -63,7 +81,7 @@ export class UserProfileStorageService {
   async deleteSignatureFile(storageKey: string): Promise<void> {
     try {
       const target = normalize(join(this.signatureDir, storageKey));
-      if (target.startsWith(this.signatureDir) && existsSync(target)) {
+      if (target.startsWith(this.signatureDir)) {
         await fs.unlink(target);
       }
     } catch (error) {

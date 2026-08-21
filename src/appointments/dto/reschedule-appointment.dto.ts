@@ -19,7 +19,8 @@ export class RescheduleAppointmentDto {
   scheduledAt!: string;
 
   @ApiPropertyOptional({
-    description: 'Duration of the appointment in minutes (defaults to current duration)',
+    description:
+      'Duration of the appointment in minutes (defaults to current duration)',
     example: 60,
     minimum: 15,
     maximum: 240,

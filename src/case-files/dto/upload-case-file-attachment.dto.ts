@@ -14,7 +14,8 @@ export class UploadCaseFileAttachmentDto {
   category?: AttachmentCategory = AttachmentCategory.OTRO;
 
   @ApiPropertyOptional({
-    description: 'Clinical notes or observations associated with the attachment',
+    description:
+      'Clinical notes or observations associated with the attachment',
     example: 'Reporte psicopedagógico emitido por el colegio.',
     maxLength: 1000,
   })

@@ -157,7 +157,8 @@ export class UpdateUserPreferencesDto {
   timeZone?: string;
 
   @ApiPropertyOptional({
-    description: 'Time display format (TWELVE_HOUR: 12h, TWENTY_FOUR_HOUR: 24h)',
+    description:
+      'Time display format (TWELVE_HOUR: 12h, TWENTY_FOUR_HOUR: 24h)',
     enum: UserTimeFormat,
     example: UserTimeFormat.TWELVE_HOUR,
   })

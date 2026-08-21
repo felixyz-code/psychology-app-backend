@@ -1,7 +1,9 @@
 import { NotFoundException } from '@nestjs/common';
-import { PsychologistProfileStatus, UserRole } from '@prisma/client';
-import { PrismaService } from '../prisma/prisma.service';
-import { UserProfileStorageService } from './user-profile-storage.service';
+import {
+  PsychologistProfileStatus,
+  UserRole,
+  UserTimeFormat,
+} from '@prisma/client';
 import { UserProfileService } from './user-profile.service';
 
 describe('UserProfileService', () => {
@@ -45,10 +47,7 @@ describe('UserProfileService', () => {
       deleteAvatarFile: jest.fn(),
       deleteSignatureFile: jest.fn(),
     };
-    service = new UserProfileService(
-      prisma as unknown as PrismaService,
-      storage as unknown as UserProfileStorageService,
-    );
+    service = new UserProfileService(prisma, storage);
   });
 
   describe('getProfile', () => {
@@ -156,7 +155,10 @@ describe('UserProfileService', () => {
         createdAt: new Date(),
         updatedAt: new Date(),
       });
-      prisma.user.update.mockResolvedValue({ ...mockUser, name: 'Dr. Updated Name' });
+      prisma.user.update.mockResolvedValue({
+        ...mockUser,
+        name: 'Dr. Updated Name',
+      });
       prisma.user.findUniqueOrThrow.mockResolvedValue({
         ...mockUser,
         name: 'Dr. Updated Name',
@@ -229,7 +231,9 @@ describe('UserProfileService', () => {
       expect(prisma.userSignatureAsset.delete).toHaveBeenCalledWith({
         where: { userId: 'user-1' },
       });
-      expect(storage.deleteSignatureFile).toHaveBeenCalledWith('old-signature.png');
+      expect(storage.deleteSignatureFile).toHaveBeenCalledWith(
+        'old-signature.png',
+      );
       expect(result.rowState).toBe('ABSENT');
     });
   });
@@ -300,7 +304,9 @@ describe('UserProfileService', () => {
     it('throws NotFoundException when updating non-existent user preferences', async () => {
       prisma.user.findUnique.mockResolvedValue(null);
       await expect(
-        service.updatePreferences('non-existent', { timeZone: 'America/Santiago' }),
+        service.updatePreferences('non-existent', {
+          timeZone: 'America/Santiago',
+        }),
       ).rejects.toThrow(NotFoundException);
     });
 
@@ -326,7 +332,7 @@ describe('UserProfileService', () => {
         emailNotifications: false,
         reminderAdvanceMinutes: 120,
         timeZone: 'America/Santiago',
-        timeFormat: 'TWENTY_FOUR_HOUR' as any,
+        timeFormat: UserTimeFormat.TWENTY_FOUR_HOUR,
         locale: 'es-CL',
         weekStartsOn: 0,
       });

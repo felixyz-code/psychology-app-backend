@@ -1,10 +1,7 @@
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import { UserDateFormat, UserTimeFormat } from '@prisma/client';
-import {
-  UpdateUserPreferencesDto,
-  IsIanaTimeZone,
-} from './user-preferences.dto';
+import { UpdateUserPreferencesDto } from './user-preferences.dto';
 
 describe('UpdateUserPreferencesDto validation', () => {
   it('validates a correct payload successfully', async () => {

@@ -12,8 +12,14 @@ export interface ValidatedUserAsset {
   height: number;
 }
 
-export function validateAvatarImage(file: Express.Multer.File): ValidatedUserAsset {
-  if (!file || !Buffer.isBuffer(file.buffer) || file.buffer.byteLength !== file.size) {
+export function validateAvatarImage(
+  file: Express.Multer.File,
+): ValidatedUserAsset {
+  if (
+    !file ||
+    !Buffer.isBuffer(file.buffer) ||
+    file.buffer.byteLength !== file.size
+  ) {
     throw new BadRequestException('Avatar upload bytes are invalid');
   }
   if (file.buffer.byteLength > MAX_AVATAR_BYTES) {
@@ -34,7 +40,9 @@ export function validateAvatarImage(file: Express.Multer.File): ValidatedUserAss
   }
 
   if (!dimensions.width || !dimensions.height) {
-    throw new BadRequestException('Avatar image dimensions could not be determined');
+    throw new BadRequestException(
+      'Avatar image dimensions could not be determined',
+    );
   }
 
   const mimeType =
@@ -52,12 +60,20 @@ export function validateAvatarImage(file: Express.Multer.File): ValidatedUserAss
   };
 }
 
-export function validateSignatureImage(file: Express.Multer.File): ValidatedUserAsset {
-  if (!file || !Buffer.isBuffer(file.buffer) || file.buffer.byteLength !== file.size) {
+export function validateSignatureImage(
+  file: Express.Multer.File,
+): ValidatedUserAsset {
+  if (
+    !file ||
+    !Buffer.isBuffer(file.buffer) ||
+    file.buffer.byteLength !== file.size
+  ) {
     throw new BadRequestException('Signature upload bytes are invalid');
   }
   if (file.buffer.byteLength > MAX_SIGNATURE_BYTES) {
-    throw new PayloadTooLargeException('Signature image exceeds the 1 MiB limit');
+    throw new PayloadTooLargeException(
+      'Signature image exceeds the 1 MiB limit',
+    );
   }
 
   const extension = extname(file.originalname).toLowerCase();
@@ -74,7 +90,9 @@ export function validateSignatureImage(file: Express.Multer.File): ValidatedUser
   }
 
   if (!dimensions.width || !dimensions.height) {
-    throw new BadRequestException('Signature image dimensions could not be determined');
+    throw new BadRequestException(
+      'Signature image dimensions could not be determined',
+    );
   }
 
   const mimeType = extension === '.png' ? 'image/png' : 'image/jpeg';

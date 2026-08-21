@@ -26,7 +26,9 @@ describe('User Preferences schema contract', () => {
     expect(schema).toContain('dateFormat             UserDateFormat');
     expect(schema).toContain('locale                 String');
     expect(schema).toContain('weekStartsOn           Int');
-    expect(schema).toContain('preferences                     UserPreferences?');
+    expect(schema).toContain(
+      'preferences                     UserPreferences?',
+    );
     expect(schema).toContain('@@map("user_preferences")');
   });
 
@@ -34,7 +36,9 @@ describe('User Preferences schema contract', () => {
     expect(migration).toContain('CREATE TYPE "UserTimeFormat"');
     expect(migration).toContain('CREATE TYPE "UserDateFormat"');
     expect(migration).toContain('CREATE TABLE "user_preferences"');
-    expect(migration).toContain('ALTER TABLE "user_preferences" ADD CONSTRAINT "user_preferences_userId_fkey"');
+    expect(migration).toContain(
+      'ALTER TABLE "user_preferences" ADD CONSTRAINT "user_preferences_userId_fkey"',
+    );
     expect(migration).toContain('ON DELETE CASCADE ON UPDATE CASCADE');
   });
 });

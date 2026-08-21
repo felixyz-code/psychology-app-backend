@@ -69,7 +69,9 @@ describe('UserProfileController', () => {
   });
 
   it('delegates updateProfile to service', async () => {
-    service.updateProfile.mockResolvedValue({ professionalName: 'Dr. Updated' });
+    service.updateProfile.mockResolvedValue({
+      professionalName: 'Dr. Updated',
+    });
     const dto = { professionalName: 'Dr. Updated' };
     const result = await controller.updateProfile(mockUser, dto);
     expect(service.updateProfile).toHaveBeenCalledWith('user-1', dto);
