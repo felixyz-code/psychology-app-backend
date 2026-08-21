@@ -6,41 +6,8 @@ import { UserProfileService } from './user-profile.service';
 
 describe('UserProfileService', () => {
   let service: UserProfileService;
-  let prisma: {
-    user: {
-      findUnique: ReturnType<typeof jest.fn>;
-      findUniqueOrThrow: ReturnType<typeof jest.fn>;
-      update: ReturnType<typeof jest.fn>;
-    };
-    psychologistProfile: {
-      findUnique: ReturnType<typeof jest.fn>;
-      create: ReturnType<typeof jest.fn>;
-      upsert: ReturnType<typeof jest.fn>;
-    };
-    userAvatarAsset: {
-      findUnique: ReturnType<typeof jest.fn>;
-      upsert: ReturnType<typeof jest.fn>;
-      delete: ReturnType<typeof jest.fn>;
-    };
-    userSignatureAsset: {
-      findUnique: ReturnType<typeof jest.fn>;
-      upsert: ReturnType<typeof jest.fn>;
-      delete: ReturnType<typeof jest.fn>;
-    };
-    userPreferences: {
-      findUnique: ReturnType<typeof jest.fn>;
-      create: ReturnType<typeof jest.fn>;
-      upsert: ReturnType<typeof jest.fn>;
-    };
-  };
-  let storage: {
-    writeAvatar: ReturnType<typeof jest.fn>;
-    writeSignature: ReturnType<typeof jest.fn>;
-    resolveAvatarPath: ReturnType<typeof jest.fn>;
-    resolveSignaturePath: ReturnType<typeof jest.fn>;
-    deleteAvatarFile: ReturnType<typeof jest.fn>;
-    deleteSignatureFile: ReturnType<typeof jest.fn>;
-  };
+  let prisma: any;
+  let storage: any;
 
   beforeEach(() => {
     prisma = {
@@ -189,7 +156,6 @@ describe('UserProfileService', () => {
         createdAt: new Date(),
         updatedAt: new Date(),
       });
-      prisma.prisma = prisma;
       prisma.user.update.mockResolvedValue({ ...mockUser, name: 'Dr. Updated Name' });
       prisma.user.findUniqueOrThrow.mockResolvedValue({
         ...mockUser,

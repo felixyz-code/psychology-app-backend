@@ -10,15 +10,12 @@ describe('AssessmentsController', () => {
   let service: AssessmentsService;
 
   const mockTenant: TenantContext = {
+    userId: 'user-111',
     organizationId: 'org-111',
     membershipId: 'mem-111',
-    role: 'PSYCHOLOGIST' as any,
-    organizationStatus: 'ACTIVE' as any,
-    slug: 'clinic-alpha',
-    displayName: 'Clínica Alpha',
-    timezone: 'UTC',
-    locale: 'es-MX',
-    currency: 'MXN',
+    organizationRole: 'PSYCHOLOGIST' as any,
+    legacyUserRole: 'PSYCHOLOGIST' as any,
+    resolutionMode: 'EXPLICIT' as any,
   };
 
   const mockUser: AuthenticatedUser = {
