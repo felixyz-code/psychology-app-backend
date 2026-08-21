@@ -493,7 +493,11 @@ describe('AssessmentsService', () => {
         severity: 'MODERATE',
         subscaleScoresJson: {},
         flagsJson: [],
-        scoringSpecSnapshotJson: { schemaVersion: '1.0', scoringType: 'SUM', strata: [] },
+        scoringSpecSnapshotJson: {
+          schemaVersion: '1.0',
+          scoringType: 'SUM',
+          strata: [],
+        },
         createdAt: new Date(),
       };
 
@@ -541,21 +545,41 @@ describe('AssessmentsService', () => {
           },
           definitionJson: {
             schemaVersion: '1.0',
-            metadata: { title: 'PHQ-9', acronym: 'PHQ-9', author: 'Kroenke et al.' },
+            metadata: {
+              title: 'PHQ-9',
+              acronym: 'PHQ-9',
+              author: 'Kroenke et al.',
+            },
             items: [
-              { code: 'PHQ9_1', sequenceNumber: 1, prompt: 'Poco interés o placer', required: true, options: [{ value: '0', label: 'Nunca', weight: 0 }] },
+              {
+                code: 'PHQ9_1',
+                sequenceNumber: 1,
+                prompt: 'Poco interés o placer',
+                required: true,
+                options: [{ value: '0', label: 'Nunca', weight: 0 }],
+              },
             ],
           },
         },
         responses: [
-          { itemCode: 'PHQ9_1', responseValue: '0', numericWeight: 0, createdAt: new Date(), updatedAt: new Date() },
+          {
+            itemCode: 'PHQ9_1',
+            responseValue: '0',
+            numericWeight: 0,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          },
         ],
         organization: {
           id: mockOrgId,
           legalName: 'Clínica Psicológica XYZ S.A. de C.V.',
           displayName: 'Clínica XYZ',
           slug: 'clinica-xyz',
-          branding: { primaryColor: '#0284c7', accentColor: '#0369a1', visualName: null },
+          branding: {
+            primaryColor: '#0284c7',
+            accentColor: '#0369a1',
+            visualName: null,
+          },
           logoAsset: null,
         },
       });
@@ -574,7 +598,9 @@ describe('AssessmentsService', () => {
     });
 
     it('should throw NotFoundException if administration not found', async () => {
-      mockPrismaService.assessmentAdministration.findFirst.mockResolvedValue(null);
+      mockPrismaService.assessmentAdministration.findFirst.mockResolvedValue(
+        null,
+      );
 
       await expect(
         service.getReport(mockOrgId, mockAdministrationId),
@@ -651,7 +677,9 @@ describe('AssessmentsService', () => {
       expect(result.series[0].delta).toBeNull();
       expect(result.series[1].delta!.rawScoreDelta).toBe(-6);
       expect(result.series[1].delta!.severityChange).toBe('IMPROVED');
-      expect(result.series[1].delta!.clinicalSignificance).toBe('CLINICALLY_SIGNIFICANT');
+      expect(result.series[1].delta!.clinicalSignificance).toBe(
+        'CLINICALLY_SIGNIFICANT',
+      );
       expect(result.summary.scoreTrend).toBe('IMPROVING');
       expect(result.summary.scoreMin).toBe(14);
       expect(result.summary.scoreMax).toBe(20);
@@ -685,4 +713,3 @@ describe('AssessmentsService', () => {
     });
   });
 });
-

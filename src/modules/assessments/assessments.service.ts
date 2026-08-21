@@ -688,8 +688,8 @@ export class AssessmentsService {
   }
 
   async getReport(organizationId: string, id: string) {
-    const administration =
-      await this.prisma.assessmentAdministration.findFirst({
+    const administration = await this.prisma.assessmentAdministration.findFirst(
+      {
         where: { id, organizationId },
         include: {
           patient: {
@@ -745,24 +745,29 @@ export class AssessmentsService {
             },
           },
         },
-      });
+      },
+    );
 
     if (!administration) {
       throw new NotFoundException('Assessment administration not found');
     }
 
-    if (
-      administration.status !== 'COMPLETED' ||
-      !administration.result
-    ) {
+    if (administration.status !== 'COMPLETED' || !administration.result) {
       throw new UnprocessableEntityException(
         'Assessment has not been completed yet. A psychometric report requires a finalized evaluation.',
       );
     }
 
     const reportGeneratedAt = new Date().toISOString();
-    const { patient, professional, branch, organization, instrumentVersion, result, responses } =
-      administration;
+    const {
+      patient,
+      professional,
+      branch,
+      organization,
+      instrumentVersion,
+      result,
+      responses,
+    } = administration;
 
     // Calculate patient age
     let age: number | null = null;
@@ -785,8 +790,10 @@ export class AssessmentsService {
     }
 
     // Parse definition for item prompts
-    const definition = instrumentVersion.definitionJson as unknown as InstrumentDefinition;
-    const scoringSnapshot = result.scoringSpecSnapshotJson as unknown as ScoringSpec;
+    const definition =
+      instrumentVersion.definitionJson as unknown as InstrumentDefinition;
+    const scoringSnapshot =
+      result.scoringSpecSnapshotJson as unknown as ScoringSpec;
 
     // Build item-level lookup
     const itemMap = new Map(
@@ -794,10 +801,8 @@ export class AssessmentsService {
     );
 
     // Subscales typed
-    const subscaleScores = (result.subscaleScoresJson ?? {}) as unknown as Record<
-      string,
-      SubscaleScoreResult
-    >;
+    const subscaleScores = (result.subscaleScoresJson ??
+      {}) as unknown as Record<string, SubscaleScoreResult>;
 
     // Find strata description for current strata
     let strataDescription: string | null = null;
@@ -823,16 +828,23 @@ export class AssessmentsService {
       const item = itemMap.get(r.itemCode);
       let responseLabel: string | null = null;
       if (item?.options && r.responseValue !== null) {
-        const opt = item.options.find(
-          (o) => o.value === String(r.responseValue),
-        );
+        const valStr =
+          typeof r.responseValue === 'object'
+            ? JSON.stringify(r.responseValue)
+            : String(r.responseValue);
+        const opt = item.options.find((o) => o.value === valStr);
         responseLabel = opt?.label ?? null;
       }
       return {
         itemCode: r.itemCode,
         sequenceNumber: item?.sequenceNumber ?? 0,
         prompt: item?.prompt ?? r.itemCode,
-        responseValue: r.responseValue as string | number | boolean | string[] | null,
+        responseValue: r.responseValue as
+          | string
+          | number
+          | boolean
+          | string[]
+          | null,
         responseLabel,
         numericWeight: r.numericWeight,
         isRequired: item?.required ?? false,
@@ -841,18 +853,18 @@ export class AssessmentsService {
     });
 
     const acronym =
-      (definition as any)?.metadata?.acronym ??
-      instrumentVersion.instrument.code;
-    const author = (definition as any)?.metadata?.author ?? null;
-    const administrationMode =
-      (definition as any)?.metadata?.administrationMode ?? null;
+      definition?.metadata?.acronym ?? instrumentVersion.instrument.code;
+    const author = definition?.metadata?.author ?? null;
+    const administrationMode = definition?.metadata?.administrationMode ?? null;
     const estimatedTimeMinutes =
-      (definition as any)?.metadata?.estimatedTimeMinutes ?? null;
+      definition?.metadata?.estimatedTimeMinutes ?? null;
 
     const subscalesArr = Object.values(subscaleScores).map((sub) => {
       let subStrataDesc: string | null = null;
       if (sub.strataCode && scoringSnapshot?.scales) {
-        const scale = scoringSnapshot.scales?.find((sc) => sc.code === sub.scaleCode);
+        const scale = scoringSnapshot.scales?.find(
+          (sc) => sc.code === sub.scaleCode,
+        );
         const subStrata = scale?.strata?.find((s) => s.code === sub.strataCode);
         subStrataDesc = subStrata?.description ?? null;
       }
@@ -875,8 +887,7 @@ export class AssessmentsService {
       instrumentVersion.instrument.name,
       acronym,
       instrumentVersion.versionNumber,
-      professional.psychologistProfile?.professionalName ??
-        professional.name,
+      professional.psychologistProfile?.professionalName ?? professional.name,
       professional.psychologistProfile?.licenseNumber ?? null,
       reportGeneratedAt,
       organization.legalName,
@@ -909,8 +920,7 @@ export class AssessmentsService {
         email: professional.email,
         professionalName:
           professional.psychologistProfile?.professionalName ?? null,
-        licenseNumber:
-          professional.psychologistProfile?.licenseNumber ?? null,
+        licenseNumber: professional.psychologistProfile?.licenseNumber ?? null,
       },
       patient: {
         id: patient.id,
@@ -948,8 +958,8 @@ export class AssessmentsService {
         strataTitle: result.strataTitle,
         severity: result.severity,
         strataDescription,
-        minPossibleScore: (scoringSnapshot as any)?.minScore ?? null,
-        maxPossibleScore: (scoringSnapshot as any)?.maxScore ?? null,
+        minPossibleScore: scoringSnapshot?.minScore ?? null,
+        maxPossibleScore: scoringSnapshot?.maxScore ?? null,
         subscales: subscalesArr,
         clinicalAlerts: clinicalAlerts.map((f) => ({
           alertType: f.alertType,
@@ -966,12 +976,14 @@ export class AssessmentsService {
     };
   }
 
+  /**
+   * Retrieves longitudinal evolution data for a patient's assessments over time.
+   */
   async getLongitudinalSeries(
     organizationId: string,
     patientId: string,
     query: QueryLongitudinalDto,
   ) {
-    // Verify patient belongs to organization
     const patient = await this.prisma.patient.findFirst({
       where: { id: patientId, organizationId },
       select: { id: true, firstName: true, lastName: true },
@@ -983,7 +995,7 @@ export class AssessmentsService {
 
     const limit = Math.min(100, Math.max(1, query.limit ?? 20));
 
-    const where: any = {
+    const where: Prisma.AssessmentAdministrationWhereInput = {
       organizationId,
       patientId,
       status: 'COMPLETED',
@@ -1005,8 +1017,8 @@ export class AssessmentsService {
         : {}),
     };
 
-    const administrations =
-      await this.prisma.assessmentAdministration.findMany({
+    const administrations = await this.prisma.assessmentAdministration.findMany(
+      {
         where,
         take: limit,
         orderBy: { completedAt: 'asc' },
@@ -1014,7 +1026,8 @@ export class AssessmentsService {
           instrumentVersion: { include: { instrument: true } },
           result: true,
         },
-      });
+      },
+    );
 
     // MCiD thresholds by instrument code
     const MCID_THRESHOLDS: Record<string, number> = {
@@ -1031,17 +1044,22 @@ export class AssessmentsService {
     const series = administrations.map((adm) => {
       const instrCode = adm.instrumentVersion.instrument.code;
       const result = adm.result!;
-      const subscaleScores = (result.subscaleScoresJson ?? {}) as unknown as Record<
-        string,
-        SubscaleScoreResult
-      >;
-      const flags = (Array.isArray(result.flagsJson) ? result.flagsJson : []) as unknown as ClinicalFlagResult[];
+      const subscaleScores = (result.subscaleScoresJson ??
+        {}) as unknown as Record<string, SubscaleScoreResult>;
+      const flags = (Array.isArray(result.flagsJson)
+        ? result.flagsJson
+        : []) as unknown as ClinicalFlagResult[];
       const activeCriticalAlerts = flags.filter(
         (f) => f.severity === 'CRITICAL' || f.severity === 'EMERGENCY',
       ).length;
 
       const prev = previousByInstrument.get(instrCode);
-      let delta: any = null;
+      let delta: {
+        previousAdministrationId: string;
+        rawScoreDelta: number;
+        severityChange: string;
+        clinicalSignificance: string;
+      } | null = null;
 
       if (prev) {
         const rawDelta = result.rawScore - prev.rawScore;
@@ -1116,7 +1134,8 @@ export class AssessmentsService {
 
       // Trend: compare first vs last delta (for single instrument)
       if (series.length >= 2) {
-        const singleInstrument = new Set(series.map((s) => s.instrumentCode)).size === 1;
+        const singleInstrument =
+          new Set(series.map((s) => s.instrumentCode)).size === 1;
         if (singleInstrument) {
           const firstScore = series[0].rawScore;
           const lastScore = series[series.length - 1].rawScore;
@@ -1150,4 +1169,3 @@ export class AssessmentsService {
     };
   }
 }
-

@@ -1,20 +1,17 @@
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import {
-  Injectable,
-  Logger,
-  NotFoundException,
-} from '@nestjs/common';
+  PsychologistProfileStatus,
+  UserPreferences,
+  UserRole,
+} from '@prisma/client';
 import { extname } from 'node:path';
 import { PrismaService } from '../prisma/prisma.service';
-import {
-  UserAssetResponseDto,
-} from './dto/user-asset-response.dto';
+import { UserAssetResponseDto } from './dto/user-asset-response.dto';
 import {
   UpdateUserPreferencesDto,
   UserPreferencesResponseDto,
 } from './dto/user-preferences.dto';
-import {
-  UserProfileResponseDto,
-} from './dto/user-profile-response.dto';
+import { UserProfileResponseDto } from './dto/user-profile-response.dto';
 import { UpdateUserProfileDto } from './dto/user-profile.dto';
 import { UserProfileStorageService } from './user-profile-storage.service';
 import {
@@ -181,7 +178,8 @@ export class UserProfileService {
   ): Promise<UserAssetResponseDto> {
     await this.ensureProfileExists(userId);
     const validated = validateAvatarImage(file);
-    const ext = extname(file.originalname).replace('.', '').toLowerCase() || 'png';
+    const ext =
+      extname(file.originalname).replace('.', '').toLowerCase() || 'png';
     const storageKey = await this.storage.writeAvatar(userId, file.buffer, ext);
 
     const oldAsset = await this.prisma.userAvatarAsset.findUnique({
@@ -270,7 +268,9 @@ export class UserProfileService {
     if (!asset) {
       throw new NotFoundException('Signature asset not found');
     }
-    const absolutePath = await this.storage.resolveSignaturePath(asset.storageKey);
+    const absolutePath = await this.storage.resolveSignaturePath(
+      asset.storageKey,
+    );
     return {
       absolutePath,
       mimeType: asset.mimeType,
@@ -285,8 +285,13 @@ export class UserProfileService {
   ): Promise<UserAssetResponseDto> {
     await this.ensureProfileExists(userId);
     const validated = validateSignatureImage(file);
-    const ext = extname(file.originalname).replace('.', '').toLowerCase() || 'png';
-    const storageKey = await this.storage.writeSignature(userId, file.buffer, ext);
+    const ext =
+      extname(file.originalname).replace('.', '').toLowerCase() || 'png';
+    const storageKey = await this.storage.writeSignature(
+      userId,
+      file.buffer,
+      ext,
+    );
 
     const oldAsset = await this.prisma.userSignatureAsset.findUnique({
       where: { userId },
@@ -451,7 +456,9 @@ export class UserProfileService {
     return this.toPreferencesResponse(updated);
   }
 
-  private toPreferencesResponse(prefs: any): UserPreferencesResponseDto {
+  private toPreferencesResponse(
+    prefs: UserPreferences,
+  ): UserPreferencesResponseDto {
     return {
       userId: prefs.userId,
       emailNotifications: prefs.emailNotifications,
@@ -470,8 +477,20 @@ export class UserProfileService {
   }
 
   private toProfileResponse(
-    user: { id: string; email: string; role: any },
-    profile: any,
+    user: { id: string; email: string; role: UserRole },
+    profile: {
+      id: string;
+      professionalName: string;
+      licenseNumber?: string | null;
+      phone?: string | null;
+      specialties?: string[];
+      bio?: string | null;
+      status: PsychologistProfileStatus;
+      avatarAsset?: unknown;
+      signatureAsset?: unknown;
+      createdAt: Date;
+      updatedAt: Date;
+    },
   ): UserProfileResponseDto {
     return {
       id: profile.id,

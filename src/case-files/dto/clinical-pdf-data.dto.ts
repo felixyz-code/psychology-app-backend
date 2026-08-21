@@ -17,7 +17,10 @@ export class ClinicalDocumentTenantDto {
   @ApiProperty({ description: 'Display name of the organization' })
   displayName!: string;
 
-  @ApiPropertyOptional({ description: 'Trade name of the organization', nullable: true })
+  @ApiPropertyOptional({
+    description: 'Trade name of the organization',
+    nullable: true,
+  })
   tradeName?: string | null;
 
   @ApiPropertyOptional({ description: 'Tax ID or RFC', nullable: true })
@@ -29,16 +32,28 @@ export class ClinicalDocumentTenantDto {
   @ApiPropertyOptional({ description: 'Contact email address', nullable: true })
   email?: string | null;
 
-  @ApiPropertyOptional({ description: 'Physical address of the clinic', nullable: true })
+  @ApiPropertyOptional({
+    description: 'Physical address of the clinic',
+    nullable: true,
+  })
   address?: string | null;
 
-  @ApiPropertyOptional({ description: 'Primary brand color hex code', nullable: true })
+  @ApiPropertyOptional({
+    description: 'Primary brand color hex code',
+    nullable: true,
+  })
   primaryColor?: string | null;
 
-  @ApiPropertyOptional({ description: 'Accent brand color hex code', nullable: true })
+  @ApiPropertyOptional({
+    description: 'Accent brand color hex code',
+    nullable: true,
+  })
   accentColor?: string | null;
 
-  @ApiPropertyOptional({ description: 'Base64 data URI of the organization logo', nullable: true })
+  @ApiPropertyOptional({
+    description: 'Base64 data URI of the organization logo',
+    nullable: true,
+  })
   logoDataUri?: string | null;
 }
 
@@ -52,19 +67,31 @@ export class ClinicalDocumentTherapistDto {
   @ApiProperty({ description: 'Professional full name with titles' })
   professionalName!: string;
 
-  @ApiPropertyOptional({ description: 'Professional license number (Cédula Profesional)', nullable: true })
+  @ApiPropertyOptional({
+    description: 'Professional license number (Cédula Profesional)',
+    nullable: true,
+  })
   licenseNumber?: string | null;
 
   @ApiProperty({ description: 'Clinical specialties', type: [String] })
   specialties!: string[];
 
-  @ApiPropertyOptional({ description: 'Therapist phone number', nullable: true })
+  @ApiPropertyOptional({
+    description: 'Therapist phone number',
+    nullable: true,
+  })
   phone?: string | null;
 
-  @ApiPropertyOptional({ description: 'Therapist email address', nullable: true })
+  @ApiPropertyOptional({
+    description: 'Therapist email address',
+    nullable: true,
+  })
   email?: string | null;
 
-  @ApiPropertyOptional({ description: 'Base64 data URI of the digitalized signature asset', nullable: true })
+  @ApiPropertyOptional({
+    description: 'Base64 data URI of the digitalized signature asset',
+    nullable: true,
+  })
   signatureDataUri?: string | null;
 }
 
@@ -84,7 +111,10 @@ export class ClinicalDocumentPatientDto {
   @ApiPropertyOptional({ description: 'Date of birth', nullable: true })
   birthDate?: string | null;
 
-  @ApiPropertyOptional({ description: 'Calculated age in years', nullable: true })
+  @ApiPropertyOptional({
+    description: 'Calculated age in years',
+    nullable: true,
+  })
   age?: number | null;
 
   @ApiPropertyOptional({ description: 'Patient contact phone', nullable: true })
@@ -101,7 +131,10 @@ export class ClinicalDocumentCaseFileSummaryDto {
   @ApiPropertyOptional({ description: 'Clinical diagnosis', nullable: true })
   diagnosis?: string | null;
 
-  @ApiPropertyOptional({ description: 'Clinical treatment plan', nullable: true })
+  @ApiPropertyOptional({
+    description: 'Clinical treatment plan',
+    nullable: true,
+  })
   treatmentPlan?: string | null;
 
   @ApiProperty({ description: 'Creation ISO timestamp' })
@@ -118,7 +151,10 @@ export class ClinicalDocumentSessionNoteDto {
   @ApiProperty({ description: 'Date and time of session' })
   sessionDate!: string;
 
-  @ApiPropertyOptional({ description: 'Title of the session note', nullable: true })
+  @ApiPropertyOptional({
+    description: 'Title of the session note',
+    nullable: true,
+  })
   title?: string | null;
 
   @ApiProperty({ description: 'Clinical evolution content' })
@@ -156,7 +192,9 @@ export class ClinicalPdfExportPayloadDto {
   @ApiProperty({ description: 'ISO timestamp when payload was compiled' })
   generatedAt!: string;
 
-  @ApiProperty({ description: 'Tenant and clinic institutional branding details' })
+  @ApiProperty({
+    description: 'Tenant and clinic institutional branding details',
+  })
   tenant!: ClinicalDocumentTenantDto;
 
   @ApiProperty({ description: 'Professional therapist details and signature' })
@@ -168,9 +206,15 @@ export class ClinicalPdfExportPayloadDto {
   @ApiProperty({ description: 'Case file clinical record details' })
   caseFile!: ClinicalDocumentCaseFileSummaryDto;
 
-  @ApiPropertyOptional({ description: 'Session note details for evolution notes', nullable: true })
+  @ApiPropertyOptional({
+    description: 'Session note details for evolution notes',
+    nullable: true,
+  })
   sessionNote?: ClinicalDocumentSessionNoteDto | null;
 
-  @ApiPropertyOptional({ description: 'Related appointment details', nullable: true })
+  @ApiPropertyOptional({
+    description: 'Related appointment details',
+    nullable: true,
+  })
   appointment?: ClinicalDocumentAppointmentDto | null;
 }

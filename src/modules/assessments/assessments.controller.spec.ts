@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { AdministrationStatus } from '@prisma/client';
+import { AdministrationStatus, MembershipRole, UserRole } from '@prisma/client';
+import { TenantResolutionMode } from '../../common/request-context/request-context.service';
 import type { AuthenticatedUser } from '../../auth/types/authenticated-user.type';
 import type { TenantContext } from '../../tenant-context/tenant-context.types';
 import { AssessmentsController } from './assessments.controller';
@@ -13,9 +14,9 @@ describe('AssessmentsController', () => {
     userId: 'user-111',
     organizationId: 'org-111',
     membershipId: 'mem-111',
-    organizationRole: 'PSYCHOLOGIST' as any,
-    legacyUserRole: 'PSYCHOLOGIST' as any,
-    resolutionMode: 'EXPLICIT' as any,
+    organizationRole: MembershipRole.PSYCHOLOGIST,
+    legacyUserRole: UserRole.PSYCHOLOGIST,
+    resolutionMode: TenantResolutionMode.EXPLICIT,
   };
 
   const mockUser: AuthenticatedUser = {

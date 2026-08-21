@@ -306,13 +306,15 @@ export class AssessmentsController {
   })
   @ApiParam({ name: 'id', description: 'Assessment administration UUID' })
   @ApiOkResponse({
-    description: 'Structured clinical psychometric report generated successfully',
+    description:
+      'Structured clinical psychometric report generated successfully',
   })
   @ApiNotFoundResponse({
     description: 'Assessment administration not found in tenant',
   })
   @ApiUnprocessableEntityResponse({
-    description: 'Assessment has not been completed yet — report requires finalized evaluation',
+    description:
+      'Assessment has not been completed yet — report requires finalized evaluation',
   })
   getReport(
     @CurrentTenant(true) tenant: TenantContext,
@@ -355,4 +357,3 @@ export class AssessmentsController {
     );
   }
 }
-

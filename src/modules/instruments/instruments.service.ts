@@ -5,7 +5,7 @@ import {
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
-import { InstrumentVersionStatus } from '@prisma/client';
+import { InstrumentVersionStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateInstrumentVersionDto } from './dto/create-instrument-version.dto';
 import { CreateInstrumentDto } from './dto/create-instrument.dto';
@@ -259,10 +259,12 @@ export class InstrumentsService {
       clinicalAlerts: [],
     };
 
-    const definitionJson =
-      dto.initialDraft?.definitionJson ?? (defaultDefinition as any);
-    const scoringSpecJson =
-      dto.initialDraft?.scoringSpecJson ?? (defaultScoringSpec as any);
+    const definitionJson: Prisma.InputJsonValue = (dto.initialDraft
+      ?.definitionJson ??
+      defaultDefinition) as unknown as Prisma.InputJsonValue;
+    const scoringSpecJson: Prisma.InputJsonValue = (dto.initialDraft
+      ?.scoringSpecJson ??
+      defaultScoringSpec) as unknown as Prisma.InputJsonValue;
 
     return this.prisma.instrument.create({
       data: {
@@ -363,16 +365,14 @@ export class InstrumentsService {
     const nextVersionNumber = latest ? latest.versionNumber + 1 : 1;
 
     // Use provided definition or clone from latest version
-    const definitionJson =
-      dto?.definitionJson ??
+    const definitionJson = dto?.definitionJson ??
       (latest?.definitionJson as Record<string, any>) ?? {
         schemaVersion: '1.0',
         metadata: { title: instrument.name, acronym: instrument.code },
         items: [],
       };
 
-    const scoringSpecJson =
-      dto?.scoringSpecJson ??
+    const scoringSpecJson = dto?.scoringSpecJson ??
       (latest?.scoringSpecJson as Record<string, any>) ?? {
         schemaVersion: '1.0',
         scoringType: 'SUM',
@@ -463,8 +463,13 @@ export class InstrumentsService {
     }
 
     // Validate specification consistency before publishing
-    const definition = version.definitionJson as unknown as InstrumentDefinition;
-    if (!definition || !Array.isArray(definition.items) || definition.items.length === 0) {
+    const definition =
+      version.definitionJson as unknown as InstrumentDefinition;
+    if (
+      !definition ||
+      !Array.isArray(definition.items) ||
+      definition.items.length === 0
+    ) {
       throw new UnprocessableEntityException(
         'Cannot publish an instrument with 0 items. Please add at least 1 prompt before publishing.',
       );

@@ -149,7 +149,9 @@ export class AppointmentsController {
     action: 'CLINICAL_APPOINTMENT_RESCHEDULED',
     resourceType: 'Appointment',
   })
-  @ApiOperation({ summary: 'Reschedule an appointment with overlap validation' })
+  @ApiOperation({
+    summary: 'Reschedule an appointment with overlap validation',
+  })
   @ApiParam({
     name: 'id',
     description: 'Appointment ID',

@@ -10,7 +10,6 @@ import {
   Res,
   StreamableFile,
   UploadedFile,
-  UseGuards,
   UseInterceptors,
   UsePipes,
   ValidationPipe,
@@ -63,7 +62,9 @@ export class UserProfileController {
   }
 
   @Patch('preferences')
-  @ApiOperation({ summary: 'Update user notification, timezone and localization preferences' })
+  @ApiOperation({
+    summary: 'Update user notification, timezone and localization preferences',
+  })
   @ApiBody({ type: UpdateUserPreferencesDto })
   @ApiOkResponse({ type: UserPreferencesResponseDto })
   @ApiBadRequestResponse({ description: 'Validation failed' })
@@ -149,7 +150,9 @@ export class UserProfileController {
   }
 
   @Get('signature/content')
-  @ApiOperation({ summary: 'Stream authenticated user digital signature image' })
+  @ApiOperation({
+    summary: 'Stream authenticated user digital signature image',
+  })
   @ApiNotFoundResponse({ description: 'Signature not found' })
   async getSignatureContent(
     @CurrentUser() user: AuthenticatedUser,
@@ -178,7 +181,8 @@ export class UserProfileController {
     @CurrentUser() user: AuthenticatedUser,
     @UploadedFile() file?: Express.Multer.File,
   ) {
-    if (!file) throw new BadRequestException('Signature image file is required');
+    if (!file)
+      throw new BadRequestException('Signature image file is required');
     return this.userProfileService.uploadSignature(user.id, file);
   }
 

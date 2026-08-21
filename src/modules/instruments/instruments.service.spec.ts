@@ -69,7 +69,11 @@ describe('InstrumentsService', () => {
           isSystem: true,
           tenantConfigs: [{ isEnabled: true }],
           versions: [
-            { id: 'v1', versionNumber: 1, status: InstrumentVersionStatus.PUBLISHED },
+            {
+              id: 'v1',
+              versionNumber: 1,
+              status: InstrumentVersionStatus.PUBLISHED,
+            },
           ],
         },
         {
@@ -78,7 +82,11 @@ describe('InstrumentsService', () => {
           isSystem: true,
           tenantConfigs: [{ isEnabled: false }], // Disabled for this tenant
           versions: [
-            { id: 'v2', versionNumber: 1, status: InstrumentVersionStatus.PUBLISHED },
+            {
+              id: 'v2',
+              versionNumber: 1,
+              status: InstrumentVersionStatus.PUBLISHED,
+            },
           ],
         },
         {
@@ -144,7 +152,11 @@ describe('InstrumentsService', () => {
         updatedAt: new Date(),
       });
 
-      const res = await service.toggleVisibility(mockOrgId, mockInstrumentId, false);
+      const res = await service.toggleVisibility(
+        mockOrgId,
+        mockInstrumentId,
+        false,
+      );
 
       expect(res.isEnabled).toBe(false);
       expect(prisma.tenantInstrumentConfig.upsert).toHaveBeenCalledWith({

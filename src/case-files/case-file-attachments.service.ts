@@ -311,10 +311,7 @@ export class CaseFileAttachmentsService {
       : resolve(process.cwd(), uploadRoot);
   }
 
-  private async resolveAttachmentFilePath(
-    filePath: string,
-    patientId: string,
-  ) {
+  private async resolveAttachmentFilePath(filePath: string, patientId: string) {
     const { uploadsRoot, candidatePath } = this.getConfinedAttachmentPath(
       filePath,
       patientId,
@@ -322,10 +319,7 @@ export class CaseFileAttachmentsService {
 
     try {
       await access(candidatePath);
-      await this.assertResolvedPathIsWithinUploadsRoot(
-        uploadsRoot,
-        candidatePath,
-      );
+      this.assertResolvedPathIsWithinUploadsRoot(uploadsRoot, candidatePath);
     } catch {
       throw new NotFoundException('Attachment file not found');
     }
@@ -335,7 +329,10 @@ export class CaseFileAttachmentsService {
 
   private getConfinedAttachmentPath(filePath: string, patientId?: string) {
     const uploadsRoot = this.getUploadsRoot();
-    const candidatePath = this.resolveStoredAttachmentPath(filePath, uploadsRoot);
+    const candidatePath = this.resolveStoredAttachmentPath(
+      filePath,
+      uploadsRoot,
+    );
     const relativeToUploadsRoot = relative(uploadsRoot, candidatePath);
 
     if (
@@ -346,9 +343,7 @@ export class CaseFileAttachmentsService {
     }
 
     if (patientId) {
-      const normalizedRelativePath = relativeToUploadsRoot
-        .split(sep)
-        .join('/');
+      const normalizedRelativePath = relativeToUploadsRoot.split(sep).join('/');
       if (!normalizedRelativePath.startsWith(`patients/${patientId}/`)) {
         throw new NotFoundException('Attachment file not found');
       }
@@ -357,10 +352,7 @@ export class CaseFileAttachmentsService {
     return { uploadsRoot, candidatePath };
   }
 
-  private resolveStoredAttachmentPath(
-    filePath: string,
-    uploadsRoot: string,
-  ) {
+  private resolveStoredAttachmentPath(filePath: string, uploadsRoot: string) {
     if (isAbsolute(filePath)) {
       return resolve(filePath);
     }
@@ -379,10 +371,11 @@ export class CaseFileAttachmentsService {
 
   private async cleanupAttachmentFile(filePath: string, patientId?: string) {
     try {
-      const { candidatePath } = this.getConfinedAttachmentPath(
+      const { uploadsRoot, candidatePath } = this.getConfinedAttachmentPath(
         filePath,
         patientId,
       );
+      this.assertResolvedPathIsWithinUploadsRoot(uploadsRoot, candidatePath);
       await unlink(candidatePath);
     } catch (error) {
       this.logger.error(
@@ -394,7 +387,7 @@ export class CaseFileAttachmentsService {
     }
   }
 
-  private async assertResolvedPathIsWithinUploadsRoot(
+  private assertResolvedPathIsWithinUploadsRoot(
     uploadsRoot: string,
     candidatePath: string,
   ) {

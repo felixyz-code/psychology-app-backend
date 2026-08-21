@@ -2,10 +2,7 @@ import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { MembershipRole, UserRole } from '@prisma/client';
 import { TenantResolutionMode } from '../common/request-context/request-context.service';
 import { PrismaService } from '../prisma/prisma.service';
-import {
-  CapabilityDecision,
-  OrganizationCapability,
-} from '../tenant-context/authorization/organization-capability';
+import { CapabilityDecision } from '../tenant-context/authorization/organization-capability';
 import { OrganizationPolicyService } from '../tenant-context/authorization/organization-policy.service';
 import type { ClinicalAccessScope } from '../tenant-context/clinical-access.types';
 import { TenantObservabilityService } from '../tenant-context/tenant-observability.service';
@@ -48,8 +45,8 @@ describe('ScheduleBlocksService', () => {
       },
     };
     policy = {
-      decisionFor: jest.fn((scope: ClinicalAccessScope, capability: string) =>
-        decisionFor(scope.organizationRole, capability),
+      decisionFor: jest.fn((scope: ClinicalAccessScope) =>
+        decisionFor(scope.organizationRole),
       ),
     };
     observability = { capabilityDenied: jest.fn() };
@@ -118,7 +115,9 @@ describe('ScheduleBlocksService', () => {
 
     await expect(
       service.create(dto, scope(MembershipRole.ADMIN)),
-    ).rejects.toThrow('El horario seleccionado coincide con un bloqueo de agenda del terapeuta: "Supervision Session".');
+    ).rejects.toThrow(
+      'El horario seleccionado coincide con un bloqueo de agenda del terapeuta: "Supervision Session".',
+    );
   });
 
   it('rejects schedule block creation when overlapping with an active appointment', async () => {
@@ -140,7 +139,9 @@ describe('ScheduleBlocksService', () => {
 
     await expect(
       service.create(dto, scope(MembershipRole.ADMIN)),
-    ).rejects.toThrow('Existe un conflicto de horario con otra cita ya programada.');
+    ).rejects.toThrow(
+      'Existe un conflicto de horario con otra cita ya programada.',
+    );
   });
 
   it('lists schedule blocks with optional date filters', async () => {
@@ -175,7 +176,10 @@ describe('ScheduleBlocksService', () => {
     prisma.scheduleBlock.findFirst.mockResolvedValue(block);
     prisma.scheduleBlock.delete.mockResolvedValue(block);
 
-    const deleted = await service.remove('block-1', scope(MembershipRole.ADMIN));
+    const deleted = await service.remove(
+      'block-1',
+      scope(MembershipRole.ADMIN),
+    );
     expect(deleted.id).toBe('block-1');
     expect(prisma.scheduleBlock.delete).toHaveBeenCalledWith({
       where: { id: 'block-1' },
@@ -191,8 +195,7 @@ describe('ScheduleBlocksService', () => {
   });
 });
 
-function decisionFor(role: MembershipRole, capability: string) {
-  const organizationCapability = capability as OrganizationCapability;
+function decisionFor(role: MembershipRole) {
   if (role === MembershipRole.OWNER || role === MembershipRole.ADMIN) {
     return CapabilityDecision.ALLOW;
   }

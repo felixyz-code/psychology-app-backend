@@ -155,8 +155,9 @@ describe('CaseFileAttachmentsController', () => {
 
     attachmentsService.findByCaseFileId.mockResolvedValue(mockList as any);
 
-    const response = await request(app.getHttpServer())
-      .get(`/case-files/${caseFileId}/attachments`);
+    const response = await request(app.getHttpServer()).get(
+      `/case-files/${caseFileId}/attachments`,
+    );
 
     expect(response.status).toBe(200);
     expect(attachmentsService.findByCaseFileId).toHaveBeenCalledTimes(1);
@@ -182,8 +183,9 @@ describe('CaseFileAttachmentsController', () => {
 
     attachmentsService.remove.mockResolvedValue(mockDeleted as any);
 
-    const response = await request(app.getHttpServer())
-      .delete(`/case-files/${caseFileId}/attachments/${attachmentId}`);
+    const response = await request(app.getHttpServer()).delete(
+      `/case-files/${caseFileId}/attachments/${attachmentId}`,
+    );
 
     expect(response.status).toBe(200);
     expect(attachmentsService.remove).toHaveBeenCalledTimes(1);

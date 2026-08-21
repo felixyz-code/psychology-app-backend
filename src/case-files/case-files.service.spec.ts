@@ -352,7 +352,9 @@ describe('CaseFilesService D2 tenant-aware policy', () => {
       expect(result.therapist.professionalName).toBe('Dra. María Elena Ramos');
       expect(result.therapist.licenseNumber).toBe('CED-1234567');
       expect(result.tenant.displayName).toBe('Centro PsiqueOS');
-      expect(result.sessionNote?.content).toBe('Paciente refiere síntomas de ansiedad.');
+      expect(result.sessionNote?.content).toBe(
+        'Paciente refiere síntomas de ansiedad.',
+      );
       expect(result.appointment?.id).toBe('appt-1');
     });
 

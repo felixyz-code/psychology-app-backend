@@ -199,7 +199,8 @@ export class AppointmentsService {
       updateAppointmentDto.psychologistId
     ) {
       const targetPsychologistId =
-        updateAppointmentDto.psychologistId ?? existingAppointment.psychologistId;
+        updateAppointmentDto.psychologistId ??
+        existingAppointment.psychologistId;
       const targetStartTime = updateAppointmentDto.scheduledAt
         ? new Date(updateAppointmentDto.scheduledAt)
         : new Date(existingAppointment.scheduledAt);
@@ -309,10 +310,7 @@ export class AppointmentsService {
     );
   }
 
-  async getAvailability(
-    query: AvailabilityQueryDto,
-    scope: AppointmentScope,
-  ) {
+  async getAvailability(query: AvailabilityQueryDto, scope: AppointmentScope) {
     this.requireAppointmentCapability(
       scope,
       OrganizationCapability.APPOINTMENT_READ,
@@ -475,9 +473,7 @@ export class AppointmentsService {
           gte: windowStart,
           lt: endTime,
         },
-        ...(excludeAppointmentId
-          ? { id: { not: excludeAppointmentId } }
-          : {}),
+        ...(excludeAppointmentId ? { id: { not: excludeAppointmentId } } : {}),
       },
       select: {
         id: true,

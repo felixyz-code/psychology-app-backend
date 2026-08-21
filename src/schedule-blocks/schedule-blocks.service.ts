@@ -4,7 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { AppointmentStatus, MembershipRole } from '@prisma/client';
+import { AppointmentStatus, MembershipRole, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   CapabilityDecision,
@@ -105,23 +105,19 @@ export class ScheduleBlocksService {
       therapistId = scope.userId;
     }
 
-    const where: any = {
+    const andConditions: Prisma.ScheduleBlockWhereInput[] = [];
+    if (query.startDate) {
+      andConditions.push({ endTime: { gte: new Date(query.startDate) } });
+    }
+    if (query.endDate) {
+      andConditions.push({ startTime: { lte: new Date(query.endDate) } });
+    }
+
+    const where: Prisma.ScheduleBlockWhereInput = {
       organizationId: scope.organizationId,
+      ...(therapistId && { therapistId }),
+      ...(andConditions.length > 0 && { AND: andConditions }),
     };
-
-    if (therapistId) {
-      where.therapistId = therapistId;
-    }
-
-    if (query.startDate || query.endDate) {
-      where.AND = [];
-      if (query.startDate) {
-        where.AND.push({ endTime: { gte: new Date(query.startDate) } });
-      }
-      if (query.endDate) {
-        where.AND.push({ startTime: { lte: new Date(query.endDate) } });
-      }
-    }
 
     return this.prisma.scheduleBlock.findMany({
       where,

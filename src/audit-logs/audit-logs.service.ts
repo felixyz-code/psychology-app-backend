@@ -63,9 +63,9 @@ export class AuditLogService {
           ? (data.details as Prisma.InputJsonValue)
           : Prisma.JsonNull;
 
-      const severity = this.resolveSeverity(data) as AuditSeverity;
+      const severity = this.resolveSeverity(data);
 
-      const createData: any = {
+      const createData: Prisma.AuditLogUncheckedCreateInput = {
         organizationId: data.organizationId ?? null,
         branchId: data.branchId ?? null,
         userId: data.userId ?? null,
@@ -221,7 +221,7 @@ export class AuditLogService {
       'Details (JSON)',
     ];
 
-    const rows = items.map((entry) => [
+    const rows: string[][] = items.map((entry) => [
       entry.id,
       entry.timestamp.toISOString(),
       entry.organizationId ?? '',
@@ -232,14 +232,14 @@ export class AuditLogService {
       `"${(entry.user?.name ?? '').replace(/"/g, '""')}"`,
       entry.user?.email ?? '',
       entry.actorRole ?? '',
-      (entry as any).severity ?? 'INFO',
+      entry.severity ?? 'INFO',
       entry.action,
       entry.resourceType,
       entry.resourceId ?? '',
       entry.ipAddress ?? '',
       `"${(entry.userAgent ?? '').replace(/"/g, '""')}"`,
-      entry.statusCode ?? '',
-      entry.executionTimeMs ?? '',
+      String(entry.statusCode ?? ''),
+      String(entry.executionTimeMs ?? ''),
       `"${JSON.stringify(entry.details ?? {}).replace(/"/g, '""')}"`,
     ]);
 

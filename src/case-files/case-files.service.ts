@@ -560,7 +560,8 @@ export class CaseFilesService {
     ) {
       const sigAsset = therapistUser.psychologistProfile.signatureAsset;
       signatureDataUri = await this.loadAssetDataUri(
-        () => this.userProfileStorage!.resolveSignaturePath(sigAsset.storageKey),
+        () =>
+          this.userProfileStorage!.resolveSignaturePath(sigAsset.storageKey),
         sigAsset.mimeType,
       );
     }

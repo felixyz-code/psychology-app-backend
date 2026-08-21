@@ -93,9 +93,7 @@ describe('AuditLog schema contract and migration', () => {
     expect(schema).toContain('HIGH');
     expect(schema).toContain('CRITICAL');
     expect(schema).toContain('severity        AuditSeverity @default(INFO)');
-    expect(schema).toContain(
-      '@@index([organizationId, severity, timestamp])',
-    );
+    expect(schema).toContain('@@index([organizationId, severity, timestamp])');
 
     const subphase105Dir = readdirSync(migrationsDir).find((dir) =>
       dir.includes('add_audit_severity'),
