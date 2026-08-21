@@ -145,7 +145,7 @@ export class SessionNotesController {
   }
 
   @Get(':id/pdf-data')
-  @AuditLog({ action: 'CLINICAL_NOTE_READ', resourceType: 'SessionNote' })
+  @AuditLog({ action: 'CLINICAL_DOCUMENT_EXPORT', resourceType: 'SessionNote' })
   @ApiOperation({ summary: 'Get NOM-004 evolution note PDF export payload' })
   @ApiParam({
     name: 'id',

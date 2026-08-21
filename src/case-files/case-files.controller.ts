@@ -203,7 +203,7 @@ export class CaseFilesController {
   }
 
   @Get(':id/pdf-data')
-  @AuditLog({ action: 'CLINICAL_CASE_FILE_READ', resourceType: 'CaseFile' })
+  @AuditLog({ action: 'CLINICAL_DOCUMENT_EXPORT', resourceType: 'CaseFile' })
   @ApiOperation({ summary: 'Get clinical PDF export payload for case file' })
   @ApiParam({
     name: 'id',
@@ -229,7 +229,7 @@ export class CaseFilesController {
   }
 
   @Get(':id/notes/:noteId/pdf-data')
-  @AuditLog({ action: 'CLINICAL_NOTE_READ', resourceType: 'SessionNote' })
+  @AuditLog({ action: 'CLINICAL_DOCUMENT_EXPORT', resourceType: 'SessionNote' })
   @ApiOperation({ summary: 'Get NOM-004 evolution note PDF export payload' })
   @ApiParam({
     name: 'id',
@@ -263,7 +263,7 @@ export class CaseFilesController {
   }
 
   @Get(':id/consent-data')
-  @AuditLog({ action: 'CLINICAL_CASE_FILE_READ', resourceType: 'CaseFile' })
+  @AuditLog({ action: 'CLINICAL_DOCUMENT_EXPORT', resourceType: 'CaseFile' })
   @ApiOperation({ summary: 'Get informed consent PDF export payload' })
   @ApiParam({
     name: 'id',
