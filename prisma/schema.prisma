@@ -144,6 +144,13 @@ enum UserDateFormat {
   MM_DD_YYYY
 }
 
+enum AttachmentCategory {
+  ESTUDIO_PREVIO
+  REPORTE_ESCOLAR
+  IDENTIFICACION
+  OTRO
+}
+
 model User {
   id                              String                     @id @default(uuid()) @db.Uuid
   name                            String                     @db.VarChar(150)
@@ -155,6 +162,7 @@ model User {
   patients                        Patient[]
   sessionNotes                    SessionNote[]
   uploadedDocuments               Document[]
+  caseFileAttachments             CaseFileAttachment[]       @relation("UserCaseFileAttachments")
   appointments                    Appointment[]
   financialTransactions           FinancialTransaction[]
   preferredOrganization           Organization?              @relation("UserPreferredOrganization", fields: [preferredOrganizationId], references: [id], onDelete: SetNull, onUpdate: Cascade)
@@ -198,6 +206,7 @@ model Organization {
   caseFiles                 CaseFile[]
   sessionNotes              SessionNote[]
   documents                 Document[]
+  caseFileAttachments       CaseFileAttachment[]
   appointments              Appointment[]
   transactions              FinancialTransaction[]
   assignments               PatientAssignment[]
@@ -404,6 +413,7 @@ model CaseFile {
   organization              Organization?              @relation(fields: [organizationId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   sessionNotes              SessionNote[]
   documents                 Document[]
+  attachments               CaseFileAttachment[]
   assessmentAdministrations AssessmentAdministration[]
   createdAt                 DateTime                   @default(now())
   updatedAt                 DateTime                   @updatedAt
@@ -451,6 +461,31 @@ model Document {
   @@index([uploadedById])
   @@index([organizationId, uploadedAt])
   @@map("documents")
+}
+
+model CaseFileAttachment {
+  id             String             @id @default(uuid()) @db.Uuid
+  organizationId String?            @db.Uuid
+  caseFileId     String             @db.Uuid
+  uploadedById   String             @db.Uuid
+  fileName       String             @db.VarChar(255)
+  originalName   String             @db.VarChar(255)
+  mimeType       String             @db.VarChar(100)
+  sizeBytes      Int
+  category       AttachmentCategory @default(OTRO)
+  notes          String?            @db.Text
+  filePath       String             @db.Text
+  caseFile       CaseFile           @relation(fields: [caseFileId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  uploadedBy     User               @relation("UserCaseFileAttachments", fields: [uploadedById], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  organization   Organization?      @relation(fields: [organizationId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  @@index([caseFileId])
+  @@index([uploadedById])
+  @@index([organizationId, createdAt])
+  @@index([category])
+  @@map("case_file_attachments")
 }
 
 model Appointment {
