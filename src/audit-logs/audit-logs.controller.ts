@@ -5,6 +5,7 @@ import {
   Param,
   ParseUUIDPipe,
   Query,
+  Res,
   UseGuards,
   UsePipes,
   ValidationPipe,
@@ -20,6 +21,7 @@ import {
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
+import type { Response } from 'express';
 import { RequireCapabilities } from '../tenant-context/authorization/require-capabilities.decorator';
 import { CapabilitiesGuard } from '../tenant-context/authorization/capabilities.guard';
 import { OrganizationCapability } from '../tenant-context/authorization/organization-capability';
@@ -63,7 +65,7 @@ export class AuditLogsController {
   @Get()
   @ApiOperation({
     summary:
-      'List forensic audit log entries for organization (OWNER / AUDITOR only)',
+      'List forensic audit log entries for organization (OWNER / ADMIN / AUDITOR)',
   })
   @ApiOkResponse({
     description: 'Paginated audit log entries retrieved successfully',
@@ -73,22 +75,81 @@ export class AuditLogsController {
     @CurrentTenant(true) tenant: TenantContext,
     @Query() query: AuditLogsQueryDto,
   ) {
-    const fromDate = query.from ? new Date(query.from) : undefined;
-    const toDate = query.to ? new Date(query.to) : undefined;
+    const fromDate =
+      query.from || query.startDate
+        ? new Date(query.from || query.startDate!)
+        : undefined;
+    const toDate =
+      query.to || query.endDate
+        ? new Date(query.to || query.endDate!)
+        : undefined;
 
     return this.auditLogService.findAll({
-      organizationId: tenant.organizationId,
+      organizationId: query.tenantId ?? tenant.organizationId,
       branchId: query.branchId,
       userId: query.userId,
+      resource: query.resource,
       resourceType: query.resourceType,
       resourceId: query.resourceId,
       action: query.action,
+      severity: query.severity,
       search: query.search,
       from: fromDate,
       to: toDate,
       limit: query.limit ?? 50,
       offset: query.offset ?? 0,
     });
+  }
+
+  @Get('export')
+  @ApiOperation({
+    summary:
+      'Export forensic audit log entries for organization as CSV or JSON file',
+  })
+  @ApiOkResponse({
+    description: 'Audit logs exported successfully as downloadable file',
+  })
+  async export(
+    @CurrentTenant(true) tenant: TenantContext,
+    @Query() query: AuditLogsQueryDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const fromDate =
+      query.from || query.startDate
+        ? new Date(query.from || query.startDate!)
+        : undefined;
+    const toDate =
+      query.to || query.endDate
+        ? new Date(query.to || query.endDate!)
+        : undefined;
+    const format = query.format === 'json' ? 'json' : 'csv';
+
+    const result = await this.auditLogService.exportLogs(
+      {
+        organizationId: query.tenantId ?? tenant.organizationId,
+        branchId: query.branchId,
+        userId: query.userId,
+        resource: query.resource,
+        resourceType: query.resourceType,
+        resourceId: query.resourceId,
+        action: query.action,
+        severity: query.severity,
+        search: query.search,
+        from: fromDate,
+        to: toDate,
+        limit: query.limit,
+        offset: query.offset,
+      },
+      format,
+    );
+
+    res.setHeader('Content-Type', result.contentType);
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${result.filename}"`,
+    );
+
+    return result.data;
   }
 
   @Get(':id')
