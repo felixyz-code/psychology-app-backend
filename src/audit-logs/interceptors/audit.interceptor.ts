@@ -158,6 +158,7 @@ export class AuditInterceptor implements NestInterceptor {
       params.caseFileId ||
       params.noteId ||
       params.documentId ||
+      params.attachmentId ||
       params.appointmentId ||
       params.branchId ||
       params.id ||
