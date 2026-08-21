@@ -126,6 +126,8 @@ describeCertification('Organization configuration runtime', () => {
           rowState: 'ABSENT',
           updatedAt: null,
           primaryColor: null,
+          visualName: null,
+          accentColor: null,
         });
       });
 

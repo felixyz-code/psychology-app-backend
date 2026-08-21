@@ -209,6 +209,34 @@ describe('SessionNotesService D2 tenant-aware policy', () => {
       },
     });
   });
+
+  describe('getPdfData', () => {
+    it('delegates to CaseFilesService when available and assigned', async () => {
+      const mockCaseFilesService = {
+        getClinicalPdfData: jest.fn().mockResolvedValue({
+          documentType: 'NOM_004_EVOLUTION_NOTE',
+          patient: { fullName: 'Juan Pérez' },
+        }),
+      };
+      const customService = new SessionNotesService(
+        prisma as unknown as PrismaService,
+        clinicalPolicy as unknown as ClinicalAccessPolicyService,
+        mockCaseFilesService as any,
+      );
+
+      prisma.sessionNote.findFirst.mockResolvedValue(noteWithRelation());
+      prisma.patientAssignment.findFirst.mockResolvedValue({ id: 'assignment-id' });
+
+      const result = await customService.getPdfData('note-id', scope);
+
+      expect(mockCaseFilesService.getClinicalPdfData).toHaveBeenCalledWith(
+        'case-file-id',
+        scope,
+        'note-id',
+      );
+      expect(result.documentType).toBe('NOM_004_EVOLUTION_NOTE');
+    });
+  });
 });
 
 function noteWithRelation() {

@@ -85,4 +85,31 @@ describe('organization configuration DTOs', () => {
       ]),
     );
   });
+
+  it('accepts and normalizes valid visualName and accentColor', async () => {
+    const dto = plainToInstance(UpdateOrganizationBrandingDto, {
+      visualName: '  Centro Psicológico  ',
+      primaryColor: '#2563EB',
+      accentColor: '#0d9488',
+      expectedRowState: 'ABSENT',
+    });
+
+    await expect(validate(dto)).resolves.toHaveLength(0);
+    expect(dto.visualName).toBe('Centro Psicológico');
+    expect(dto.accentColor).toBe('#0D9488');
+  });
+
+  it('rejects invalid accentColor format', async () => {
+    const dto = plainToInstance(UpdateOrganizationBrandingDto, {
+      primaryColor: '#2563EB',
+      accentColor: 'invalid-color',
+      expectedRowState: 'ABSENT',
+    });
+
+    await expect(validate(dto)).resolves.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ property: 'accentColor' }),
+      ]),
+    );
+  });
 });

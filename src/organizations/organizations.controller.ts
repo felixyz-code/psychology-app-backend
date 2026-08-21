@@ -108,6 +108,27 @@ export class OrganizationsController {
     return this.organizations.current(tenant);
   }
 
+  @Get('me')
+  @TenantRequired()
+  @AllowedOrganizationStatuses(
+    OrganizationStatus.ACTIVE,
+    OrganizationStatus.SUSPENDED,
+  )
+  @UseGuards(CapabilitiesGuard)
+  @RequireCapabilities(OrganizationCapability.ORGANIZATION_READ)
+  @ApiOperation({ summary: 'Get the currently resolved organization' })
+  me(@CurrentTenant(true) tenant: TenantContext) {
+    return this.organizations.current(tenant);
+  }
+
+  @Get('my-memberships')
+  @ApiOperation({
+    summary: 'List active organization memberships of the authenticated user',
+  })
+  myMemberships(@CurrentUser() user: AuthenticatedUser) {
+    return this.organizations.findAccessible(user);
+  }
+
   @Get(':organizationId')
   @TenantRequired()
   @AllowedOrganizationStatuses(

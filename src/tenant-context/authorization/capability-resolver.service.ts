@@ -55,6 +55,8 @@ const ROLE_CAPABILITY_POLICY: Readonly<
       OrganizationCapability.FINANCE_MANAGE,
       OrganizationCapability.FINANCE_SUMMARY_READ,
       OrganizationCapability.REPORT_READ,
+      OrganizationCapability.ASSESSMENT_TEMPLATE_MANAGE,
+      OrganizationCapability.AUDIT_READ,
     ],
     conditional: [
       OrganizationCapability.MEMBERSHIP_MANAGE_ROLE,
@@ -92,6 +94,7 @@ const ROLE_CAPABILITY_POLICY: Readonly<
       OrganizationCapability.APPOINTMENT_READ,
       OrganizationCapability.APPOINTMENT_MANAGE,
       OrganizationCapability.REPORT_READ,
+      OrganizationCapability.ASSESSMENT_TEMPLATE_MANAGE,
     ],
   },
   [MembershipRole.RECEPTIONIST]: {

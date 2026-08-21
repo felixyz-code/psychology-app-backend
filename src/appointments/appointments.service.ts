@@ -1,9 +1,11 @@
 import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import {
+  AppointmentStatus,
   MembershipRole,
   PatientAssignmentStatus,
   Prisma,
@@ -18,6 +20,8 @@ import type { ClinicalAccessScope } from '../tenant-context/clinical-access.type
 import { TenantObservabilityService } from '../tenant-context/tenant-observability.service';
 import { CreateAppointmentDto } from './dto/create-appointment.dto';
 import { UpdateAppointmentDto } from './dto/update-appointment.dto';
+import { RescheduleAppointmentDto } from './dto/reschedule-appointment.dto';
+import { AvailabilityQueryDto } from './dto/availability-query.dto';
 
 type AppointmentScope = ClinicalAccessScope;
 type AuthorizedAppointment = Prisma.AppointmentGetPayload<{
@@ -62,6 +66,20 @@ export class AppointmentsService {
     );
     if (hasProvided(createAppointmentDto, 'notes')) {
       await this.requireNotesWrite(patient.id, scope);
+    }
+
+    const startTime = new Date(createAppointmentDto.scheduledAt);
+    const endTime = new Date(
+      startTime.getTime() + createAppointmentDto.durationMinutes * 60 * 1000,
+    );
+    const conflict = await this.checkOverlap(
+      createAppointmentDto.psychologistId,
+      startTime,
+      endTime,
+      scope.organizationId ?? undefined,
+    );
+    if (conflict.hasConflict) {
+      throw new BadRequestException(conflict.message);
     }
 
     const appointment = await this.prisma.appointment.create({
@@ -175,6 +193,35 @@ export class AppointmentsService {
       await this.requireNotesWrite(patientId, scope);
     }
 
+    if (
+      updateAppointmentDto.scheduledAt ||
+      updateAppointmentDto.durationMinutes ||
+      updateAppointmentDto.psychologistId
+    ) {
+      const targetPsychologistId =
+        updateAppointmentDto.psychologistId ?? existingAppointment.psychologistId;
+      const targetStartTime = updateAppointmentDto.scheduledAt
+        ? new Date(updateAppointmentDto.scheduledAt)
+        : new Date(existingAppointment.scheduledAt);
+      const targetDuration =
+        updateAppointmentDto.durationMinutes ??
+        existingAppointment.durationMinutes;
+      const targetEndTime = new Date(
+        targetStartTime.getTime() + targetDuration * 60 * 1000,
+      );
+
+      const conflict = await this.checkOverlap(
+        targetPsychologistId,
+        targetStartTime,
+        targetEndTime,
+        scope.organizationId ?? undefined,
+        existingAppointment.id,
+      );
+      if (conflict.hasConflict) {
+        throw new BadRequestException(conflict.message);
+      }
+    }
+
     const result = await this.prisma.appointment.updateMany({
       where: {
         id,
@@ -192,6 +239,290 @@ export class AppointmentsService {
       appointment,
       await this.canReadNotes(appointment.patientId, scope),
     );
+  }
+
+  async reschedule(
+    id: string,
+    rescheduleDto: RescheduleAppointmentDto,
+    scope: AppointmentScope,
+  ) {
+    const existingAppointment = await this.getVisibleAppointmentOrThrow(
+      id,
+      scope,
+    );
+    this.requireAppointmentCapability(
+      scope,
+      OrganizationCapability.APPOINTMENT_MANAGE,
+      'appointments.reschedule',
+      { allowReceptionistOperational: true },
+    );
+
+    if (existingAppointment.status !== AppointmentStatus.SCHEDULED) {
+      throw new BadRequestException(
+        'La cita no se encuentra en un estado que permita su reprogramación.',
+      );
+    }
+
+    const newStart = new Date(rescheduleDto.scheduledAt);
+    if (isNaN(newStart.getTime())) {
+      throw new BadRequestException('Formato de fecha u hora inválido.');
+    }
+
+    const durationMinutes =
+      rescheduleDto.durationMinutes ?? existingAppointment.durationMinutes;
+    const newEnd = new Date(newStart.getTime() + durationMinutes * 60 * 1000);
+
+    const conflict = await this.checkOverlap(
+      existingAppointment.psychologistId,
+      newStart,
+      newEnd,
+      scope.organizationId ?? undefined,
+      existingAppointment.id,
+    );
+
+    if (conflict.hasConflict) {
+      throw new BadRequestException(conflict.message);
+    }
+
+    let notes = existingAppointment.notes;
+    if (rescheduleDto.reason) {
+      const reasonLine = `[Reprogramada: ${new Date().toISOString()} - Motivo: ${rescheduleDto.reason.trim()}]`;
+      notes = notes ? `${notes}\n${reasonLine}` : reasonLine;
+    }
+
+    await this.prisma.appointment.updateMany({
+      where: {
+        id: existingAppointment.id,
+        organizationId: scope.organizationId,
+      },
+      data: {
+        scheduledAt: newStart,
+        durationMinutes,
+        notes,
+      },
+    });
+
+    const appointment = await this.getVisibleAppointmentOrThrow(id, scope);
+    return this.projectAppointment(
+      appointment,
+      await this.canReadNotes(appointment.patientId, scope),
+    );
+  }
+
+  async getAvailability(
+    query: AvailabilityQueryDto,
+    scope: AppointmentScope,
+  ) {
+    this.requireAppointmentCapability(
+      scope,
+      OrganizationCapability.APPOINTMENT_READ,
+      'appointments.availability',
+    );
+
+    const therapistId = query.therapistId;
+    await this.ensureTenantProfessionalOrThrow(therapistId, scope);
+
+    const dateStr = query.date; // "YYYY-MM-DD"
+    const [yearStr, monthStr, dayStr] = dateStr.split('-');
+    const year = parseInt(yearStr, 10);
+    const month = parseInt(monthStr, 10) - 1;
+    const day = parseInt(dayStr, 10);
+
+    const duration = query.durationMinutes || 60;
+    const startHour = query.startHour ?? 8;
+    const endHour = query.endHour ?? 20;
+
+    if (startHour >= endHour) {
+      throw new BadRequestException(
+        'La hora inicial debe ser menor a la hora final.',
+      );
+    }
+
+    const dayStart = new Date(Date.UTC(year, month, day, 0, 0, 0, 0));
+    const dayEnd = new Date(Date.UTC(year, month, day, 23, 59, 59, 999));
+
+    const appointments = await this.prisma.appointment.findMany({
+      where: {
+        psychologistId: therapistId,
+        organizationId: scope.organizationId ?? null,
+        status: AppointmentStatus.SCHEDULED,
+        scheduledAt: {
+          gte: dayStart,
+          lte: dayEnd,
+        },
+      },
+      select: {
+        id: true,
+        scheduledAt: true,
+        durationMinutes: true,
+      },
+    });
+
+    const scheduleBlocks = await this.prisma.scheduleBlock.findMany({
+      where: {
+        therapistId,
+        organizationId: scope.organizationId,
+        startTime: { lte: dayEnd },
+        endTime: { gte: dayStart },
+      },
+      select: {
+        id: true,
+        title: true,
+        startTime: true,
+        endTime: true,
+      },
+    });
+
+    const slots: {
+      startTime: string;
+      endTime: string;
+      available: boolean;
+      conflictType?: 'APPOINTMENT' | 'SCHEDULE_BLOCK';
+      title?: string;
+    }[] = [];
+
+    const slotStartTotalMinutes = startHour * 60;
+    const slotEndTotalMinutes = endHour * 60;
+
+    for (
+      let currentMinutes = slotStartTotalMinutes;
+      currentMinutes + duration <= slotEndTotalMinutes;
+      currentMinutes += duration
+    ) {
+      const slotHours = Math.floor(currentMinutes / 60);
+      const slotMins = currentMinutes % 60;
+      const endTotalMins = currentMinutes + duration;
+      const endSlotHours = Math.floor(endTotalMins / 60);
+      const endSlotMins = endTotalMins % 60;
+
+      const slotStartTime = new Date(
+        Date.UTC(year, month, day, slotHours, slotMins, 0, 0),
+      );
+      const slotEndTime = new Date(
+        Date.UTC(year, month, day, endSlotHours, endSlotMins, 0, 0),
+      );
+
+      const slotStartMs = slotStartTime.getTime();
+      const slotEndMs = slotEndTime.getTime();
+
+      const apptConflict = appointments.find((appt) => {
+        const aStart = new Date(appt.scheduledAt).getTime();
+        const aEnd = aStart + appt.durationMinutes * 60 * 1000;
+        return aStart < slotEndMs && aEnd > slotStartMs;
+      });
+
+      if (apptConflict) {
+        slots.push({
+          startTime: slotStartTime.toISOString(),
+          endTime: slotEndTime.toISOString(),
+          available: false,
+          conflictType: 'APPOINTMENT',
+        });
+        continue;
+      }
+
+      const blockConflict = scheduleBlocks.find((block) => {
+        const bStart = new Date(block.startTime).getTime();
+        const bEnd = new Date(block.endTime).getTime();
+        return bStart < slotEndMs && bEnd > slotStartMs;
+      });
+
+      if (blockConflict) {
+        slots.push({
+          startTime: slotStartTime.toISOString(),
+          endTime: slotEndTime.toISOString(),
+          available: false,
+          conflictType: 'SCHEDULE_BLOCK',
+          title: blockConflict.title,
+        });
+        continue;
+      }
+
+      slots.push({
+        startTime: slotStartTime.toISOString(),
+        endTime: slotEndTime.toISOString(),
+        available: true,
+      });
+    }
+
+    return {
+      therapistId,
+      date: dateStr,
+      slotDurationMinutes: duration,
+      slots,
+    };
+  }
+
+  async checkOverlap(
+    psychologistId: string,
+    startTime: Date,
+    endTime: Date,
+    organizationId?: string,
+    excludeAppointmentId?: string,
+  ): Promise<{
+    hasConflict: boolean;
+    type?: 'APPOINTMENT' | 'SCHEDULE_BLOCK';
+    message?: string;
+    title?: string;
+  }> {
+    const windowStart = new Date(startTime.getTime() - 24 * 60 * 60 * 1000);
+    const appointments = await this.prisma.appointment.findMany({
+      where: {
+        psychologistId,
+        organizationId: organizationId ?? null,
+        status: AppointmentStatus.SCHEDULED,
+        scheduledAt: {
+          gte: windowStart,
+          lt: endTime,
+        },
+        ...(excludeAppointmentId
+          ? { id: { not: excludeAppointmentId } }
+          : {}),
+      },
+      select: {
+        id: true,
+        scheduledAt: true,
+        durationMinutes: true,
+      },
+    });
+
+    const startMs = startTime.getTime();
+    const endMs = endTime.getTime();
+
+    const conflictingAppt = appointments.find((appt) => {
+      const apptStart = new Date(appt.scheduledAt).getTime();
+      const apptEnd = apptStart + appt.durationMinutes * 60 * 1000;
+      return apptStart < endMs && apptEnd > startMs;
+    });
+
+    if (conflictingAppt) {
+      return {
+        hasConflict: true,
+        type: 'APPOINTMENT',
+        message: 'Existe un conflicto de horario con otra cita ya programada.',
+      };
+    }
+
+    const block = await this.prisma.scheduleBlock.findFirst({
+      where: {
+        organizationId: organizationId ?? undefined,
+        therapistId: psychologistId,
+        startTime: { lt: endTime },
+        endTime: { gt: startTime },
+      },
+    });
+
+    if (block) {
+      return {
+        hasConflict: true,
+        type: 'SCHEDULE_BLOCK',
+        message:
+          'El horario seleccionado coincide con un bloqueo de agenda del terapeuta.',
+        title: block.title,
+      };
+    }
+
+    return { hasConflict: false };
   }
 
   async remove(id: string, scope: AppointmentScope) {

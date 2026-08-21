@@ -30,6 +30,12 @@ const organizationAdminSelect = {
   timezone: true,
   locale: true,
   currency: true,
+  tradeName: true,
+  taxId: true,
+  phone: true,
+  email: true,
+  website: true,
+  address: true,
   createdAt: true,
   updatedAt: true,
 } as const;
@@ -239,6 +245,24 @@ function buildOrganizationUpdateData(dto: UpdateOrganizationDto) {
   }
   if (dto.currency !== undefined) {
     data.currency = dto.currency;
+  }
+  if (dto.tradeName !== undefined) {
+    data.tradeName = dto.tradeName;
+  }
+  if (dto.taxId !== undefined) {
+    data.taxId = dto.taxId;
+  }
+  if (dto.phone !== undefined) {
+    data.phone = dto.phone;
+  }
+  if (dto.email !== undefined) {
+    data.email = dto.email;
+  }
+  if (dto.website !== undefined) {
+    data.website = dto.website;
+  }
+  if (dto.address !== undefined) {
+    data.address = dto.address;
   }
 
   return data;

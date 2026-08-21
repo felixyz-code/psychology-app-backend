@@ -32,6 +32,10 @@ import { EntitlementsModule } from './entitlements/entitlements.module';
 import { BillingModule } from './billing/billing.module';
 import { BranchesModule } from './modules/enterprise/branches/branches.module';
 import { CorporateModule } from './modules/enterprise/corporate/corporate.module';
+import { InstrumentsModule } from './modules/instruments/instruments.module';
+import { AssessmentsModule } from './modules/assessments/assessments.module';
+import { UserProfileModule } from './user-profile/user-profile.module';
+import { ScheduleBlocksModule } from './schedule-blocks/schedule-blocks.module';
 
 @Module({
   imports: [
@@ -48,6 +52,7 @@ import { CorporateModule } from './modules/enterprise/corporate/corporate.module
     SessionNotesModule,
     DocumentsModule,
     AppointmentsModule,
+    ScheduleBlocksModule,
     FinancialTransactionsModule,
     HealthModule,
     TenantContextModule,
@@ -59,7 +64,10 @@ import { CorporateModule } from './modules/enterprise/corporate/corporate.module
     BillingModule,
     BranchesModule,
     CorporateModule,
+    InstrumentsModule,
+    AssessmentsModule,
     PaefGovernanceModule,
+    UserProfileModule,
   ],
   controllers: [AppController],
   providers: [
