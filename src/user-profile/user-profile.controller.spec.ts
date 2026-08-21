@@ -5,20 +5,7 @@ import { UserProfileService } from './user-profile.service';
 
 describe('UserProfileController', () => {
   let controller: UserProfileController;
-  let service: {
-    getProfile: ReturnType<typeof jest.fn>;
-    updateProfile: ReturnType<typeof jest.fn>;
-    getPreferences: ReturnType<typeof jest.fn>;
-    updatePreferences: ReturnType<typeof jest.fn>;
-    getAvatarMetadata: ReturnType<typeof jest.fn>;
-    getAvatarContent: ReturnType<typeof jest.fn>;
-    uploadAvatar: ReturnType<typeof jest.fn>;
-    removeAvatar: ReturnType<typeof jest.fn>;
-    getSignatureMetadata: ReturnType<typeof jest.fn>;
-    getSignatureContent: ReturnType<typeof jest.fn>;
-    uploadSignature: ReturnType<typeof jest.fn>;
-    removeSignature: ReturnType<typeof jest.fn>;
-  };
+  let service: Record<string, jest.Mock>;
 
   const mockUser: AuthenticatedUser = {
     id: 'user-1',
