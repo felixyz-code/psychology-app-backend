@@ -56,6 +56,8 @@ const ROLE_CAPABILITY_POLICY: Readonly<
       OrganizationCapability.FINANCE_SUMMARY_READ,
       OrganizationCapability.REPORT_READ,
       OrganizationCapability.ASSESSMENT_TEMPLATE_MANAGE,
+      OrganizationCapability.NOTIFICATION_TEMPLATE_READ,
+      OrganizationCapability.NOTIFICATION_TEMPLATE_MANAGE,
       OrganizationCapability.AUDIT_READ,
     ],
     conditional: [
@@ -71,6 +73,7 @@ const ROLE_CAPABILITY_POLICY: Readonly<
       OrganizationCapability.ORGANIZATION_READ,
       OrganizationCapability.MEMBERSHIP_LEAVE,
       OrganizationCapability.PATIENT_CREATE,
+      OrganizationCapability.NOTIFICATION_TEMPLATE_READ,
     ],
     conditional: [
       OrganizationCapability.PATIENT_READ,
@@ -95,6 +98,7 @@ const ROLE_CAPABILITY_POLICY: Readonly<
       OrganizationCapability.APPOINTMENT_MANAGE,
       OrganizationCapability.REPORT_READ,
       OrganizationCapability.ASSESSMENT_TEMPLATE_MANAGE,
+      OrganizationCapability.NOTIFICATION_TEMPLATE_MANAGE,
     ],
   },
   [MembershipRole.RECEPTIONIST]: {
@@ -102,6 +106,7 @@ const ROLE_CAPABILITY_POLICY: Readonly<
       OrganizationCapability.ORGANIZATION_READ,
       OrganizationCapability.MEMBERSHIP_LEAVE,
       OrganizationCapability.APPOINTMENT_READ,
+      OrganizationCapability.NOTIFICATION_TEMPLATE_READ,
     ],
     conditional: [
       OrganizationCapability.APPOINTMENT_MANAGE,
@@ -132,6 +137,7 @@ const ROLE_CAPABILITY_POLICY: Readonly<
       OrganizationCapability.APPOINTMENT_READ,
       OrganizationCapability.FINANCE_READ,
       OrganizationCapability.REPORT_READ,
+      OrganizationCapability.NOTIFICATION_TEMPLATE_READ,
     ],
   },
   [MembershipRole.READ_ONLY]: {
@@ -145,6 +151,7 @@ const ROLE_CAPABILITY_POLICY: Readonly<
       OrganizationCapability.DOCUMENT_READ,
       OrganizationCapability.APPOINTMENT_READ,
       OrganizationCapability.REPORT_READ,
+      OrganizationCapability.NOTIFICATION_TEMPLATE_READ,
     ],
   },
 };

@@ -44,13 +44,37 @@ describe('OpenAPI document', () => {
   it('documents every certified route and the Bearer security scheme', () => {
     const document = createDocument(app);
 
-    expect(Object.keys(document.paths)).toHaveLength(119);
+    expect(Object.keys(document.paths)).toHaveLength(124);
     expect(document.components?.securitySchemes?.bearer).toEqual({
       type: 'http',
       scheme: 'bearer',
       bearerFormat: 'JWT',
       description: 'Paste the JWT access token here',
     });
+    expect(document.paths['/notification-templates'].get?.security).toEqual([
+      { bearer: [] },
+    ]);
+    expect(document.paths['/notification-templates'].post?.security).toEqual([
+      { bearer: [] },
+    ]);
+    expect(
+      document.paths['/notification-templates/variables'].get?.security,
+    ).toEqual([{ bearer: [] }]);
+    expect(
+      document.paths['/notification-templates/seed-defaults'].post?.security,
+    ).toEqual([{ bearer: [] }]);
+    expect(
+      document.paths['/notification-templates/render-preview'].post?.security,
+    ).toEqual([{ bearer: [] }]);
+    expect(document.paths['/notification-templates/{id}'].get?.security).toEqual([
+      { bearer: [] },
+    ]);
+    expect(
+      document.paths['/notification-templates/{id}'].patch?.security,
+    ).toEqual([{ bearer: [] }]);
+    expect(
+      document.paths['/notification-templates/{id}'].delete?.security,
+    ).toEqual([{ bearer: [] }]);
     expect(document.paths['/appointments/availability'].get?.security).toEqual([
       { bearer: [] },
     ]);

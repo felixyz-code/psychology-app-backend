@@ -224,6 +224,7 @@ model Organization {
   assessmentAdministrations AssessmentAdministration[]
   tenantInstrumentConfigs   TenantInstrumentConfig[]
   scheduleBlocks            ScheduleBlock[]
+  notificationTemplates     NotificationTemplate[]
   createdAt                 DateTime                   @default(now()) @db.Timestamptz(3)
   updatedAt                 DateTime                   @updatedAt @db.Timestamptz(3)
 
@@ -1065,5 +1066,41 @@ model ScheduleBlock {
   @@index([therapistId, startTime, endTime])
   @@index([startTime, endTime])
   @@map("schedule_blocks")
+}
+
+enum NotificationChannel {
+  EMAIL
+  SMS
+  WHATSAPP
+}
+
+enum NotificationEventType {
+  APPOINTMENT_CONFIRMATION
+  APPOINTMENT_REMINDER_24H
+  APPOINTMENT_REMINDER_2H
+  APPOINTMENT_RESCHEDULED
+  APPOINTMENT_CANCELLED
+}
+
+model NotificationTemplate {
+  id             String                @id @default(uuid()) @db.Uuid
+  organizationId String                @map("organization_id") @db.Uuid
+  channel        NotificationChannel
+  eventType      NotificationEventType @map("event_type")
+  name           String                @db.VarChar(150)
+  subject        String?               @db.VarChar(255)
+  body           String                @db.Text
+  variables      Json?
+  isActive       Boolean               @default(true) @map("is_active")
+  createdAt      DateTime              @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime              @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@unique([organizationId, channel, eventType])
+  @@index([organizationId, channel])
+  @@index([organizationId, eventType])
+  @@index([organizationId, isActive])
+  @@map("notification_templates")
 }
 
