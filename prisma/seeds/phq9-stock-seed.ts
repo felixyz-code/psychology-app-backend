@@ -264,7 +264,16 @@ export async function seedPhq9StockInstrument(prisma: PrismaClient) {
     },
   });
 
-  if (!existingVersion) {
+  if (existingVersion) {
+    await prisma.instrumentVersion.update({
+      where: { id: existingVersion.id },
+      data: {
+        definitionJson: phq9DefinitionJson,
+        scoringSpecJson: phq9ScoringSpecJson,
+        status: InstrumentVersionStatus.PUBLISHED,
+      },
+    });
+  } else {
     await prisma.instrumentVersion.create({
       data: {
         id: PHQ9_SYSTEM_VERSION_1_ID,

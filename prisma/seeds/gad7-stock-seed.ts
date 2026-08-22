@@ -226,7 +226,16 @@ export async function seedGad7StockInstrument(prisma: PrismaClient) {
     },
   });
 
-  if (!existingVersion) {
+  if (existingVersion) {
+    await prisma.instrumentVersion.update({
+      where: { id: existingVersion.id },
+      data: {
+        definitionJson: gad7DefinitionJson,
+        scoringSpecJson: gad7ScoringSpecJson,
+        status: InstrumentVersionStatus.PUBLISHED,
+      },
+    });
+  } else {
     await prisma.instrumentVersion.create({
       data: {
         id: GAD7_SYSTEM_VERSION_1_ID,

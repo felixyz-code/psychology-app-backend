@@ -288,7 +288,16 @@ export async function seedPss10StockInstrument(prisma: PrismaClient) {
     },
   });
 
-  if (!existingVersion) {
+  if (existingVersion) {
+    await prisma.instrumentVersion.update({
+      where: { id: existingVersion.id },
+      data: {
+        definitionJson: pss10DefinitionJson,
+        scoringSpecJson: pss10ScoringSpecJson,
+        status: InstrumentVersionStatus.PUBLISHED,
+      },
+    });
+  } else {
     await prisma.instrumentVersion.create({
       data: {
         id: PSS10_SYSTEM_VERSION_1_ID,
