@@ -9,6 +9,7 @@
   "include": [
     "prisma/seed.ts",
     "prisma/seed-certification.ts",
+    "prisma/seeds/**/*.ts",
     "prisma/backfill/**/*.ts",
     "src/prisma/legacy-backfill/**/*.ts"
   ]

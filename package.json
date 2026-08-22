@@ -15,6 +15,7 @@
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "format:check": "prettier --check \"src/**/*.ts\" \"test/**/*.ts\"",
     "seed": "ts-node --project tsconfig.seed.json prisma/seed.ts",
+    "seed:instruments": "ts-node --project tsconfig.seed.json prisma/seeds/permanent-stock-instruments.ts",
     "seed:commercial": "ts-node --project tsconfig.seed.json prisma/seed-commercial.ts",
     "seed:certify": "ts-node --project tsconfig.seed.json prisma/seed-certification.ts",
     "postman:certify": "ts-node --project tsconfig.postman.json postman/postman-certify.ts",
