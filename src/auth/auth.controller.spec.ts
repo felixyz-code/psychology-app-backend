@@ -8,6 +8,7 @@ describe('AuthController', () => {
     updatePreferredOrganization: jest.fn(),
     login: jest.fn(),
     freelancerBootstrap: jest.fn(),
+    forgotPassword: jest.fn(),
   };
 
   const controller = new AuthController(authService as never);
