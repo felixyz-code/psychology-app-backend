@@ -29,6 +29,10 @@ import { CapabilityResolverService } from '../tenant-context/authorization/capab
 import { projectAuthContextCapabilities } from '../tenant-context/authorization/capability-projection';
 import { AuthenticatedUser } from './types/authenticated-user.type';
 import { CreateFreelancerBootstrapDto } from './dto/create-freelancer-bootstrap.dto';
+import {
+  ForgotPasswordDto,
+  ForgotPasswordResponseDto,
+} from './dto/forgot-password.dto';
 import { UpdateAuthContextPreferenceDto } from './dto/auth-context-preference.dto';
 import { AuthContextStatus } from './dto/auth-context-response.dto';
 import { LoginDto } from './dto/login.dto';
@@ -83,6 +87,27 @@ export class AuthService {
     return {
       accessToken,
       user: this.toPublicUser(user),
+    };
+  }
+
+  async forgotPassword(
+    dto: ForgotPasswordDto,
+  ): Promise<ForgotPasswordResponseDto> {
+    const normalizedEmail = normalizeEmailIdentity(dto.email);
+    // Best practice: Query user without leaking timing/existence
+    const user = await this.prisma.user.findUnique({
+      where: { normalizedEmail },
+      select: { id: true, email: true },
+    });
+
+    if (user) {
+      // In future subphases: Trigger password reset email workflow
+    }
+
+    return {
+      success: true,
+      message:
+        'Si el correo electrónico existe en la plataforma, se enviarán las instrucciones para restablecer el acceso.',
     };
   }
 

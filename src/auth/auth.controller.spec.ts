@@ -8,6 +8,7 @@ describe('AuthController', () => {
     updatePreferredOrganization: jest.fn(),
     login: jest.fn(),
     freelancerBootstrap: jest.fn(),
+    forgotPassword: jest.fn(),
   };
 
   const controller = new AuthController(authService as never);
@@ -89,5 +90,18 @@ describe('AuthController', () => {
       user,
       { organizationId: 'organization-b' },
     );
+  });
+
+  it('delegates POST /auth/forgot-password to the auth service', async () => {
+    const dto = { email: 'test@example.com' };
+    const response = {
+      success: true,
+      message:
+        'Si el correo electrónico existe en la plataforma, se enviarán las instrucciones para restablecer el acceso.',
+    };
+    authService.forgotPassword = jest.fn().mockResolvedValue(response);
+
+    await expect(controller.forgotPassword(dto)).resolves.toEqual(response);
+    expect(authService.forgotPassword).toHaveBeenCalledWith(dto);
   });
 });

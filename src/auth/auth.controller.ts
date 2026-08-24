@@ -32,6 +32,10 @@ import { CurrentUser } from './decorators/current-user.decorator';
 import { AuthService } from './auth.service';
 import { CreateFreelancerBootstrapDto } from './dto/create-freelancer-bootstrap.dto';
 import { FreelancerBootstrapResponseDto } from './dto/freelancer-bootstrap-response.dto';
+import {
+  ForgotPasswordDto,
+  ForgotPasswordResponseDto,
+} from './dto/forgot-password.dto';
 import { LoginDto } from './dto/login.dto';
 import { LoginResponseDto } from './dto/login-response.dto';
 import { CurrentTenant } from '../tenant-context/decorators/current-tenant.decorator';
@@ -48,7 +52,11 @@ import {
 import { AuthContextResponseV1Dto } from './dto/auth-context-response.dto';
 
 @ApiTags('auth')
-@ApiExtraModels(AuthContextResponseV1Dto, AuthContextPreferenceResponseDto)
+@ApiExtraModels(
+  AuthContextResponseV1Dto,
+  AuthContextPreferenceResponseDto,
+  ForgotPasswordResponseDto,
+)
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
@@ -64,6 +72,18 @@ export class AuthController {
   @ApiUnauthorizedResponse({ description: 'Invalid email or password' })
   login(@Body() loginDto: LoginDto) {
     return this.authService.login(loginDto);
+  }
+
+  @Post('forgot-password')
+  @Public()
+  @ApiOperation({ summary: 'Request password reset instructions' })
+  @ApiBody({ type: ForgotPasswordDto })
+  @ApiOkResponse({
+    description: 'Password reset request acknowledged',
+    type: ForgotPasswordResponseDto,
+  })
+  forgotPassword(@Body() dto: ForgotPasswordDto) {
+    return this.authService.forgotPassword(dto);
   }
 
   @Post('freelancer-bootstrap')
