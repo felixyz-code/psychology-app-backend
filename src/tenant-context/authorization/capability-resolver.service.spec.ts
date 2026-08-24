@@ -135,6 +135,52 @@ describe('CapabilityResolverService', () => {
     ).toBe(CapabilityDecision.DENY);
   });
 
+  it('grants notification template management to OWNER and ADMIN, conditional for PSYCHOLOGIST, and read to operational roles', () => {
+    expect(
+      resolver.resolve(
+        MembershipRole.OWNER,
+        OrganizationCapability.NOTIFICATION_TEMPLATE_MANAGE,
+      ),
+    ).toBe(CapabilityDecision.ALLOW);
+    expect(
+      resolver.resolve(
+        MembershipRole.ADMIN,
+        OrganizationCapability.NOTIFICATION_TEMPLATE_MANAGE,
+      ),
+    ).toBe(CapabilityDecision.ALLOW);
+    expect(
+      resolver.resolve(
+        MembershipRole.PSYCHOLOGIST,
+        OrganizationCapability.NOTIFICATION_TEMPLATE_MANAGE,
+      ),
+    ).toBe(CapabilityDecision.CONDITIONAL);
+    expect(
+      resolver.resolve(
+        MembershipRole.RECEPTIONIST,
+        OrganizationCapability.NOTIFICATION_TEMPLATE_MANAGE,
+      ),
+    ).toBe(CapabilityDecision.DENY);
+
+    expect(
+      resolver.resolve(
+        MembershipRole.PSYCHOLOGIST,
+        OrganizationCapability.NOTIFICATION_TEMPLATE_READ,
+      ),
+    ).toBe(CapabilityDecision.ALLOW);
+    expect(
+      resolver.resolve(
+        MembershipRole.RECEPTIONIST,
+        OrganizationCapability.NOTIFICATION_TEMPLATE_READ,
+      ),
+    ).toBe(CapabilityDecision.ALLOW);
+    expect(
+      resolver.resolve(
+        MembershipRole.AUDITOR,
+        OrganizationCapability.NOTIFICATION_TEMPLATE_READ,
+      ),
+    ).toBe(CapabilityDecision.CONDITIONAL);
+  });
+
   it('grants audit.read capability to OWNER, ADMIN, and AUDITOR', () => {
     expect(
       resolver.resolve(MembershipRole.OWNER, OrganizationCapability.AUDIT_READ),

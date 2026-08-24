@@ -271,7 +271,16 @@ export async function seedRsesStockInstrument(prisma: PrismaClient) {
     },
   });
 
-  if (!existingVersion) {
+  if (existingVersion) {
+    await prisma.instrumentVersion.update({
+      where: { id: existingVersion.id },
+      data: {
+        definitionJson: rsesDefinitionJson,
+        scoringSpecJson: rsesScoringSpecJson,
+        status: InstrumentVersionStatus.PUBLISHED,
+      },
+    });
+  } else {
     await prisma.instrumentVersion.create({
       data: {
         id: RSES_SYSTEM_VERSION_1_ID,

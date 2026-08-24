@@ -46,6 +46,8 @@ export enum OrganizationCapability {
   REPORT_READ = 'report.read',
   AUDIT_READ = 'audit.read',
   ASSESSMENT_TEMPLATE_MANAGE = 'assessment.template_manage',
+  NOTIFICATION_TEMPLATE_READ = 'notification_template.read',
+  NOTIFICATION_TEMPLATE_MANAGE = 'notification_template.manage',
 }
 
 export enum CapabilityDecision {

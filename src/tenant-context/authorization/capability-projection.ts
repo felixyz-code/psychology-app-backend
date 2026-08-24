@@ -27,6 +27,8 @@ const AUTH_CONTEXT_CAPABILITY_CATALOG = new Set([
   'membership.reactivate',
   'membership.remove',
   'membership.suspend',
+  'notification_template.manage',
+  'notification_template.read',
   'organization.manage',
   'organization.read',
   'ownership.transfer',
