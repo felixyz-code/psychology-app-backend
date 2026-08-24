@@ -37,6 +37,7 @@ import { AssessmentsModule } from './modules/assessments/assessments.module';
 import { UserProfileModule } from './user-profile/user-profile.module';
 import { ScheduleBlocksModule } from './schedule-blocks/schedule-blocks.module';
 import { NotificationTemplatesModule } from './notification-templates/notification-templates.module';
+import { TeleconsultationModule } from './teleconsultation/teleconsultation.module';
 
 @Module({
   imports: [
@@ -70,6 +71,7 @@ import { NotificationTemplatesModule } from './notification-templates/notificati
     AssessmentsModule,
     PaefGovernanceModule,
     UserProfileModule,
+    TeleconsultationModule,
   ],
   controllers: [AppController],
   providers: [
