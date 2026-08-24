@@ -90,7 +90,9 @@ export class AuthService {
     };
   }
 
-  async forgotPassword(dto: ForgotPasswordDto): Promise<ForgotPasswordResponseDto> {
+  async forgotPassword(
+    dto: ForgotPasswordDto,
+  ): Promise<ForgotPasswordResponseDto> {
     const normalizedEmail = normalizeEmailIdentity(dto.email);
     // Best practice: Query user without leaking timing/existence
     const user = await this.prisma.user.findUnique({

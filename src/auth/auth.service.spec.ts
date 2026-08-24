@@ -732,13 +732,18 @@ describe('AuthService', () => {
   });
 
   it('returns generic success on forgotPassword whether user exists or not', async () => {
-    prisma.user.findUnique.mockResolvedValueOnce({ id: 'user-1', email: 'test@example.com' });
+    prisma.user.findUnique.mockResolvedValueOnce({
+      id: 'user-1',
+      email: 'test@example.com',
+    });
     const res1 = await service.forgotPassword({ email: 'test@example.com' });
     expect(res1.success).toBe(true);
     expect(res1.message).toContain('instrucciones');
 
     prisma.user.findUnique.mockResolvedValueOnce(null);
-    const res2 = await service.forgotPassword({ email: 'nonexistent@example.com' });
+    const res2 = await service.forgotPassword({
+      email: 'nonexistent@example.com',
+    });
     expect(res2.success).toBe(true);
     expect(res2.message).toContain('instrucciones');
   });
