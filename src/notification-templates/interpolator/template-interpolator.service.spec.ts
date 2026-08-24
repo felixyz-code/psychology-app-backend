@@ -174,6 +174,18 @@ describe('TemplateInterpolatorService', () => {
       expect(keys).toContain('appointmentDate');
       expect(keys).toContain('appointmentTime');
       expect(keys).toContain('locationOrLink');
+      expect(keys).toContain('enlace_teleconsulta');
+    });
+
+    it('interpolates enlace_teleconsulta variable correctly', () => {
+      const template = 'Accede a tu teleconsulta aquí: {{enlace_teleconsulta}}';
+      const context = {
+        enlace_teleconsulta: 'https://app.psiqueos.com/teleconsulta/abc123def456ghi7?token=token-uuid-1',
+      };
+      const result = service.interpolate(template, context);
+      expect(result.renderedText).toBe(
+        'Accede a tu teleconsulta aquí: https://app.psiqueos.com/teleconsulta/abc123def456ghi7?token=token-uuid-1',
+      );
     });
   });
 });

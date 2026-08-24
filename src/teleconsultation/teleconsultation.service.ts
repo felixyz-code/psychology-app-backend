@@ -4,6 +4,7 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { randomBytes, randomUUID } from 'crypto';
 import { TeleconsultationRoomStatus, MembershipRole } from '@prisma/client';
@@ -179,6 +180,96 @@ export class TeleconsultationService {
       data: { status: TeleconsultationRoomStatus.TERMINATED },
     });
     return this.formatRoom(updated);
+  }
+
+  // ─────────────────────────────────────────────
+  // PUBLIC PATIENT ACCESS
+  // ─────────────────────────────────────────────
+
+  async getRoomAccess(roomCode: string, token: string) {
+    if (!token || !token.trim()) {
+      throw new UnauthorizedException('Missing or invalid patient token.');
+    }
+
+    const room = await this.prisma.teleconsultationRoom.findUnique({
+      where: { roomCode },
+      include: {
+        appointment: {
+          include: {
+            patient: {
+              select: {
+                firstName: true,
+                lastName: true,
+              },
+            },
+            psychologist: {
+              select: {
+                name: true,
+              },
+            },
+            organization: {
+              select: {
+                displayName: true,
+                tradeName: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!room) {
+      throw new NotFoundException('Teleconsultation room not found.');
+    }
+
+    if (room.patientToken !== token.trim()) {
+      throw new UnauthorizedException('Invalid patient token.');
+    }
+
+    const isExpired =
+      room.status === TeleconsultationRoomStatus.EXPIRED ||
+      new Date() > room.expiresAt;
+
+    const currentStatus =
+      room.status === TeleconsultationRoomStatus.TERMINATED
+        ? TeleconsultationRoomStatus.TERMINATED
+        : isExpired
+          ? TeleconsultationRoomStatus.EXPIRED
+          : room.status;
+
+    const patientFullName = room.appointment?.patient
+      ? `${room.appointment.patient.firstName} ${room.appointment.patient.lastName}`.trim()
+      : 'Paciente';
+
+    const psychologistFullName =
+      room.appointment?.psychologist?.name || 'Profesional de la salud';
+
+    const organizationDisplayName =
+      room.appointment?.organization?.displayName ||
+      room.appointment?.organization?.tradeName ||
+      'PsiqueOS';
+
+    return {
+      id: room.id,
+      roomCode: room.roomCode,
+      provider: room.provider,
+      status: currentStatus,
+      expiresAt: room.expiresAt.toISOString(),
+      scheduledAt: room.appointment.scheduledAt.toISOString(),
+      durationMinutes: room.appointment.durationMinutes,
+      organizationName: organizationDisplayName,
+      psychologistName: psychologistFullName,
+      patientName: patientFullName,
+    };
+  }
+
+  buildTeleconsultationUrl(
+    frontendBaseUrl: string,
+    roomCode: string,
+    patientToken: string,
+  ): string {
+    const base = frontendBaseUrl.replace(/\/+$/, '');
+    return `${base}/teleconsulta/${roomCode}?token=${patientToken}`;
   }
 
   // ─────────────────────────────────────────────

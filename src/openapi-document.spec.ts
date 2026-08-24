@@ -44,7 +44,10 @@ describe('OpenAPI document', () => {
   it('documents every certified route and the Bearer security scheme', () => {
     const document = createDocument(app);
 
-    expect(Object.keys(document.paths)).toHaveLength(126);
+    expect(Object.keys(document.paths)).toHaveLength(127);
+    expect(
+      document.paths['/teleconsultation/access/{roomCode}'].get?.security,
+    ).toBeUndefined();
     expect(document.components?.securitySchemes?.bearer).toEqual({
       type: 'http',
       scheme: 'bearer',

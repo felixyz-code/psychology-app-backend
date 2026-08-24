@@ -86,6 +86,13 @@ export const CANONICAL_TEMPLATE_VARIABLES: readonly TemplateVariableMetadata[] =
     exampleValue: 'contacto@psiqueos.com',
     category: 'organization',
   },
+  {
+    key: 'enlace_teleconsulta',
+    label: 'Enlace de Teleconsulta',
+    description: 'Enlace directo y seguro para que el paciente ingrese a la sala virtual',
+    exampleValue: 'https://app.psiqueos.com/teleconsulta/abc123def456ghi7?token=3f8b0561-1c39-4475-8123-ec2d79ba4d78',
+    category: 'appointment',
+  },
 ];
 
 export interface DefaultTemplateDefinition {

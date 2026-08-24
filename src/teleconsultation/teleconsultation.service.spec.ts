@@ -313,4 +313,69 @@ describe('TeleconsultationService', () => {
       await expect(service.terminateRoom(APPT_ID, ownerScope)).rejects.toThrow(BadRequestException);
     });
   });
+
+  // ─────────────────────────────────────────────────────────────────
+  // getRoomAccess (Public Patient Access)
+  // ─────────────────────────────────────────────────────────────────
+
+  describe('getRoomAccess', () => {
+    const mockRoomWithRelations = {
+      ...mockRoom,
+      appointment: {
+        ...mockAppointment,
+        patient: { firstName: 'Ana', lastName: 'Rodríguez' },
+        psychologist: { name: 'Dr. Carlos Mendoza' },
+        organization: { displayName: 'PsiqueOS Central', tradeName: null },
+      },
+    };
+
+    it('returns public room metadata when roomCode and token match', async () => {
+      mockPrisma.teleconsultationRoom.findUnique.mockResolvedValue(mockRoomWithRelations);
+
+      const result = await service.getRoomAccess(mockRoom.roomCode, mockRoom.patientToken);
+      expect(result.roomCode).toBe(mockRoom.roomCode);
+      expect(result.patientName).toBe('Ana Rodríguez');
+      expect(result.psychologistName).toBe('Dr. Carlos Mendoza');
+      expect(result.organizationName).toBe('PsiqueOS Central');
+      expect(result.status).toBe(TeleconsultationRoomStatus.PENDING);
+      expect((result as any).therapistPasscode).toBeUndefined();
+    });
+
+    it('throws UnauthorizedException when token is missing or empty', async () => {
+      await expect(service.getRoomAccess(mockRoom.roomCode, '')).rejects.toThrow();
+    });
+
+    it('throws NotFoundException when roomCode is not found', async () => {
+      mockPrisma.teleconsultationRoom.findUnique.mockResolvedValue(null);
+      await expect(
+        service.getRoomAccess('nonexistent-code', mockRoom.patientToken),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('throws UnauthorizedException when token does not match', async () => {
+      mockPrisma.teleconsultationRoom.findUnique.mockResolvedValue(mockRoomWithRelations);
+      await expect(
+        service.getRoomAccess(mockRoom.roomCode, 'wrong-token'),
+      ).rejects.toThrow();
+    });
+
+    it('returns EXPIRED status when expiresAt is in the past', async () => {
+      mockPrisma.teleconsultationRoom.findUnique.mockResolvedValue({
+        ...mockRoomWithRelations,
+        expiresAt: new Date(Date.now() - 60000),
+      });
+
+      const result = await service.getRoomAccess(mockRoom.roomCode, mockRoom.patientToken);
+      expect(result.status).toBe(TeleconsultationRoomStatus.EXPIRED);
+    });
+
+    it('builds teleconsultation patient URL correctly', () => {
+      const url = service.buildTeleconsultationUrl(
+        'https://app.psiqueos.com',
+        'code123',
+        'token456',
+      );
+      expect(url).toBe('https://app.psiqueos.com/teleconsulta/code123?token=token456');
+    });
+  });
 });
