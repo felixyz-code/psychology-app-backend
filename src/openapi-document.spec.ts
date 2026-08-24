@@ -44,7 +44,7 @@ describe('OpenAPI document', () => {
   it('documents every certified route and the Bearer security scheme', () => {
     const document = createDocument(app);
 
-    expect(Object.keys(document.paths)).toHaveLength(127);
+    expect(Object.keys(document.paths)).toHaveLength(128);
     expect(
       document.paths['/teleconsultation/access/{roomCode}'].get?.security,
     ).toBeUndefined();
@@ -201,6 +201,9 @@ describe('OpenAPI document', () => {
       '404',
     );
     expect(document.paths['/auth/login'].post?.security).toBeUndefined();
+    expect(
+      document.paths['/auth/forgot-password'].post?.security,
+    ).toBeUndefined();
     expect(
       document.paths['/auth/freelancer-bootstrap'].post?.security,
     ).toBeUndefined();
