@@ -85,7 +85,8 @@ export class NotificationTemplatesController {
 
   @Get('variables')
   @ApiOperation({
-    summary: 'Get metadata catalogue of all dynamic placeholders available for templates',
+    summary:
+      'Get metadata catalogue of all dynamic placeholders available for templates',
   })
   @ApiOkResponse({
     description: 'List of variable definitions and sample values',

@@ -1,7 +1,19 @@
-import { BadRequestException, ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
-import { TeleconsultationRoomStatus, MembershipRole, UserRole } from '@prisma/client';
-import { TenantResolutionMode, type TenantContext } from '../common/request-context/request-context.service';
+import {
+  TeleconsultationRoomStatus,
+  MembershipRole,
+  UserRole,
+} from '@prisma/client';
+import {
+  TenantResolutionMode,
+  type TenantContext,
+} from '../common/request-context/request-context.service';
 import { TeleconsultationService } from './teleconsultation.service';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -106,12 +118,16 @@ describe('TeleconsultationService', () => {
 
     it('throws NotFoundException when appointment not found in tenant', async () => {
       mockPrisma.appointment.findFirst.mockResolvedValue(null);
-      await expect(service.createRoom(APPT_ID, ownerScope)).rejects.toThrow(NotFoundException);
+      await expect(service.createRoom(APPT_ID, ownerScope)).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('throws ForbiddenException when user is not the assigned therapist', async () => {
       mockPrisma.appointment.findFirst.mockResolvedValue(mockAppointment);
-      await expect(service.createRoom(APPT_ID, otherUserScope)).rejects.toThrow(ForbiddenException);
+      await expect(service.createRoom(APPT_ID, otherUserScope)).rejects.toThrow(
+        ForbiddenException,
+      );
     });
 
     it('allows ADMIN to create a room for any appointment', async () => {
@@ -131,7 +147,9 @@ describe('TeleconsultationService', () => {
         ...mockRoom,
         status: TeleconsultationRoomStatus.ACTIVE,
       });
-      await expect(service.createRoom(APPT_ID, ownerScope)).rejects.toThrow(ConflictException);
+      await expect(service.createRoom(APPT_ID, ownerScope)).rejects.toThrow(
+        ConflictException,
+      );
     });
 
     it('allows creating a new room when previous is TERMINATED', async () => {
@@ -193,7 +211,9 @@ describe('TeleconsultationService', () => {
     it('throws NotFoundException when room does not exist', async () => {
       mockPrisma.appointment.findFirst.mockResolvedValue(mockAppointment);
       mockPrisma.teleconsultationRoom.findUnique.mockResolvedValue(null);
-      await expect(service.getRoom(APPT_ID, ownerScope)).rejects.toThrow(NotFoundException);
+      await expect(service.getRoom(APPT_ID, ownerScope)).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('throws ForbiddenException when room belongs to different org', async () => {
@@ -202,7 +222,9 @@ describe('TeleconsultationService', () => {
         ...mockRoom,
         organizationId: 'other-org-uuid',
       });
-      await expect(service.getRoom(APPT_ID, ownerScope)).rejects.toThrow(ForbiddenException);
+      await expect(service.getRoom(APPT_ID, ownerScope)).rejects.toThrow(
+        ForbiddenException,
+      );
     });
   });
 
@@ -229,7 +251,9 @@ describe('TeleconsultationService', () => {
         ...mockRoom,
         status: TeleconsultationRoomStatus.ACTIVE,
       });
-      await expect(service.activateRoom(APPT_ID, ownerScope)).rejects.toThrow(BadRequestException);
+      await expect(service.activateRoom(APPT_ID, ownerScope)).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('throws BadRequestException when room is TERMINATED', async () => {
@@ -238,7 +262,9 @@ describe('TeleconsultationService', () => {
         ...mockRoom,
         status: TeleconsultationRoomStatus.TERMINATED,
       });
-      await expect(service.activateRoom(APPT_ID, ownerScope)).rejects.toThrow(BadRequestException);
+      await expect(service.activateRoom(APPT_ID, ownerScope)).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('activates an EXPIRED room and extends expiresAt by 60 minutes', async () => {
@@ -311,7 +337,9 @@ describe('TeleconsultationService', () => {
         ...mockRoom,
         status: TeleconsultationRoomStatus.TERMINATED,
       });
-      await expect(service.terminateRoom(APPT_ID, ownerScope)).rejects.toThrow(BadRequestException);
+      await expect(service.terminateRoom(APPT_ID, ownerScope)).rejects.toThrow(
+        BadRequestException,
+      );
     });
   });
 
@@ -331,9 +359,14 @@ describe('TeleconsultationService', () => {
     };
 
     it('returns public room metadata when roomCode and token match', async () => {
-      mockPrisma.teleconsultationRoom.findUnique.mockResolvedValue(mockRoomWithRelations);
+      mockPrisma.teleconsultationRoom.findUnique.mockResolvedValue(
+        mockRoomWithRelations,
+      );
 
-      const result = await service.getRoomAccess(mockRoom.roomCode, mockRoom.patientToken);
+      const result = await service.getRoomAccess(
+        mockRoom.roomCode,
+        mockRoom.patientToken,
+      );
       expect(result.roomCode).toBe(mockRoom.roomCode);
       expect(result.patientName).toBe('Ana Rodríguez');
       expect(result.psychologistName).toBe('Dr. Carlos Mendoza');
@@ -343,7 +376,9 @@ describe('TeleconsultationService', () => {
     });
 
     it('throws UnauthorizedException when token is missing or empty', async () => {
-      await expect(service.getRoomAccess(mockRoom.roomCode, '')).rejects.toThrow();
+      await expect(
+        service.getRoomAccess(mockRoom.roomCode, ''),
+      ).rejects.toThrow();
     });
 
     it('throws NotFoundException when roomCode is not found', async () => {
@@ -354,7 +389,9 @@ describe('TeleconsultationService', () => {
     });
 
     it('throws UnauthorizedException when token does not match', async () => {
-      mockPrisma.teleconsultationRoom.findUnique.mockResolvedValue(mockRoomWithRelations);
+      mockPrisma.teleconsultationRoom.findUnique.mockResolvedValue(
+        mockRoomWithRelations,
+      );
       await expect(
         service.getRoomAccess(mockRoom.roomCode, 'wrong-token'),
       ).rejects.toThrow();
@@ -366,7 +403,10 @@ describe('TeleconsultationService', () => {
         expiresAt: new Date(Date.now() - 60000),
       });
 
-      const result = await service.getRoomAccess(mockRoom.roomCode, mockRoom.patientToken);
+      const result = await service.getRoomAccess(
+        mockRoom.roomCode,
+        mockRoom.patientToken,
+      );
       expect(result.status).toBe(TeleconsultationRoomStatus.EXPIRED);
     });
 
@@ -376,7 +416,9 @@ describe('TeleconsultationService', () => {
         'code123',
         'token456',
       );
-      expect(url).toBe('https://app.psiqueos.com/teleconsulta/code123?token=token456');
+      expect(url).toBe(
+        'https://app.psiqueos.com/teleconsulta/code123?token=token456',
+      );
     });
   });
 });

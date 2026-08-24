@@ -43,7 +43,10 @@ export class CreateNotificationTemplateDto {
     example: 'Confirmación de tu cita en {{organizationName}}',
     maxLength: 255,
   })
-  @ValidateIf((o) => o.channel === NotificationChannel.EMAIL)
+  @ValidateIf(
+    (o: CreateNotificationTemplateDto) =>
+      o.channel === NotificationChannel.EMAIL,
+  )
   @IsString()
   @IsNotEmpty({
     message: 'Subject is mandatory when channel is EMAIL',
@@ -52,8 +55,10 @@ export class CreateNotificationTemplateDto {
   subject?: string;
 
   @ApiProperty({
-    description: 'Template message body containing dynamic variable placeholders',
-    example: 'Hola {{patientName}}, tu cita es el {{appointmentDate}} a las {{appointmentTime}}.',
+    description:
+      'Template message body containing dynamic variable placeholders',
+    example:
+      'Hola {{patientName}}, tu cita es el {{appointmentDate}} a las {{appointmentTime}}.',
   })
   @IsString()
   @IsNotEmpty()
@@ -62,7 +67,12 @@ export class CreateNotificationTemplateDto {
   @ApiPropertyOptional({
     description: 'List of allowed or detected variable placeholder keys',
     type: [String],
-    example: ['patientName', 'appointmentDate', 'appointmentTime', 'therapistName'],
+    example: [
+      'patientName',
+      'appointmentDate',
+      'appointmentTime',
+      'therapistName',
+    ],
   })
   @IsOptional()
   @IsArray()

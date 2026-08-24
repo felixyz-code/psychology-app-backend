@@ -29,8 +29,10 @@ export class UpdateNotificationTemplateDto {
   subject?: string;
 
   @ApiPropertyOptional({
-    description: 'Template message body containing dynamic variable placeholders',
-    example: 'Hola {{patientName}}, recordatorio de cita con {{therapistName}}.',
+    description:
+      'Template message body containing dynamic variable placeholders',
+    example:
+      'Hola {{patientName}}, recordatorio de cita con {{therapistName}}.',
   })
   @IsOptional()
   @IsString()

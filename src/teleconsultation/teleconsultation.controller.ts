@@ -41,28 +41,38 @@ const APPOINTMENT_ID_PARAM = {
 
 @ApiTags('teleconsultation')
 @ApiBearerAuth('bearer')
-@ApiUnauthorizedResponse({ description: 'Missing, invalid, or expired Bearer JWT' })
-@ApiForbiddenResponse({ description: 'Authenticated user lacks a permitted role' })
+@ApiUnauthorizedResponse({
+  description: 'Missing, invalid, or expired Bearer JWT',
+})
+@ApiForbiddenResponse({
+  description: 'Authenticated user lacks a permitted role',
+})
 @TenantRequired()
 @Controller('appointments/:appointmentId/teleconsultation-room')
 @Roles(UserRole.ADMIN, UserRole.PSYCHOLOGIST)
 @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
 export class TeleconsultationController {
-  constructor(private readonly teleconsultationService: TeleconsultationService) {}
+  constructor(
+    private readonly teleconsultationService: TeleconsultationService,
+  ) {}
 
   @Post()
   @AuditLog({
     action: 'TELECONSULTATION_ROOM_CREATED',
     resourceType: 'TeleconsultationRoom',
   })
-  @ApiOperation({ summary: 'Create a secure teleconsultation room for an appointment' })
+  @ApiOperation({
+    summary: 'Create a secure teleconsultation room for an appointment',
+  })
   @ApiParam(APPOINTMENT_ID_PARAM)
   @ApiCreatedResponse({
     description: 'Teleconsultation room created',
     type: TeleconsultationRoomResponseDto,
   })
   @ApiBadRequestResponse({ description: 'Invalid appointment ID' })
-  @ApiConflictResponse({ description: 'An active room already exists for this appointment' })
+  @ApiConflictResponse({
+    description: 'An active room already exists for this appointment',
+  })
   @ApiNotFoundResponse({ description: 'Appointment not found in this tenant' })
   createRoom(
     @Param('appointmentId', ParseUUIDPipe) appointmentId: string,
@@ -106,7 +116,9 @@ export class TeleconsultationController {
     description: 'Room activated',
     type: TeleconsultationRoomResponseDto,
   })
-  @ApiBadRequestResponse({ description: 'Room already active, expired, or terminated' })
+  @ApiBadRequestResponse({
+    description: 'Room already active, expired, or terminated',
+  })
   @ApiNotFoundResponse({ description: 'Room or appointment not found' })
   activateRoom(
     @Param('appointmentId', ParseUUIDPipe) appointmentId: string,
@@ -131,7 +143,9 @@ export class TeleconsultationController {
     type: TeleconsultationRoomResponseDto,
   })
   @ApiBadRequestResponse({ description: 'Room is already terminated' })
-  @ApiForbiddenResponse({ description: 'Only the assigned therapist or admin can terminate' })
+  @ApiForbiddenResponse({
+    description: 'Only the assigned therapist or admin can terminate',
+  })
   @ApiNotFoundResponse({ description: 'Room or appointment not found' })
   terminateRoom(
     @Param('appointmentId', ParseUUIDPipe) appointmentId: string,

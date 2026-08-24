@@ -157,7 +157,7 @@ export class TemplateInterpolatorService {
 
     // Clean dangerous keys from context
     for (const forbidden of FORBIDDEN_KEYS) {
-      delete (mergedContext as any)[forbidden];
+      delete (mergedContext as Record<string, unknown>)[forbidden];
     }
 
     const bodyResult = this.interpolate(params.body, mergedContext, {

@@ -17,7 +17,6 @@ describe('NotificationTemplatesService', () => {
       delete: jest.Mock;
     };
   };
-  let interpolator: TemplateInterpolatorService;
 
   const mockOrgId = 'org-uuid-1111-2222';
   const mockTemplate = {
@@ -56,9 +55,6 @@ describe('NotificationTemplatesService', () => {
 
     service = module.get<NotificationTemplatesService>(
       NotificationTemplatesService,
-    );
-    interpolator = module.get<TemplateInterpolatorService>(
-      TemplateInterpolatorService,
     );
   });
 

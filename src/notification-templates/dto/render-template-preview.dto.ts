@@ -1,8 +1,7 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiPropertyOptional } from '@nestjs/swagger';
 import { NotificationChannel, NotificationEventType } from '@prisma/client';
 import {
   IsEnum,
-  IsNotEmpty,
   IsObject,
   IsOptional,
   IsString,
@@ -49,9 +48,13 @@ export class RenderTemplatePreviewDto {
   body?: string;
 
   @ApiPropertyOptional({
-    description: 'Custom key-value context pairs to override default sample values',
+    description:
+      'Custom key-value context pairs to override default sample values',
     type: Object,
-    example: { patientName: 'Sofía Valenzuela', therapistName: 'Lic. Andrés Soto' },
+    example: {
+      patientName: 'Sofía Valenzuela',
+      therapistName: 'Lic. Andrés Soto',
+    },
   })
   @IsOptional()
   @IsObject()

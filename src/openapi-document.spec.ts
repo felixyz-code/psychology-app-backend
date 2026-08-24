@@ -69,9 +69,9 @@ describe('OpenAPI document', () => {
     expect(
       document.paths['/notification-templates/render-preview'].post?.security,
     ).toEqual([{ bearer: [] }]);
-    expect(document.paths['/notification-templates/{id}'].get?.security).toEqual([
-      { bearer: [] },
-    ]);
+    expect(
+      document.paths['/notification-templates/{id}'].get?.security,
+    ).toEqual([{ bearer: [] }]);
     expect(
       document.paths['/notification-templates/{id}'].patch?.security,
     ).toEqual([{ bearer: [] }]);

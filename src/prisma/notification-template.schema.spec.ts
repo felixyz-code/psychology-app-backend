@@ -51,7 +51,9 @@ describe('NotificationTemplate schema contract and migration', () => {
     expect(migration).toContain('CREATE TABLE "notification_templates"');
     expect(migration).toContain('"organization_id" UUID NOT NULL');
     expect(migration).toContain('"channel" "NotificationChannel" NOT NULL');
-    expect(migration).toContain('"event_type" "NotificationEventType" NOT NULL');
+    expect(migration).toContain(
+      '"event_type" "NotificationEventType" NOT NULL',
+    );
     expect(migration).toContain(
       'CREATE UNIQUE INDEX "notification_templates_organization_id_channel_event_type_key"',
     );

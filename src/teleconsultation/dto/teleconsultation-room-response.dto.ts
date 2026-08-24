@@ -8,13 +8,20 @@ export class TeleconsultationRoomResponseDto {
   @ApiProperty({ description: 'Appointment UUID', format: 'uuid' })
   appointmentId!: string;
 
-  @ApiProperty({ description: 'Organization UUID', format: 'uuid', nullable: true })
+  @ApiProperty({
+    description: 'Organization UUID',
+    format: 'uuid',
+    nullable: true,
+  })
   organizationId!: string | null;
 
   @ApiProperty({ description: 'Unique alphanumeric room code (16 hex chars)' })
   roomCode!: string;
 
-  @ApiProperty({ description: 'Video provider identifier', example: 'internal' })
+  @ApiProperty({
+    description: 'Video provider identifier',
+    example: 'internal',
+  })
   provider!: string;
 
   @ApiProperty({ description: 'Therapist 6-digit numeric passcode' })

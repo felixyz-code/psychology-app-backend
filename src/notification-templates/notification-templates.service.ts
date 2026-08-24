@@ -118,7 +118,10 @@ export class NotificationTemplatesService {
         channel: dto.channel,
         eventType: dto.eventType,
         name: dto.name.trim(),
-        subject: dto.channel === NotificationChannel.EMAIL ? dto.subject?.trim() || null : null,
+        subject:
+          dto.channel === NotificationChannel.EMAIL
+            ? dto.subject?.trim() || null
+            : null,
         body: dto.body,
         variables,
         isActive: dto.isActive !== undefined ? dto.isActive : true,

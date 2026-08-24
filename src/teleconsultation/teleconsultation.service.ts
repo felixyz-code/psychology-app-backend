@@ -57,8 +57,7 @@ export class TeleconsultationService {
     // expiresAt = scheduledAt + durationMinutes + 60 min safety buffer
     const scheduledAt = new Date(appointment.scheduledAt);
     const expiresAt = new Date(
-      scheduledAt.getTime() +
-        (appointment.durationMinutes + 60) * 60 * 1000,
+      scheduledAt.getTime() + (appointment.durationMinutes + 60) * 60 * 1000,
     );
 
     if (existing) {
@@ -105,7 +104,9 @@ export class TeleconsultationService {
       where: { appointmentId },
     });
     if (!room) {
-      throw new NotFoundException('No teleconsultation room found for this appointment.');
+      throw new NotFoundException(
+        'No teleconsultation room found for this appointment.',
+      );
     }
     this.requireTenantRoom(room.organizationId, scope);
 
@@ -124,7 +125,9 @@ export class TeleconsultationService {
       where: { appointmentId },
     });
     if (!room) {
-      throw new NotFoundException('No teleconsultation room found for this appointment.');
+      throw new NotFoundException(
+        'No teleconsultation room found for this appointment.',
+      );
     }
     this.requireTenantRoom(room.organizationId, scope);
 
@@ -167,7 +170,9 @@ export class TeleconsultationService {
       where: { appointmentId },
     });
     if (!room) {
-      throw new NotFoundException('No teleconsultation room found for this appointment.');
+      throw new NotFoundException(
+        'No teleconsultation room found for this appointment.',
+      );
     }
     this.requireTenantRoom(room.organizationId, scope);
 
@@ -322,7 +327,11 @@ export class TeleconsultationService {
     roomOrgId: string | null,
     scope: TeleconsultationScope,
   ) {
-    if (scope.organizationId && roomOrgId && roomOrgId !== scope.organizationId) {
+    if (
+      scope.organizationId &&
+      roomOrgId &&
+      roomOrgId !== scope.organizationId
+    ) {
       throw new ForbiddenException(
         'This teleconsultation room does not belong to your organization.',
       );

@@ -5,7 +5,10 @@ import {
   NotificationEventType,
   UserRole,
 } from '@prisma/client';
-import { TenantResolutionMode, type TenantContext } from '../common/request-context/request-context.service';
+import {
+  TenantResolutionMode,
+  type TenantContext,
+} from '../common/request-context/request-context.service';
 import { NotificationTemplatesController } from './notification-templates.controller';
 import { NotificationTemplatesService } from './notification-templates.service';
 

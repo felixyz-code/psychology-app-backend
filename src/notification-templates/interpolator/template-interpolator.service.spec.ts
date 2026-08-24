@@ -35,7 +35,8 @@ describe('TemplateInterpolatorService', () => {
     });
 
     it('ignores forbidden prototype keys during extraction', () => {
-      const template = 'Malicious: {{__proto__}} and {{constructor}} and {{patientName}}';
+      const template =
+        'Malicious: {{__proto__}} and {{constructor}} and {{patientName}}';
       const variables = service.extractVariables(template);
 
       expect(variables).toEqual(['patientName']);
@@ -68,7 +69,8 @@ describe('TemplateInterpolatorService', () => {
     });
 
     it('keeps unmapped variables intact and reports them in unmappedVariables', () => {
-      const template = 'Estimado {{patientName}}, su enlace es {{rescheduleLink}} en {{branchName}}';
+      const template =
+        'Estimado {{patientName}}, su enlace es {{rescheduleLink}} en {{branchName}}';
       const context = {
         patientName: 'Juan Pérez',
       };
@@ -90,7 +92,8 @@ describe('TemplateInterpolatorService', () => {
     });
 
     it('prevents prototype pollution when malicious keys are passed', () => {
-      const template = 'Valor: {{__proto__}} y {{constructor}} y {{patientName}}';
+      const template =
+        'Valor: {{__proto__}} y {{constructor}} y {{patientName}}';
       const context: Record<string, any> = {
         patientName: 'Seguro',
         __proto__: { injected: 'evil' },
@@ -180,7 +183,8 @@ describe('TemplateInterpolatorService', () => {
     it('interpolates enlace_teleconsulta variable correctly', () => {
       const template = 'Accede a tu teleconsulta aquí: {{enlace_teleconsulta}}';
       const context = {
-        enlace_teleconsulta: 'https://app.psiqueos.com/teleconsulta/abc123def456ghi7?token=token-uuid-1',
+        enlace_teleconsulta:
+          'https://app.psiqueos.com/teleconsulta/abc123def456ghi7?token=token-uuid-1',
       };
       const result = service.interpolate(template, context);
       expect(result.renderedText).toBe(
