@@ -3,10 +3,9 @@ import {
   MembershipRole,
   NotificationChannel,
   NotificationEventType,
-  OrganizationStatus,
   UserRole,
 } from '@prisma/client';
-import type { TenantContext } from '../tenant-context/tenant-context.types';
+import { TenantResolutionMode, type TenantContext } from '../common/request-context/request-context.service';
 import { NotificationTemplatesController } from './notification-templates.controller';
 import { NotificationTemplatesService } from './notification-templates.service';
 
@@ -27,10 +26,9 @@ describe('NotificationTemplatesController', () => {
     organizationId: 'org-uuid-1111',
     membershipId: 'mem-uuid-2222',
     organizationRole: MembershipRole.ADMIN,
-    organizationStatus: OrganizationStatus.ACTIVE,
     userId: 'user-uuid-3333',
     legacyUserRole: UserRole.ADMIN,
-    resolutionMode: 'EXPLICIT',
+    resolutionMode: TenantResolutionMode.EXPLICIT,
   };
 
   const mockTemplateResponse = {

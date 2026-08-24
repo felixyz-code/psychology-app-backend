@@ -1,6 +1,7 @@
 import { BadRequestException, ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
-import { TeleconsultationRoomStatus, MembershipRole } from '@prisma/client';
+import { TeleconsultationRoomStatus, MembershipRole, UserRole } from '@prisma/client';
+import { TenantResolutionMode, type TenantContext } from '../common/request-context/request-context.service';
 import { TeleconsultationService } from './teleconsultation.service';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -33,13 +34,13 @@ const mockRoom = {
   updatedAt: new Date(),
 };
 
-const ownerScope = {
+const ownerScope: TenantContext = {
   organizationId: ORG_ID,
   userId: USER_ID,
   membershipId: 'mem-1',
   organizationRole: MembershipRole.PSYCHOLOGIST,
-  legacyUserRole: null,
-  resolutionMode: 'TENANT' as const,
+  legacyUserRole: UserRole.PSYCHOLOGIST,
+  resolutionMode: TenantResolutionMode.EXPLICIT,
 };
 
 const adminScope = {
