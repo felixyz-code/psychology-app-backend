@@ -9,6 +9,11 @@ describe('AuthController', () => {
     login: jest.fn(),
     freelancerBootstrap: jest.fn(),
     forgotPassword: jest.fn(),
+    rotateRefreshToken: jest.fn(),
+    listActiveSessions: jest.fn(),
+    revokeSession: jest.fn(),
+    revokeOtherSessions: jest.fn(),
+    logout: jest.fn(),
   };
 
   const controller = new AuthController(authService as never);
