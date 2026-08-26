@@ -48,12 +48,47 @@ describe('RolesGuard', () => {
     ).toBe(true);
   });
 
-  it('allows administrators under the existing unrestricted-admin contract', () => {
+  it('allows administrators under the existing unrestricted-admin contract for standard roles', () => {
     reflector.getAllAndOverride.mockReturnValue([UserRole.PSYCHOLOGIST]);
 
     expect(guard.canActivate(createContext({ role: UserRole.ADMIN }))).toBe(
       true,
     );
+  });
+
+  it('strictly rejects clinic ADMIN when SUPERADMIN role is required', () => {
+    reflector.getAllAndOverride.mockReturnValue([UserRole.SUPERADMIN]);
+
+    expect(guard.canActivate(createContext({ role: UserRole.ADMIN }))).toBe(
+      false,
+    );
+  });
+
+  it('allows global SUPERADMIN for any role requirement', () => {
+    reflector.getAllAndOverride.mockReturnValue([UserRole.SUPERADMIN]);
+    expect(
+      guard.canActivate(createContext({ role: UserRole.SUPERADMIN })),
+    ).toBe(true);
+
+    reflector.getAllAndOverride.mockReturnValue([UserRole.ADMIN]);
+    expect(
+      guard.canActivate(createContext({ role: UserRole.SUPERADMIN })),
+    ).toBe(true);
+
+    reflector.getAllAndOverride.mockReturnValue([UserRole.PSYCHOLOGIST]);
+    expect(
+      guard.canActivate(createContext({ role: UserRole.SUPERADMIN })),
+    ).toBe(true);
+  });
+
+  it('allows user with isSuperAdmin=true flag for SUPERADMIN routes', () => {
+    reflector.getAllAndOverride.mockReturnValue([UserRole.SUPERADMIN]);
+
+    expect(
+      guard.canActivate(
+        createContext({ role: UserRole.ADMIN, isSuperAdmin: true } as any),
+      ),
+    ).toBe(true);
   });
 
   it('rejects an authenticated user whose role is not allowed', () => {

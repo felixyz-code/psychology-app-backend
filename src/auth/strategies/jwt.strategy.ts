@@ -11,6 +11,7 @@ export type JwtPayload = {
   name: string;
   email: string;
   role: UserRole;
+  isSuperAdmin?: boolean;
   sid?: string;
 };
 
@@ -39,6 +40,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         name: true,
         email: true,
         role: true,
+        isSuperAdmin: true,
       },
     });
 
@@ -58,7 +60,11 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     }
 
     return {
-      ...user,
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      isSuperAdmin: user.role === UserRole.SUPERADMIN || user.isSuperAdmin,
       sessionId: payload.sid,
     };
   }

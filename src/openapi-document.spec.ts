@@ -44,7 +44,7 @@ describe('OpenAPI document', () => {
   it('documents every certified route and the Bearer security scheme', () => {
     const document = createDocument(app);
 
-    expect(Object.keys(document.paths)).toHaveLength(133);
+    expect(Object.keys(document.paths)).toHaveLength(138);
     expect(
       document.paths['/teleconsultation/access/{roomCode}'].get?.security,
     ).toBeUndefined();
@@ -287,6 +287,24 @@ describe('OpenAPI document', () => {
     expect(
       document.paths['/admin/billing/plan-override'].patch?.responses,
     ).toHaveProperty('200');
+    expect(document.paths['/admin/tenants'].get?.security).toEqual([
+      { bearer: [] },
+    ]);
+    expect(document.paths['/admin/tenants'].get?.responses).toHaveProperty(
+      '200',
+    );
+    expect(
+      document.paths['/admin/tenants/{id}/extend-trial'].post?.security,
+    ).toEqual([{ bearer: [] }]);
+    expect(
+      document.paths['/admin/tenants/{id}/grant-lifetime'].post?.security,
+    ).toEqual([{ bearer: [] }]);
+    expect(
+      document.paths['/admin/tenants/{id}/quotas'].patch?.security,
+    ).toEqual([{ bearer: [] }]);
+    expect(
+      document.paths['/admin/tenants/{id}/freeze'].post?.security,
+    ).toEqual([{ bearer: [] }]);
     expect(document.paths['/organizations'].get?.security).toEqual([
       { bearer: [] },
     ]);

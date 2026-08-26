@@ -69,7 +69,38 @@ describe('EntitlementsService', () => {
         planTier: PlanTier.PROFESSIONAL,
         status: SubscriptionStatus.ACTIVE,
         isGracePeriod: false,
+        isExempt: undefined,
+        customTherapistsLimit: undefined,
+        customPatientsLimit: undefined,
+        customBranchesLimit: undefined,
       });
+    });
+
+    it('returns lifetime sponsor subscription context with exemption', async () => {
+      prisma.subscription.findFirst.mockResolvedValue({
+        id: 'sub-sponsor',
+        organizationId: orgId,
+        planId: proPlanId,
+        status: SubscriptionStatus.LIFETIME_SPONSOR,
+        isExempt: true,
+        customTherapistsLimit: 20,
+        customPatientsLimit: 500,
+        customBranchesLimit: 3,
+        gracePeriodEndsAt: null,
+        plan: {
+          id: proPlanId,
+          code: 'pro-monthly',
+          tier: PlanTier.PROFESSIONAL,
+        },
+      });
+
+      const context = await service.resolveSubscriptionContext(orgId);
+
+      expect(context.status).toBe(SubscriptionStatus.LIFETIME_SPONSOR);
+      expect(context.isExempt).toBe(true);
+      expect(context.customTherapistsLimit).toBe(20);
+      expect(context.customPatientsLimit).toBe(500);
+      expect(context.customBranchesLimit).toBe(3);
     });
 
     it('identifies past due subscription within grace period', async () => {
@@ -110,6 +141,7 @@ describe('EntitlementsService', () => {
         planTier: PlanTier.FREE,
         status: SubscriptionStatus.ACTIVE,
         isGracePeriod: false,
+        isExempt: false,
       });
     });
   });
@@ -151,6 +183,41 @@ describe('EntitlementsService', () => {
         },
         include: { definition: true },
       });
+    });
+
+    it('returns custom quota override values when set at subscription level', async () => {
+      prisma.subscription.findFirst.mockResolvedValue({
+        id: 'sub-sponsor',
+        organizationId: orgId,
+        planId: proPlanId,
+        status: SubscriptionStatus.LIFETIME_SPONSOR,
+        isExempt: true,
+        customTherapistsLimit: 15,
+        customPatientsLimit: 300,
+        customBranchesLimit: 4,
+        plan: {
+          id: proPlanId,
+          code: 'pro-monthly',
+          tier: PlanTier.PROFESSIONAL,
+        },
+      });
+
+      const staffResult = await service.getEntitlement(
+        orgId,
+        EntitlementKey.MAX_STAFF_SEATS,
+      );
+      const patResult = await service.getEntitlement(
+        orgId,
+        EntitlementKey.MAX_PATIENTS,
+      );
+      const branchResult = await service.getEntitlement(
+        orgId,
+        EntitlementKey.MAX_BRANCHES,
+      );
+
+      expect(staffResult.numericValue).toBe(15);
+      expect(patResult.numericValue).toBe(300);
+      expect(branchResult.numericValue).toBe(4);
     });
 
     it('returns null values if entitlement is not mapped in the plan', async () => {

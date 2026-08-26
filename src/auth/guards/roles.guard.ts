@@ -5,6 +5,7 @@ import { ROLES_KEY } from '../decorators/roles.decorator';
 
 type AuthenticatedRequestUser = {
   role?: UserRole;
+  isSuperAdmin?: boolean;
 };
 
 @Injectable()
@@ -24,9 +25,18 @@ export class RolesGuard implements CanActivate {
     const request = context
       .switchToHttp()
       .getRequest<{ user?: AuthenticatedRequestUser }>();
-    const userRole = request.user?.role;
+    const user = request.user;
+    const userRole = user?.role;
 
     if (!userRole) {
+      return false;
+    }
+
+    if (userRole === UserRole.SUPERADMIN || user?.isSuperAdmin === true) {
+      return true;
+    }
+
+    if (requiredRoles.includes(UserRole.SUPERADMIN)) {
       return false;
     }
 
