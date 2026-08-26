@@ -5,4 +5,6 @@ export type AuthenticatedUser = {
   name: string;
   email: string;
   role: UserRole;
+  isSuperAdmin?: boolean;
+  sessionId?: string;
 };

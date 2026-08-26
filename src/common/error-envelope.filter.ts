@@ -63,12 +63,14 @@ export class ErrorEnvelopeFilter implements ExceptionFilter {
     const message =
       mappedPrisma?.message ?? this.messageForException(exception, statusCode);
     const requestId = this.requestContext.requestId ?? 'unavailable';
+    const traceId = this.requestContext.traceId ?? requestId;
 
     if (statusCode >= 500) {
       this.logger.error(
         JSON.stringify({
           event: 'unhandled_http_error',
           requestId,
+          traceId,
           statusCode,
           code,
           error: exception instanceof Error ? exception.message : exception,
@@ -82,6 +84,7 @@ export class ErrorEnvelopeFilter implements ExceptionFilter {
       code,
       message,
       requestId,
+      traceId,
       details,
     });
   }

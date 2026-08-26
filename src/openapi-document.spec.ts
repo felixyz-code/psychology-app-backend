@@ -44,10 +44,23 @@ describe('OpenAPI document', () => {
   it('documents every certified route and the Bearer security scheme', () => {
     const document = createDocument(app);
 
-    expect(Object.keys(document.paths)).toHaveLength(128);
+    expect(Object.keys(document.paths)).toHaveLength(141);
     expect(
       document.paths['/teleconsultation/access/{roomCode}'].get?.security,
     ).toBeUndefined();
+    expect(document.paths['/auth/refresh'].post?.security).toBeUndefined();
+    expect(document.paths['/auth/sessions'].get?.security).toEqual([
+      { bearer: [] },
+    ]);
+    expect(document.paths['/auth/sessions/{id}'].delete?.security).toEqual([
+      { bearer: [] },
+    ]);
+    expect(
+      document.paths['/auth/sessions/revoke-others'].post?.security,
+    ).toEqual([{ bearer: [] }]);
+    expect(document.paths['/auth/logout'].post?.security).toEqual([
+      { bearer: [] },
+    ]);
     expect(document.components?.securitySchemes?.bearer).toEqual({
       type: 'http',
       scheme: 'bearer',
@@ -216,6 +229,7 @@ describe('OpenAPI document', () => {
     expect(document.paths['/health'].get?.security).toBeUndefined();
     expect(document.paths['/health/live'].get?.security).toBeUndefined();
     expect(document.paths['/health/ready'].get?.security).toBeUndefined();
+    expect(document.paths['/metrics'].get?.security).toBeUndefined();
     expect(document.paths['/patients'].get?.security).toEqual([{ bearer: [] }]);
     expect(document.paths['/patients'].get?.responses).toHaveProperty('401');
     expect(document.paths['/patients'].get?.responses).toHaveProperty('403');
@@ -274,6 +288,36 @@ describe('OpenAPI document', () => {
     expect(
       document.paths['/admin/billing/plan-override'].patch?.responses,
     ).toHaveProperty('200');
+    expect(document.paths['/admin/tenants'].get?.security).toEqual([
+      { bearer: [] },
+    ]);
+    expect(document.paths['/admin/tenants'].get?.responses).toHaveProperty(
+      '200',
+    );
+    expect(
+      document.paths['/admin/tenants/{id}/extend-trial'].post?.security,
+    ).toEqual([{ bearer: [] }]);
+    expect(
+      document.paths['/admin/tenants/{id}/grant-lifetime'].post?.security,
+    ).toEqual([{ bearer: [] }]);
+    expect(
+      document.paths['/admin/tenants/{id}/quotas'].patch?.security,
+    ).toEqual([{ bearer: [] }]);
+    expect(document.paths['/admin/tenants/{id}/freeze'].post?.security).toEqual(
+      [{ bearer: [] }],
+    );
+    expect(document.paths['/admin/audit-logs'].get?.security).toEqual([
+      { bearer: [] },
+    ]);
+    expect(document.paths['/admin/audit-logs'].get?.responses).toHaveProperty(
+      '200',
+    );
+    expect(document.paths['/admin/metrics'].get?.security).toEqual([
+      { bearer: [] },
+    ]);
+    expect(document.paths['/admin/metrics'].get?.responses).toHaveProperty(
+      '200',
+    );
     expect(document.paths['/organizations'].get?.security).toEqual([
       { bearer: [] },
     ]);

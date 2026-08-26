@@ -256,6 +256,7 @@ export class TeleconsultationService {
 
     return {
       id: room.id,
+      appointmentId: room.appointmentId,
       roomCode: room.roomCode,
       provider: room.provider,
       status: currentStatus,

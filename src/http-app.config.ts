@@ -15,13 +15,16 @@ export function configureHttpApp(app: INestApplication, config: HttpAppConfig) {
   }
   app.use(
     helmet({
+      frameguard: { action: 'deny' },
+      xContentTypeOptions: true,
+      referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
       contentSecurityPolicy: {
         directives: {
           defaultSrc: ["'self'"],
           baseUri: ["'self'"],
           fontSrc: ["'self'", 'data:'],
           formAction: ["'self'"],
-          frameAncestors: ["'self'"],
+          frameAncestors: ["'none'"],
           imgSrc: ["'self'", 'data:'],
           objectSrc: ["'none'"],
           scriptSrc: ["'self'", "'unsafe-inline'"],

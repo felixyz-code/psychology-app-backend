@@ -17,6 +17,9 @@ export class AuthenticatedUserResponseDto {
 
   @ApiProperty({ enum: UserRole, example: UserRole.PSYCHOLOGIST })
   role: UserRole;
+
+  @ApiProperty({ example: false, required: false })
+  isSuperAdmin?: boolean;
 }
 
 export class LoginResponseDto {
@@ -25,6 +28,12 @@ export class LoginResponseDto {
     example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
   })
   accessToken: string;
+
+  @ApiProperty({
+    description: 'Cryptographic refresh token for session renewal and rotation',
+    example: 'dGhpcy1pcy1hLXRlc3QtcmVmcmVzaC10b2tlbg...',
+  })
+  refreshToken: string;
 
   @ApiProperty({ type: AuthenticatedUserResponseDto })
   user: AuthenticatedUserResponseDto;

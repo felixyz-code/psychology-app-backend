@@ -32,6 +32,7 @@ export class EntitlementsService {
             SubscriptionStatus.ACTIVE,
             SubscriptionStatus.TRIALING,
             SubscriptionStatus.PAST_DUE,
+            SubscriptionStatus.LIFETIME_SPONSOR,
           ],
         },
       },
@@ -58,6 +59,10 @@ export class EntitlementsService {
         planTier: activeSubscription.plan.tier,
         status: activeSubscription.status,
         isGracePeriod: isPastDue && isWithinGrace,
+        isExempt: activeSubscription.isExempt,
+        customTherapistsLimit: activeSubscription.customTherapistsLimit,
+        customPatientsLimit: activeSubscription.customPatientsLimit,
+        customBranchesLimit: activeSubscription.customBranchesLimit,
       };
     }
 
@@ -79,6 +84,7 @@ export class EntitlementsService {
       planTier: freePlan?.tier ?? PlanTier.FREE,
       status: SubscriptionStatus.ACTIVE,
       isGracePeriod: false,
+      isExempt: false,
     };
   }
 
@@ -94,6 +100,43 @@ export class EntitlementsService {
     tier: PlanTier;
   }> {
     const context = await this.resolveSubscriptionContext(organizationId);
+
+    // Evaluate custom quota limits configured at subscription/tenant level
+    if (
+      key === (EntitlementKey.MAX_STAFF_SEATS as string) &&
+      context.customTherapistsLimit !== undefined &&
+      context.customTherapistsLimit !== null
+    ) {
+      return {
+        numericValue: context.customTherapistsLimit,
+        booleanValue: null,
+        tier: context.planTier,
+      };
+    }
+
+    if (
+      key === (EntitlementKey.MAX_PATIENTS as string) &&
+      context.customPatientsLimit !== undefined &&
+      context.customPatientsLimit !== null
+    ) {
+      return {
+        numericValue: context.customPatientsLimit,
+        booleanValue: null,
+        tier: context.planTier,
+      };
+    }
+
+    if (
+      key === (EntitlementKey.MAX_BRANCHES as string) &&
+      context.customBranchesLimit !== undefined &&
+      context.customBranchesLimit !== null
+    ) {
+      return {
+        numericValue: context.customBranchesLimit,
+        booleanValue: null,
+        tier: context.planTier,
+      };
+    }
 
     const planEntitlement = await this.prisma.planEntitlement.findFirst({
       where: {

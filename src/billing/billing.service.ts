@@ -158,6 +158,18 @@ export class BillingService {
         updateData.gracePeriodEndsAt = graceEnd;
         break;
       }
+      case SubscriptionStatus.LIFETIME_SPONSOR: {
+        updateData.canceledAt = null;
+        updateData.endedAt = null;
+        updateData.cancelReason = null;
+        const distantEnd = new Date('2099-12-31T23:59:59.999Z');
+        updateData.currentPeriodEndsAt = distantEnd;
+        break;
+      }
+      case SubscriptionStatus.FROZEN: {
+        updateData.cancelReason = reason ?? 'Administrative account frozen';
+        break;
+      }
     }
 
     const updated = await this.prisma.subscription.update({

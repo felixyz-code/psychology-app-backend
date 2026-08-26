@@ -1,10 +1,12 @@
 import { Controller, Get } from '@nestjs/common';
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Public } from './auth/decorators/public.decorator';
+import { SkipTenantContext } from './tenant-context/decorators/skip-tenant-context.decorator';
 import { AppService } from './app.service';
 
 @Controller()
 @ApiTags('root')
+@SkipTenantContext()
 export class AppController {
   constructor(private readonly appService: AppService) {}
 
