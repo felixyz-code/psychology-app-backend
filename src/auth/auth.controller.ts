@@ -184,18 +184,6 @@ export class AuthController {
     return this.authService.forgotPassword(dto);
   }
 
-  @Post('forgot-password')
-  @Public()
-  @ApiOperation({ summary: 'Request password reset instructions' })
-  @ApiBody({ type: ForgotPasswordDto })
-  @ApiOkResponse({
-    description: 'Password reset request acknowledged',
-    type: ForgotPasswordResponseDto,
-  })
-  forgotPassword(@Body() dto: ForgotPasswordDto) {
-    return this.authService.forgotPassword(dto);
-  }
-
   @Post('freelancer-bootstrap')
   @Public()
   @UseGuards(FreelancerBootstrapEnabledGuard, FreelancerBootstrapThrottleGuard)
