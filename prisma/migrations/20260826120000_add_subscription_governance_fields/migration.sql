@@ -1,4 +1,7 @@
 -- AlterTable
+ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "isSuperAdmin" BOOLEAN NOT NULL DEFAULT false;
+
+-- AlterTable
 ALTER TABLE "subscriptions" ADD COLUMN IF NOT EXISTS "isExempt" BOOLEAN NOT NULL DEFAULT false;
 ALTER TABLE "subscriptions" ADD COLUMN IF NOT EXISTS "sponsorNotes" TEXT;
 ALTER TABLE "subscriptions" ADD COLUMN IF NOT EXISTS "customTherapistsLimit" INTEGER;
