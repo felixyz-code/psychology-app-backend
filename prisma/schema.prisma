@@ -119,6 +119,8 @@ enum SubscriptionStatus {
   PAST_DUE
   CANCELED
   EXPIRED
+  LIFETIME_SPONSOR
+  FROZEN
 }
 
 enum PaymentProvider {
@@ -663,6 +665,11 @@ model Subscription {
   endedAt                DateTime?          @db.Timestamptz(3)
   seatQuantity           Int                @default(1) @db.Integer
   cancelReason           String?            @db.VarChar(500)
+  isExempt               Boolean            @default(false)
+  sponsorNotes           String?            @db.Text
+  customTherapistsLimit  Int?               @db.Integer
+  customPatientsLimit    Int?               @db.Integer
+  customBranchesLimit    Int?               @db.Integer
   metadata               Json?
   organization           Organization       @relation(fields: [organizationId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   plan                   Plan               @relation(fields: [planId], references: [id], onDelete: Restrict, onUpdate: Cascade)

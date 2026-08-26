@@ -23,6 +23,10 @@ export interface ResolvedSubscriptionContext {
   planTier: PlanTier;
   status: SubscriptionStatus;
   isGracePeriod: boolean;
+  isExempt?: boolean;
+  customTherapistsLimit?: number | null;
+  customPatientsLimit?: number | null;
+  customBranchesLimit?: number | null;
 }
 
 export interface QuotaRequirement {
