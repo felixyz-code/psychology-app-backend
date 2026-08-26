@@ -66,6 +66,7 @@ const ids = {
   suspendedMember: seedUuid(23000000, 12),
   suspendedOrgUser: seedUuid(23000000, 13),
   noMembership: seedUuid(23000000, 14),
+  superadmin: seedUuid(23000000, 99),
   ownerMembershipA: seedUuid(24000000, 1),
   adminMembershipA: seedUuid(24000000, 2),
   psychologistAssignedMembershipA: seedUuid(24000000, 3),
@@ -129,6 +130,7 @@ type SeedUser = {
   email: string;
   normalizedEmail: string;
   role: UserRole;
+  isSuperAdmin: boolean;
   preferredOrganizationId: string | null;
 };
 
@@ -144,6 +146,14 @@ const organizations = [
 ] satisfies Prisma.OrganizationCreateManyInput[];
 
 const users: SeedUser[] = [
+  user(
+    ids.superadmin,
+    'Global SuperAdmin',
+    'superadmin@psiqueos.app',
+    UserRole.SUPERADMIN,
+    null,
+    true,
+  ),
   user(ids.ownerA, 'Owner A', 'owner.a@example.test'),
   user(ids.adminA, 'Admin A', 'admin.a@example.test', UserRole.ADMIN),
   user(
@@ -1500,6 +1510,7 @@ function user(
   email: string,
   role: UserRole = UserRole.PSYCHOLOGIST,
   preferredOrganizationId: string | null = null,
+  isSuperAdmin: boolean = false,
 ): SeedUser {
   return {
     id,
@@ -1507,6 +1518,7 @@ function user(
     email,
     normalizedEmail: normalizeEmailIdentity(email),
     role,
+    isSuperAdmin,
     preferredOrganizationId,
   };
 }

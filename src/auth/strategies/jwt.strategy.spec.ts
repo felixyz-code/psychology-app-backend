@@ -39,6 +39,7 @@ const currentUser = {
   name: 'Current Name',
   email: 'current@example.com',
   role: UserRole.ADMIN,
+  isSuperAdmin: false,
 };
 
 describe('JwtStrategy', () => {
@@ -65,6 +66,7 @@ describe('JwtStrategy', () => {
 
     await expect(strategy.validate(payload)).resolves.toEqual({
       ...currentUser,
+      isSuperAdmin: false,
       sessionId: undefined,
     });
     expect(prisma.user.findUnique).toHaveBeenCalledWith({
@@ -74,6 +76,7 @@ describe('JwtStrategy', () => {
         name: true,
         email: true,
         role: true,
+        isSuperAdmin: true,
       },
     });
   });
@@ -90,6 +93,7 @@ describe('JwtStrategy', () => {
       strategy.validate({ ...payload, sid: 'active-session-id' }),
     ).resolves.toEqual({
       ...currentUser,
+      isSuperAdmin: false,
       sessionId: 'active-session-id',
     });
   });

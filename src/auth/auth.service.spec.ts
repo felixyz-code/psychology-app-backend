@@ -129,6 +129,7 @@ describe('AuthService', () => {
         name: user.name,
         email: user.email,
         role: user.role,
+        isSuperAdmin: false,
       },
     });
 
@@ -145,6 +146,7 @@ describe('AuthService', () => {
       name: user.name,
       email: user.email,
       role: user.role,
+      isSuperAdmin: false,
       sid: expect.any(String),
     });
   });
@@ -801,6 +803,7 @@ describe('AuthService', () => {
         name: user.name,
         email: user.email,
         role: user.role,
+        isSuperAdmin: false,
       });
       expect(prisma.userSession.update).toHaveBeenCalledWith(
         expect.objectContaining({

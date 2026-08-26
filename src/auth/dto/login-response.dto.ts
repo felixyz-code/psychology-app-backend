@@ -17,6 +17,9 @@ export class AuthenticatedUserResponseDto {
 
   @ApiProperty({ enum: UserRole, example: UserRole.PSYCHOLOGIST })
   role: UserRole;
+
+  @ApiProperty({ example: false, required: false })
+  isSuperAdmin?: boolean;
 }
 
 export class LoginResponseDto {

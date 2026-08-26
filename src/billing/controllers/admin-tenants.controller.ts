@@ -39,10 +39,10 @@ import {
 @ApiTags('admin-tenants')
 @ApiBearerAuth('bearer')
 @ApiUnauthorizedResponse({ description: 'Authentication is required' })
-@ApiForbiddenResponse({ description: 'ADMIN role is required' })
+@ApiForbiddenResponse({ description: 'SUPERADMIN role is required' })
 @SkipTenantContext()
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(UserRole.ADMIN)
+@Roles(UserRole.SUPERADMIN)
 @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
 @Controller('admin/tenants')
 export class AdminTenantsController {
@@ -52,7 +52,7 @@ export class AdminTenantsController {
   @ApiOperation({
     summary: 'List consolidated organizations, subscriptions and quotas',
     description:
-      'Strictly requires global ADMIN role. Bypasses tenant context. Lists organizations with plan, usage, and sponsorship metadata.',
+      'Strictly requires global SUPERADMIN role. Bypasses tenant context. Lists organizations with plan, usage, and sponsorship metadata.',
   })
   @ApiOkResponse({
     description: 'Consolidated list of organizations and subscription states',
