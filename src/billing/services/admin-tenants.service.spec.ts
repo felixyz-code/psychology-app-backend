@@ -7,39 +7,68 @@ import {
   SubscriptionStatus,
 } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import { AuditLogService } from '../../audit-logs/audit-logs.service';
 import { EntitlementKey } from '../../entitlements/entitlements.constants';
 import { AdminTenantsService } from './admin-tenants.service';
 
 describe('AdminTenantsService', () => {
   let service: AdminTenantsService;
+  let auditLogService: {
+    findAll: jest.Mock;
+  };
   let prisma: {
     organization: {
       findMany: jest.Mock;
       findUnique: jest.Mock;
       update: jest.Mock;
+      count: jest.Mock;
     };
     subscription: {
       create: jest.Mock;
       update: jest.Mock;
+      count: jest.Mock;
     };
     plan: {
       findFirst: jest.Mock;
     };
+    patient: {
+      count: jest.Mock;
+    };
+    appointment: {
+      count: jest.Mock;
+    };
+    user: {
+      count: jest.Mock;
+    };
   };
 
   beforeEach(async () => {
+    auditLogService = {
+      findAll: jest.fn(),
+    };
     prisma = {
       organization: {
         findMany: jest.fn(),
         findUnique: jest.fn(),
         update: jest.fn(),
+        count: jest.fn(),
       },
       subscription: {
         create: jest.fn(),
         update: jest.fn(),
+        count: jest.fn(),
       },
       plan: {
         findFirst: jest.fn(),
+      },
+      patient: {
+        count: jest.fn(),
+      },
+      appointment: {
+        count: jest.fn(),
+      },
+      user: {
+        count: jest.fn(),
       },
     };
 
@@ -47,6 +76,7 @@ describe('AdminTenantsService', () => {
       providers: [
         AdminTenantsService,
         { provide: PrismaService, useValue: prisma },
+        { provide: AuditLogService, useValue: auditLogService },
       ],
     }).compile();
 
@@ -287,6 +317,79 @@ describe('AdminTenantsService', () => {
         },
       });
       expect(result.isFrozen).toBe(false);
+    });
+  });
+
+  describe('getGlobalAuditLogs', () => {
+    it('delegates to AuditLogService.findAll with parsed filter dates', async () => {
+      const mockResult = {
+        items: [{ id: 'log-1', action: 'TENANT_CREATE' }],
+        total: 1,
+        limit: 50,
+        offset: 0,
+      };
+      auditLogService.findAll.mockResolvedValue(mockResult);
+
+      const result = await service.getGlobalAuditLogs({
+        limit: 50,
+        offset: 0,
+        from: '2026-08-01T00:00:00.000Z',
+        to: '2026-08-31T23:59:59.999Z',
+        search: 'TENANT',
+      });
+
+      expect(auditLogService.findAll).toHaveBeenCalledWith({
+        limit: 50,
+        offset: 0,
+        from: new Date('2026-08-01T00:00:00.000Z'),
+        to: new Date('2026-08-31T23:59:59.999Z'),
+        search: 'TENANT',
+        action: undefined,
+        branchId: undefined,
+        organizationId: undefined,
+        resource: undefined,
+        resourceId: undefined,
+        resourceType: undefined,
+        severity: undefined,
+        userId: undefined,
+      });
+      expect(result).toEqual(mockResult);
+    });
+  });
+
+  describe('getPlatformMetrics', () => {
+    it('aggregates organization, subscription, patient, appointment and user metrics', async () => {
+      prisma.organization.count
+        .mockResolvedValueOnce(10) // total
+        .mockResolvedValueOnce(8) // active
+        .mockResolvedValueOnce(2); // suspended
+      prisma.subscription.count
+        .mockResolvedValueOnce(3) // trialing
+        .mockResolvedValueOnce(2) // lifetime
+        .mockResolvedValueOnce(3); // active
+      prisma.patient.count.mockResolvedValue(150);
+      prisma.appointment.count.mockResolvedValue(400);
+      prisma.user.count.mockResolvedValue(30);
+
+      const result = await service.getPlatformMetrics();
+
+      expect(result.status).toBe('HEALTHY');
+      expect(result.databaseStatus).toBe('ONLINE');
+      expect(result.tenants).toEqual({
+        total: 10,
+        active: 8,
+        suspended: 2,
+        trialing: 3,
+        lifetime: 2,
+        activeSubscriptions: 3,
+      });
+      expect(result.aggregates).toEqual({
+        totalPatients: 150,
+        totalAppointments: 400,
+        totalUsers: 30,
+      });
+      expect(result.memory.heapUsedMB).toBeGreaterThanOrEqual(0);
+      expect(result.uptimeSeconds).toBeGreaterThanOrEqual(0);
     });
   });
 });

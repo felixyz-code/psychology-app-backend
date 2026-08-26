@@ -8,6 +8,7 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Query,
   UseGuards,
   UsePipes,
   ValidationPipe,
@@ -23,6 +24,8 @@ import {
 } from '@nestjs/swagger';
 import { UserRole } from '@prisma/client';
 import { AuditLog } from '../../audit-logs/decorators/audit-log.decorator';
+import { AuditLogsQueryDto } from '../../audit-logs/dto/audit-logs-query.dto';
+import { AuditLogsPaginatedResponseDto } from '../../audit-logs/dto/audit-logs-response.dto';
 import { Roles } from '../../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../auth/guards/roles.guard';
@@ -33,6 +36,7 @@ import {
   ExtendTenantTrialDto,
   FreezeTenantDto,
   GrantLifetimeSponsorDto,
+  PlatformMetricsResponseDto,
   UpdateTenantQuotasDto,
 } from '../dto/admin-tenants.dto';
 
@@ -44,11 +48,11 @@ import {
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(UserRole.SUPERADMIN)
 @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
-@Controller('admin/tenants')
+@Controller('admin')
 export class AdminTenantsController {
   constructor(private readonly adminTenantsService: AdminTenantsService) {}
 
-  @Get()
+  @Get('tenants')
   @ApiOperation({
     summary: 'List consolidated organizations, subscriptions and quotas',
     description:
@@ -62,7 +66,7 @@ export class AdminTenantsController {
     return this.adminTenantsService.listTenants();
   }
 
-  @Post(':id/extend-trial')
+  @Post('tenants/:id/extend-trial')
   @HttpCode(HttpStatus.OK)
   @AuditLog({
     action: 'SUPERADMIN_TENANT_EXTEND_TRIAL',
@@ -71,7 +75,7 @@ export class AdminTenantsController {
   @ApiOperation({
     summary: 'Extend the trial period for a tenant',
     description:
-      'Strictly requires global ADMIN role. Extends trial period by specified days.',
+      'Strictly requires global SUPERADMIN role. Extends trial period by specified days.',
   })
   @ApiParam({ name: 'id', description: 'Organization UUID' })
   @ApiOkResponse({
@@ -84,7 +88,7 @@ export class AdminTenantsController {
     return this.adminTenantsService.extendTrial(organizationId, dto);
   }
 
-  @Post(':id/grant-lifetime')
+  @Post('tenants/:id/grant-lifetime')
   @HttpCode(HttpStatus.OK)
   @AuditLog({
     action: 'SUPERADMIN_TENANT_GRANT_LIFETIME',
@@ -93,7 +97,7 @@ export class AdminTenantsController {
   @ApiOperation({
     summary: 'Grant lifetime sponsorship membership to an organization',
     description:
-      'Strictly requires global ADMIN role. Sets status to LIFETIME_SPONSOR with isExempt=true.',
+      'Strictly requires global SUPERADMIN role. Sets status to LIFETIME_SPONSOR with isExempt=true.',
   })
   @ApiParam({ name: 'id', description: 'Organization UUID' })
   @ApiOkResponse({
@@ -106,7 +110,7 @@ export class AdminTenantsController {
     return this.adminTenantsService.grantLifetime(organizationId, dto);
   }
 
-  @Patch(':id/quotas')
+  @Patch('tenants/:id/quotas')
   @HttpCode(HttpStatus.OK)
   @AuditLog({
     action: 'SUPERADMIN_TENANT_UPDATE_QUOTAS',
@@ -115,7 +119,7 @@ export class AdminTenantsController {
   @ApiOperation({
     summary: 'Override custom quota limits for a tenant',
     description:
-      'Strictly requires global ADMIN role. Manually adjusts maximum therapists, patients, and branches.',
+      'Strictly requires global SUPERADMIN role. Manually adjusts maximum therapists, patients, and branches.',
   })
   @ApiParam({ name: 'id', description: 'Organization UUID' })
   @ApiOkResponse({
@@ -128,7 +132,7 @@ export class AdminTenantsController {
     return this.adminTenantsService.updateQuotas(organizationId, dto);
   }
 
-  @Post(':id/freeze')
+  @Post('tenants/:id/freeze')
   @HttpCode(HttpStatus.OK)
   @AuditLog({
     action: 'SUPERADMIN_TENANT_FREEZE_TOGGLE',
@@ -137,7 +141,7 @@ export class AdminTenantsController {
   @ApiOperation({
     summary: 'Freeze or unfreeze tenant access',
     description:
-      'Strictly requires global ADMIN role. Suspends/freezes or reactivates organization access.',
+      'Strictly requires global SUPERADMIN role. Suspends/freezes or reactivates organization access.',
   })
   @ApiParam({ name: 'id', description: 'Organization UUID' })
   @ApiOkResponse({
@@ -148,5 +152,33 @@ export class AdminTenantsController {
     @Body() dto: FreezeTenantDto,
   ) {
     return this.adminTenantsService.freezeTenant(organizationId, dto);
+  }
+
+  @Get('audit-logs')
+  @ApiOperation({
+    summary: 'List global platform audit logs',
+    description:
+      'Strictly requires global SUPERADMIN role. Bypasses tenant context. Lists audit events across all organizations or system-level actions.',
+  })
+  @ApiOkResponse({
+    description: 'Paginated list of global audit trail logs',
+    type: AuditLogsPaginatedResponseDto,
+  })
+  getGlobalAuditLogs(@Query() query: AuditLogsQueryDto) {
+    return this.adminTenantsService.getGlobalAuditLogs(query);
+  }
+
+  @Get('metrics')
+  @ApiOperation({
+    summary: 'Get platform health, infrastructure telemetry and tenant metrics',
+    description:
+      'Strictly requires global SUPERADMIN role. Bypasses tenant context. Returns operational status, uptime, tenant counts, and memory telemetry.',
+  })
+  @ApiOkResponse({
+    description: 'Consolidated platform metrics and infrastructure telemetry',
+    type: PlatformMetricsResponseDto,
+  })
+  getPlatformMetrics() {
+    return this.adminTenantsService.getPlatformMetrics();
   }
 }
