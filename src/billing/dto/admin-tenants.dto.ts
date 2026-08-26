@@ -205,3 +205,72 @@ export class FreezeTenantDto {
   @MaxLength(500)
   reason?: string;
 }
+
+export class PlatformMetricsTenantsDto {
+  @ApiProperty({ example: 12 })
+  total: number;
+
+  @ApiProperty({ example: 10 })
+  active: number;
+
+  @ApiProperty({ example: 2 })
+  suspended: number;
+
+  @ApiProperty({ example: 4 })
+  trialing: number;
+
+  @ApiProperty({ example: 3 })
+  lifetime: number;
+
+  @ApiProperty({ example: 3 })
+  activeSubscriptions: number;
+}
+
+export class PlatformMetricsAggregatesDto {
+  @ApiProperty({ example: 142 })
+  totalPatients: number;
+
+  @ApiProperty({ example: 520 })
+  totalAppointments: number;
+
+  @ApiProperty({ example: 28 })
+  totalUsers: number;
+}
+
+export class PlatformMetricsMemoryDto {
+  @ApiProperty({ example: 78 })
+  heapUsedMB: number;
+
+  @ApiProperty({ example: 120 })
+  heapTotalMB: number;
+
+  @ApiProperty({ example: 165 })
+  rssMB: number;
+}
+
+export class PlatformMetricsResponseDto {
+  @ApiProperty({ example: 'HEALTHY' })
+  status: 'HEALTHY' | 'DEGRADED' | 'UNHEALTHY';
+
+  @ApiProperty({ example: 3600 })
+  uptimeSeconds: number;
+
+  @ApiProperty({ example: '2026-08-26T05:00:00.000Z' })
+  serverTimestamp: string;
+
+  @ApiProperty({ example: 'production' })
+  environment: string;
+
+  @ApiProperty({ example: 'ONLINE' })
+  databaseStatus: string;
+
+  @ApiProperty({ type: PlatformMetricsTenantsDto })
+  tenants: PlatformMetricsTenantsDto;
+
+  @ApiProperty({ type: PlatformMetricsAggregatesDto })
+  aggregates: PlatformMetricsAggregatesDto;
+
+  @ApiProperty({ type: PlatformMetricsMemoryDto })
+  memory: PlatformMetricsMemoryDto;
+}
+

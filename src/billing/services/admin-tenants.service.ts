@@ -6,12 +6,15 @@ import {
   SubscriptionStatus,
 } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import { AuditLogService } from '../../audit-logs/audit-logs.service';
+import { AuditLogsQueryDto } from '../../audit-logs/dto/audit-logs-query.dto';
 import { EntitlementKey } from '../../entitlements/entitlements.constants';
 import {
   AdminTenantListItemDto,
   ExtendTenantTrialDto,
   FreezeTenantDto,
   GrantLifetimeSponsorDto,
+  PlatformMetricsResponseDto,
   UpdateTenantQuotasDto,
 } from '../dto/admin-tenants.dto';
 
@@ -19,7 +22,10 @@ import {
 export class AdminTenantsService {
   private readonly logger = new Logger(AdminTenantsService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly auditLogService: AuditLogService,
+  ) {}
 
   /**
    * Consolidates all organizations with their latest subscription status,
@@ -459,5 +465,104 @@ export class AdminTenantsService {
         message: 'Organización descongelada y reactivada exitosamente.',
       };
     }
+  }
+
+  /**
+   * Fetches global platform audit logs across all organizations and system events.
+   */
+  async getGlobalAuditLogs(query: AuditLogsQueryDto) {
+    const fromDate = query.from
+      ? new Date(query.from)
+      : query.startDate
+        ? new Date(query.startDate)
+        : undefined;
+    const toDate = query.to
+      ? new Date(query.to)
+      : query.endDate
+        ? new Date(query.endDate)
+        : undefined;
+
+    return this.auditLogService.findAll({
+      organizationId: query.tenantId,
+      branchId: query.branchId,
+      userId: query.userId,
+      resourceType: query.resourceType,
+      resourceId: query.resourceId,
+      resource: query.resource,
+      action: query.action,
+      severity: query.severity,
+      search: query.search,
+      from: fromDate,
+      to: toDate,
+      limit: query.limit,
+      offset: query.offset,
+    });
+  }
+
+  /**
+   * Calculates platform health, tenant counts, activity aggregates, and memory telemetry.
+   */
+  async getPlatformMetrics(): Promise<PlatformMetricsResponseDto> {
+    const [
+      totalOrgs,
+      activeOrgs,
+      suspendedOrgs,
+      trialingSubs,
+      lifetimeSubs,
+      activeSubs,
+      totalPatients,
+      totalAppointments,
+      totalUsers,
+    ] = await Promise.all([
+      this.prisma.organization.count(),
+      this.prisma.organization.count({
+        where: { status: OrganizationStatus.ACTIVE },
+      }),
+      this.prisma.organization.count({
+        where: { status: OrganizationStatus.SUSPENDED },
+      }),
+      this.prisma.subscription.count({
+        where: { status: SubscriptionStatus.TRIALING },
+      }),
+      this.prisma.subscription.count({
+        where: { status: SubscriptionStatus.LIFETIME_SPONSOR },
+      }),
+      this.prisma.subscription.count({
+        where: { status: SubscriptionStatus.ACTIVE },
+      }),
+      this.prisma.patient.count({
+        where: { deletedAt: null },
+      }),
+      this.prisma.appointment.count(),
+      this.prisma.user.count(),
+    ]);
+
+    const mem = process.memoryUsage();
+
+    return {
+      status: 'HEALTHY',
+      uptimeSeconds: Math.floor(process.uptime()),
+      serverTimestamp: new Date().toISOString(),
+      environment: process.env.NODE_ENV || 'development',
+      databaseStatus: 'ONLINE',
+      tenants: {
+        total: totalOrgs,
+        active: activeOrgs,
+        suspended: suspendedOrgs,
+        trialing: trialingSubs,
+        lifetime: lifetimeSubs,
+        activeSubscriptions: activeSubs,
+      },
+      aggregates: {
+        totalPatients,
+        totalAppointments,
+        totalUsers,
+      },
+      memory: {
+        heapUsedMB: Math.round(mem.heapUsed / 1024 / 1024),
+        heapTotalMB: Math.round(mem.heapTotal / 1024 / 1024),
+        rssMB: Math.round(mem.rss / 1024 / 1024),
+      },
+    };
   }
 }

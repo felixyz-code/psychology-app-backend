@@ -104,4 +104,54 @@ describe('AdminTenantsController', () => {
     });
     expect(result.isFrozen).toBe(true);
   });
+
+  it('delegates getGlobalAuditLogs to service', async () => {
+    service.getGlobalAuditLogs = jest.fn().mockResolvedValue({
+      items: [],
+      total: 0,
+      limit: 50,
+      offset: 0,
+    });
+
+    const query = { limit: 20, offset: 0 };
+    const result = await controller.getGlobalAuditLogs(query as any);
+
+    expect(service.getGlobalAuditLogs).toHaveBeenCalledWith(query);
+    expect(result.items).toEqual([]);
+  });
+
+  it('delegates getPlatformMetrics to service', async () => {
+    const mockMetrics = {
+      status: 'HEALTHY',
+      uptimeSeconds: 120,
+      serverTimestamp: '2026-08-26T05:00:00.000Z',
+      environment: 'test',
+      databaseStatus: 'ONLINE',
+      tenants: {
+        total: 5,
+        active: 4,
+        suspended: 1,
+        trialing: 2,
+        lifetime: 1,
+        activeSubscriptions: 1,
+      },
+      aggregates: {
+        totalPatients: 20,
+        totalAppointments: 40,
+        totalUsers: 10,
+      },
+      memory: {
+        heapUsedMB: 50,
+        heapTotalMB: 80,
+        rssMB: 100,
+      },
+    };
+    service.getPlatformMetrics = jest.fn().mockResolvedValue(mockMetrics);
+
+    const result = await controller.getPlatformMetrics();
+
+    expect(service.getPlatformMetrics).toHaveBeenCalled();
+    expect(result.status).toBe('HEALTHY');
+    expect(result.tenants.total).toBe(5);
+  });
 });
