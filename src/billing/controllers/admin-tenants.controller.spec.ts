@@ -11,6 +11,8 @@ describe('AdminTenantsController', () => {
     grantLifetime: jest.Mock;
     updateQuotas: jest.Mock;
     freezeTenant: jest.Mock;
+    getGlobalAuditLogs: jest.Mock;
+    getPlatformMetrics: jest.Mock;
   };
 
   beforeEach(async () => {
@@ -20,6 +22,8 @@ describe('AdminTenantsController', () => {
       grantLifetime: jest.fn(),
       updateQuotas: jest.fn(),
       freezeTenant: jest.fn(),
+      getGlobalAuditLogs: jest.fn(),
+      getPlatformMetrics: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
