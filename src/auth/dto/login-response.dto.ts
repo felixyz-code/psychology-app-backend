@@ -26,6 +26,13 @@ export class LoginResponseDto {
   })
   accessToken: string;
 
+  @ApiProperty({
+    description: 'Cryptographic refresh token for session renewal and rotation',
+    example: 'dGhpcy1pcy1hLXRlc3QtcmVmcmVzaC10b2tlbg...',
+  })
+  refreshToken: string;
+
   @ApiProperty({ type: AuthenticatedUserResponseDto })
   user: AuthenticatedUserResponseDto;
 }
+

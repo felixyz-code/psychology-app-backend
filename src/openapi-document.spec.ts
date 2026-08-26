@@ -44,10 +44,23 @@ describe('OpenAPI document', () => {
   it('documents every certified route and the Bearer security scheme', () => {
     const document = createDocument(app);
 
-    expect(Object.keys(document.paths)).toHaveLength(128);
+    expect(Object.keys(document.paths)).toHaveLength(133);
     expect(
       document.paths['/teleconsultation/access/{roomCode}'].get?.security,
     ).toBeUndefined();
+    expect(document.paths['/auth/refresh'].post?.security).toBeUndefined();
+    expect(document.paths['/auth/sessions'].get?.security).toEqual([
+      { bearer: [] },
+    ]);
+    expect(document.paths['/auth/sessions/{id}'].delete?.security).toEqual([
+      { bearer: [] },
+    ]);
+    expect(
+      document.paths['/auth/sessions/revoke-others'].post?.security,
+    ).toEqual([{ bearer: [] }]);
+    expect(document.paths['/auth/logout'].post?.security).toEqual([
+      { bearer: [] },
+    ]);
     expect(document.components?.securitySchemes?.bearer).toEqual({
       type: 'http',
       scheme: 'bearer',

@@ -283,10 +283,14 @@ describe('Authentication error handling (integration)', () => {
       })
       .expect(201);
 
-    expect(authService.login).toHaveBeenCalledWith({
-      email: validEmail,
-      password: validPassword,
-    });
+    expect(authService.login).toHaveBeenCalledWith(
+      {
+        email: validEmail,
+        password: validPassword,
+      },
+      expect.any(String),
+      undefined,
+    );
   });
 
   it.each([
@@ -367,6 +371,7 @@ describe('Authentication error handling (integration)', () => {
         organizationName: 'Bootstrap Practice',
       },
       expect.any(String),
+      undefined,
     );
   });
 

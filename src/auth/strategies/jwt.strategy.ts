@@ -11,6 +11,7 @@ export type JwtPayload = {
   name: string;
   email: string;
   role: UserRole;
+  sid?: string;
 };
 
 @Injectable()
@@ -45,6 +46,20 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       throw new UnauthorizedException();
     }
 
-    return user;
+    if (payload.sid) {
+      const session = await this.prisma.userSession.findUnique({
+        where: { id: payload.sid },
+        select: { isRevoked: true, expiresAt: true },
+      });
+
+      if (session && (session.isRevoked || session.expiresAt < new Date())) {
+        throw new UnauthorizedException('Session has been revoked or expired');
+      }
+    }
+
+    return {
+      ...user,
+      sessionId: payload.sid,
+    };
   }
 }

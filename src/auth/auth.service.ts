@@ -1,3 +1,5 @@
+import * as crypto from 'crypto';
+import { randomUUID } from 'crypto';
 import {
   ConflictException,
   Injectable,
@@ -9,6 +11,7 @@ import {
   MembershipRole,
   MembershipStatus,
   OrganizationStatus,
+  Prisma,
   UserRole,
 } from '@prisma/client';
 import { JwtService } from '@nestjs/jwt';
@@ -33,14 +36,33 @@ import {
   ForgotPasswordDto,
   ForgotPasswordResponseDto,
 } from './dto/forgot-password.dto';
+import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { UpdateAuthContextPreferenceDto } from './dto/auth-context-preference.dto';
 import { AuthContextStatus } from './dto/auth-context-response.dto';
 import { LoginDto } from './dto/login.dto';
 import { buildFreelancerBootstrapSlugCandidate } from './freelancer-bootstrap.util';
+import { parseDeviceInfo } from './session-device.util';
 
 const BCRYPT_HASH_ROUNDS = 10;
 const MAX_BOOTSTRAP_SLUG_ATTEMPTS = 5;
 const REGISTRATION_CONFLICT_MESSAGE = 'Registration could not be completed';
+const REFRESH_TOKEN_TTL_MS = 14 * 24 * 60 * 60 * 1000; // 14 days
+
+function hashTokenSecret(secret: string): string {
+  return crypto.createHash('sha256').update(secret).digest('hex');
+}
+
+function verifySecret(providedSecret: string, storedHash: string): boolean {
+  const incomingHash = hashTokenSecret(providedSecret);
+  if (incomingHash.length !== storedHash.length) {
+    return false;
+  }
+  return crypto.timingSafeEqual(
+    Buffer.from(incomingHash, 'utf8'),
+    Buffer.from(storedHash, 'utf8'),
+  );
+}
+
 
 class PreferenceEligibilityError extends Error {
   constructor(
@@ -63,7 +85,7 @@ export class AuthService {
     private readonly capabilityResolver: CapabilityResolverService,
   ) {}
 
-  async login(loginDto: LoginDto) {
+  async login(loginDto: LoginDto, ipAddress?: string, userAgent?: string) {
     const normalizedEmail = normalizeEmailIdentity(loginDto.email);
     const user = await this.prisma.user.findUnique({
       where: { normalizedEmail },
@@ -82,10 +104,19 @@ export class AuthService {
       throw new UnauthorizedException('Invalid email or password');
     }
 
-    const accessToken = await this.signIdentityOnlyAccessToken(user);
+    const { sessionId, refreshToken } = await this.createSession(
+      user.id,
+      ipAddress,
+      userAgent,
+    );
+    const accessToken = await this.signIdentityAccessToken({
+      ...user,
+      sessionId,
+    });
 
     return {
       accessToken,
+      refreshToken,
       user: this.toPublicUser(user),
     };
   }
@@ -114,6 +145,7 @@ export class AuthService {
   async freelancerBootstrap(
     dto: CreateFreelancerBootstrapDto,
     ipAddress: string,
+    userAgent?: string,
   ) {
     const normalizedEmail = normalizeEmailIdentity(dto.email);
     const email = trimEmailPresentation(dto.email);
@@ -203,10 +235,20 @@ export class AuthService {
           organizationId: result.organization.id,
           membershipId: result.membership.id,
         });
-        const accessToken = await this.signIdentityOnlyAccessToken(result.user);
+
+        const { sessionId, refreshToken } = await this.createSession(
+          result.user.id,
+          ipAddress,
+          userAgent,
+        );
+        const accessToken = await this.signIdentityAccessToken({
+          ...result.user,
+          sessionId,
+        });
 
         return {
           accessToken,
+          refreshToken,
           user: this.toPublicUser(result.user),
           organization: result.organization,
           membership: result.membership,
@@ -394,6 +436,255 @@ export class AuthService {
     }
 
     return this.setPreferredOrganization(user, dto.organizationId);
+  }
+
+  async rotateRefreshToken(
+    dto: RefreshTokenDto,
+    ipAddress?: string,
+    userAgent?: string,
+  ) {
+    const rawToken = dto.refreshToken?.trim();
+    if (!rawToken || !rawToken.includes('.')) {
+      throw new UnauthorizedException('Invalid refresh token format');
+    }
+
+    const [sessionId, tokenSecret] = rawToken.split('.');
+    if (!sessionId || !tokenSecret) {
+      throw new UnauthorizedException('Invalid refresh token format');
+    }
+
+    const session = await this.prisma.userSession.findUnique({
+      where: { id: sessionId },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            role: true,
+          },
+        },
+      },
+    });
+
+    if (!session) {
+      throw new UnauthorizedException('Invalid refresh token');
+    }
+
+    // Breach Detection 1: Session is already revoked -> Token family invalidation
+    if (session.isRevoked) {
+      await this.prisma.userSession.updateMany({
+        where: { userId: session.userId, isRevoked: false },
+        data: {
+          isRevoked: true,
+          revokedAt: new Date(),
+          revokedReason: 'REUSE_BREACH_DETECTED',
+        },
+      });
+      throw new UnauthorizedException(
+        'Security breach detected: refresh token reuse on revoked session',
+      );
+    }
+
+    // Check expiration
+    if (session.expiresAt < new Date()) {
+      await this.prisma.userSession.update({
+        where: { id: session.id },
+        data: {
+          isRevoked: true,
+          revokedAt: new Date(),
+          revokedReason: 'EXPIRED',
+        },
+      });
+      throw new UnauthorizedException('Refresh token has expired');
+    }
+
+    // Breach Detection 2: Hash mismatch -> Replay/Reuse attempt on rotated session
+    const isValidSecret = verifySecret(tokenSecret, session.refreshTokenHash);
+    if (!isValidSecret) {
+      await this.prisma.userSession.updateMany({
+        where: { userId: session.userId, isRevoked: false },
+        data: {
+          isRevoked: true,
+          revokedAt: new Date(),
+          revokedReason: 'REUSE_BREACH_DETECTED',
+        },
+      });
+      throw new UnauthorizedException(
+        'Security breach detected: refresh token secret mismatch',
+      );
+    }
+
+    // Issue new secret, update session and rotate
+    const newSecret = crypto.randomBytes(32).toString('hex');
+    const newHash = hashTokenSecret(newSecret);
+    const newRefreshToken = `${session.id}.${newSecret}`;
+    const now = new Date();
+    const newExpiresAt = new Date(now.getTime() + REFRESH_TOKEN_TTL_MS);
+
+    await this.prisma.userSession.update({
+      where: { id: session.id },
+      data: {
+        refreshTokenHash: newHash,
+        lastActiveAt: now,
+        expiresAt: newExpiresAt,
+        ipAddress: ipAddress ?? session.ipAddress,
+        userAgent: userAgent ?? session.userAgent,
+        deviceInfo: userAgent ? parseDeviceInfo(userAgent) : session.deviceInfo,
+      },
+    });
+
+    const accessToken = await this.signIdentityAccessToken({
+      ...session.user,
+      sessionId: session.id,
+    });
+
+    return {
+      accessToken,
+      refreshToken: newRefreshToken,
+      user: this.toPublicUser(session.user),
+    };
+  }
+
+  async listActiveSessions(user: AuthenticatedUser) {
+    const now = new Date();
+    const sessions = await this.prisma.userSession.findMany({
+      where: {
+        userId: user.id,
+        isRevoked: false,
+        expiresAt: { gt: now },
+      },
+      orderBy: { lastActiveAt: 'desc' },
+      select: {
+        id: true,
+        ipAddress: true,
+        userAgent: true,
+        deviceInfo: true,
+        lastActiveAt: true,
+        createdAt: true,
+      },
+    });
+
+    return sessions.map((s) => ({
+      ...s,
+      isCurrent: s.id === user.sessionId,
+    }));
+  }
+
+  async revokeSession(user: AuthenticatedUser, sessionId: string) {
+    const session = await this.prisma.userSession.findFirst({
+      where: {
+        id: sessionId,
+        userId: user.id,
+      },
+    });
+
+    if (!session) {
+      throw new NotFoundException('Session not found');
+    }
+
+    if (!session.isRevoked) {
+      await this.prisma.userSession.update({
+        where: { id: sessionId },
+        data: {
+          isRevoked: true,
+          revokedAt: new Date(),
+          revokedReason: 'MANUAL_REVOCATION',
+        },
+      });
+    }
+
+    return {
+      success: true,
+      message: 'Session revoked successfully',
+    };
+  }
+
+  async revokeOtherSessions(user: AuthenticatedUser) {
+    const result = await this.prisma.userSession.updateMany({
+      where: {
+        userId: user.id,
+        isRevoked: false,
+        ...(user.sessionId ? { id: { not: user.sessionId } } : {}),
+      },
+      data: {
+        isRevoked: true,
+        revokedAt: new Date(),
+        revokedReason: 'MANUAL_REVOCATION',
+      },
+    });
+
+    return {
+      success: true,
+      revokedCount: result.count,
+      message: 'All other sessions have been revoked',
+    };
+  }
+
+  async logout(user: AuthenticatedUser) {
+    if (user.sessionId) {
+      await this.prisma.userSession.updateMany({
+        where: {
+          id: user.sessionId,
+          userId: user.id,
+          isRevoked: false,
+        },
+        data: {
+          isRevoked: true,
+          revokedAt: new Date(),
+          revokedReason: 'LOGOUT',
+        },
+      });
+    }
+
+    return {
+      success: true,
+      message: 'Logged out successfully',
+    };
+  }
+
+  private async createSession(
+    userId: string,
+    ipAddress?: string,
+    userAgent?: string,
+    client: PrismaService | Prisma.TransactionClient = this.prisma,
+  ) {
+    const sessionId = randomUUID();
+    const tokenSecret = crypto.randomBytes(32).toString('hex');
+    const refreshTokenHash = hashTokenSecret(tokenSecret);
+    const deviceInfo = parseDeviceInfo(userAgent);
+    const expiresAt = new Date(Date.now() + REFRESH_TOKEN_TTL_MS);
+
+    await client.userSession.create({
+      data: {
+        id: sessionId,
+        userId,
+        refreshTokenHash,
+        ipAddress: ipAddress ?? null,
+        userAgent: userAgent ?? null,
+        deviceInfo,
+        expiresAt,
+      },
+    });
+
+    const refreshToken = `${sessionId}.${tokenSecret}`;
+    return { sessionId, refreshToken };
+  }
+
+  private signIdentityAccessToken(user: {
+    id: string;
+    name: string;
+    email: string;
+    role: UserRole;
+    sessionId?: string;
+  }) {
+    return this.jwtService.signAsync({
+      sub: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      sid: user.sessionId,
+    });
   }
 
   private signIdentityOnlyAccessToken(user: {
