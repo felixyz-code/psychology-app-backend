@@ -37,21 +37,64 @@ export class RequiredTenantContextUnavailableError extends Error {
   }
 }
 
-type RequestContext = {
+export type RequestContextData = {
   requestId: string;
+  traceId?: string;
+  spanId?: string;
+  traceparent?: string;
   tenantContext?: TenantContext;
 };
 
 @Injectable()
 export class RequestContextService {
-  private readonly storage = new AsyncLocalStorage<RequestContext>();
+  private readonly storage = new AsyncLocalStorage<RequestContextData>();
 
-  run<T>(requestId: string, callback: () => T): T {
-    return this.storage.run({ requestId }, callback);
+  run<T>(
+    contextOrRequestId:
+      | string
+      | {
+          requestId: string;
+          traceId?: string;
+          spanId?: string;
+          traceparent?: string;
+        },
+    callback: () => T,
+  ): T {
+    if (typeof contextOrRequestId === 'string') {
+      return this.storage.run(
+        {
+          requestId: contextOrRequestId,
+          traceId: contextOrRequestId,
+        },
+        callback,
+      );
+    }
+
+    return this.storage.run(
+      {
+        requestId: contextOrRequestId.requestId,
+        traceId: contextOrRequestId.traceId ?? contextOrRequestId.requestId,
+        spanId: contextOrRequestId.spanId,
+        traceparent: contextOrRequestId.traceparent,
+      },
+      callback,
+    );
   }
 
   get requestId() {
     return this.storage.getStore()?.requestId;
+  }
+
+  get traceId() {
+    return this.storage.getStore()?.traceId;
+  }
+
+  get spanId() {
+    return this.storage.getStore()?.spanId;
+  }
+
+  get traceparent() {
+    return this.storage.getStore()?.traceparent;
   }
 
   setTenantContext(tenantContext: TenantContext) {
