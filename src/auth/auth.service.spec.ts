@@ -18,6 +18,14 @@ type PrismaMock = {
     findUnique: jest.Mock;
     update: jest.Mock;
   };
+  userSession: {
+    create: jest.Mock;
+    findUnique: jest.Mock;
+    findFirst: jest.Mock;
+    findMany: jest.Mock;
+    update: jest.Mock;
+    updateMany: jest.Mock;
+  };
   organizationMembership: {
     findMany: jest.Mock;
   };
@@ -63,6 +71,14 @@ describe('AuthService', () => {
         findUnique: jest.fn(),
         update: jest.fn(),
       },
+      userSession: {
+        create: jest.fn().mockResolvedValue({ id: 'mock-session-id' }),
+        findUnique: jest.fn(),
+        findFirst: jest.fn(),
+        findMany: jest.fn(),
+        update: jest.fn(),
+        updateMany: jest.fn(),
+      },
       organizationMembership: {
         findMany: jest.fn(),
       },
@@ -107,6 +123,7 @@ describe('AuthService', () => {
       }),
     ).resolves.toEqual({
       accessToken: 'access-token',
+      refreshToken: expect.stringMatching(/^[a-f0-9-]+\.[a-f0-9]+$/),
       user: {
         id: user.id,
         name: user.name,
@@ -118,6 +135,7 @@ describe('AuthService', () => {
     expect(prisma.user.findUnique).toHaveBeenCalledWith({
       where: { normalizedEmail: user.email },
     });
+    expect(prisma.userSession.create).toHaveBeenCalled();
     expect(bcryptCompare).toHaveBeenCalledWith(
       'correct-password',
       user.passwordHash,
@@ -127,6 +145,7 @@ describe('AuthService', () => {
       name: user.name,
       email: user.email,
       role: user.role,
+      sid: expect.any(String),
     });
   });
 
@@ -746,5 +765,232 @@ describe('AuthService', () => {
     });
     expect(res2.success).toBe(true);
     expect(res2.message).toContain('instrucciones');
+  });
+
+  describe('Session Hardening & Refresh Token Rotation', () => {
+    const sessionId = 'a0000000-0000-4000-8000-000000000001';
+    const rawSecret = '11223344556677889900aabbccddeeff11223344556677889900aabbccddeeff';
+    const secretHash = require('crypto').createHash('sha256').update(rawSecret).digest('hex');
+    const validRefreshToken = `${sessionId}.${rawSecret}`;
+
+    it('successfully rotates a valid refresh token and emits new credentials', async () => {
+      prisma.userSession.findUnique.mockResolvedValue({
+        id: sessionId,
+        userId: user.id,
+        refreshTokenHash: secretHash,
+        isRevoked: false,
+        expiresAt: new Date(Date.now() + 1000000),
+        ipAddress: '127.0.0.1',
+        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+        deviceInfo: 'Chrome en Windows 10/11',
+        user: {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+        },
+      });
+      jwtService.signAsync.mockResolvedValue('rotated-access-token');
+
+      const result = await service.rotateRefreshToken({ refreshToken: validRefreshToken });
+
+      expect(result.accessToken).toBe('rotated-access-token');
+      expect(result.refreshToken).toMatch(new RegExp(`^${sessionId}\\.[a-f0-9]+$`));
+      expect(result.user).toEqual({
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+      });
+      expect(prisma.userSession.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: sessionId },
+        }),
+      );
+    });
+
+    it('rejects an invalid refresh token format', async () => {
+      await expect(
+        service.rotateRefreshToken({ refreshToken: 'malformedtoken' }),
+      ).rejects.toThrow(UnauthorizedException);
+    });
+
+    it('rejects if the session is not found', async () => {
+      prisma.userSession.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.rotateRefreshToken({ refreshToken: validRefreshToken }),
+      ).rejects.toThrow(UnauthorizedException);
+    });
+
+    it('detects breach and invalidates ALL user sessions when presented with a revoked token', async () => {
+      prisma.userSession.findUnique.mockResolvedValue({
+        id: sessionId,
+        userId: user.id,
+        refreshTokenHash: secretHash,
+        isRevoked: true,
+        expiresAt: new Date(Date.now() + 1000000),
+        user,
+      });
+
+      await expect(
+        service.rotateRefreshToken({ refreshToken: validRefreshToken }),
+      ).rejects.toThrow(UnauthorizedException);
+
+      expect(prisma.userSession.updateMany).toHaveBeenCalledWith({
+        where: { userId: user.id, isRevoked: false },
+        data: {
+          isRevoked: true,
+          revokedAt: expect.any(Date),
+          revokedReason: 'REUSE_BREACH_DETECTED',
+        },
+      });
+    });
+
+    it('detects breach and invalidates ALL user sessions on secret hash mismatch (token reuse attack)', async () => {
+      prisma.userSession.findUnique.mockResolvedValue({
+        id: sessionId,
+        userId: user.id,
+        refreshTokenHash: 'different-stored-hash',
+        isRevoked: false,
+        expiresAt: new Date(Date.now() + 1000000),
+        user,
+      });
+
+      await expect(
+        service.rotateRefreshToken({ refreshToken: validRefreshToken }),
+      ).rejects.toThrow(UnauthorizedException);
+
+      expect(prisma.userSession.updateMany).toHaveBeenCalledWith({
+        where: { userId: user.id, isRevoked: false },
+        data: {
+          isRevoked: true,
+          revokedAt: expect.any(Date),
+          revokedReason: 'REUSE_BREACH_DETECTED',
+        },
+      });
+    });
+
+    it('marks session revoked and rejects when token has expired', async () => {
+      prisma.userSession.findUnique.mockResolvedValue({
+        id: sessionId,
+        userId: user.id,
+        refreshTokenHash: secretHash,
+        isRevoked: false,
+        expiresAt: new Date(Date.now() - 10000),
+        user,
+      });
+
+      await expect(
+        service.rotateRefreshToken({ refreshToken: validRefreshToken }),
+      ).rejects.toThrow(UnauthorizedException);
+
+      expect(prisma.userSession.update).toHaveBeenCalledWith({
+        where: { id: sessionId },
+        data: {
+          isRevoked: true,
+          revokedAt: expect.any(Date),
+          revokedReason: 'EXPIRED',
+        },
+      });
+    });
+
+    it('lists active sessions for user and flags the current session correctly', async () => {
+      const now = new Date();
+      prisma.userSession.findMany.mockResolvedValue([
+        {
+          id: sessionId,
+          ipAddress: '192.168.1.1',
+          userAgent: 'Chrome',
+          deviceInfo: 'Chrome en Windows',
+          lastActiveAt: now,
+          createdAt: now,
+        },
+        {
+          id: 'other-session-id',
+          ipAddress: '192.168.1.2',
+          userAgent: 'Safari',
+          deviceInfo: 'Safari en iOS',
+          lastActiveAt: now,
+          createdAt: now,
+        },
+      ]);
+
+      const authUser = { ...user, sessionId };
+      const sessions = await service.listActiveSessions(authUser);
+
+      expect(sessions).toHaveLength(2);
+      expect(sessions[0].isCurrent).toBe(true);
+      expect(sessions[1].isCurrent).toBe(false);
+    });
+
+    it('revokes a specific session belonging to the user', async () => {
+      prisma.userSession.findFirst.mockResolvedValue({
+        id: 'target-session-id',
+        userId: user.id,
+        isRevoked: false,
+      });
+
+      const res = await service.revokeSession(user, 'target-session-id');
+
+      expect(res.success).toBe(true);
+      expect(prisma.userSession.update).toHaveBeenCalledWith({
+        where: { id: 'target-session-id' },
+        data: {
+          isRevoked: true,
+          revokedAt: expect.any(Date),
+          revokedReason: 'MANUAL_REVOCATION',
+        },
+      });
+    });
+
+    it('throws NotFoundException when revoking a non-existent session', async () => {
+      prisma.userSession.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.revokeSession(user, 'non-existent-session'),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('revokes other sessions excluding the current session', async () => {
+      prisma.userSession.updateMany.mockResolvedValue({ count: 3 });
+
+      const authUser = { ...user, sessionId: 'my-current-session' };
+      const res = await service.revokeOtherSessions(authUser);
+
+      expect(res.success).toBe(true);
+      expect(res.revokedCount).toBe(3);
+      expect(prisma.userSession.updateMany).toHaveBeenCalledWith({
+        where: {
+          userId: user.id,
+          isRevoked: false,
+          id: { not: 'my-current-session' },
+        },
+        data: {
+          isRevoked: true,
+          revokedAt: expect.any(Date),
+          revokedReason: 'MANUAL_REVOCATION',
+        },
+      });
+    });
+
+    it('logs out and revokes the current session', async () => {
+      const authUser = { ...user, sessionId: 'my-current-session' };
+      const res = await service.logout(authUser);
+
+      expect(res.success).toBe(true);
+      expect(prisma.userSession.updateMany).toHaveBeenCalledWith({
+        where: {
+          id: 'my-current-session',
+          userId: user.id,
+          isRevoked: false,
+        },
+        data: {
+          isRevoked: true,
+          revokedAt: expect.any(Date),
+          revokedReason: 'LOGOUT',
+        },
+      });
+    });
   });
 });

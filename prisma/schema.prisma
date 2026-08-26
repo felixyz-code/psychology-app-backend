@@ -182,6 +182,7 @@ model User {
   branchAccesses                  UserBranchAccess[]
   assessmentAdministrations       AssessmentAdministration[] @relation("ProfessionalAssessments")
   scheduleBlocks                  ScheduleBlock[]            @relation("TherapistScheduleBlocks")
+  sessions                        UserSession[]
   createdAt                       DateTime                   @default(now())
   updatedAt                       DateTime                   @updatedAt
 
@@ -1132,4 +1133,26 @@ model TeleconsultationRoom {
   @@index([appointmentId])
   @@index([expiresAt, status])
   @@map("teleconsultation_rooms")
+}
+
+model UserSession {
+  id               String    @id @default(uuid()) @db.Uuid
+  userId           String    @map("user_id") @db.Uuid
+  refreshTokenHash String    @map("refresh_token_hash") @db.VarChar(255)
+  ipAddress        String?   @map("ip_address") @db.VarChar(100)
+  userAgent        String?   @map("user_agent") @db.Text
+  deviceInfo       String?   @map("device_info") @db.VarChar(255)
+  lastActiveAt     DateTime  @default(now()) @map("last_active_at") @db.Timestamptz(3)
+  expiresAt        DateTime  @map("expires_at") @db.Timestamptz(3)
+  isRevoked        Boolean   @default(false) @map("is_revoked")
+  revokedAt        DateTime? @map("revoked_at") @db.Timestamptz(3)
+  revokedReason    String?   @map("revoked_reason") @db.VarChar(100)
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRevoked])
+  @@index([userId, lastActiveAt])
+  @@map("user_sessions")
 }

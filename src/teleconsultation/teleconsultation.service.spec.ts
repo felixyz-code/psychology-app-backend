@@ -367,6 +367,8 @@ describe('TeleconsultationService', () => {
         mockRoom.roomCode,
         mockRoom.patientToken,
       );
+      expect(result.id).toBe(mockRoom.id);
+      expect(result.appointmentId).toBe(APPT_ID);
       expect(result.roomCode).toBe(mockRoom.roomCode);
       expect(result.patientName).toBe('Ana Rodríguez');
       expect(result.psychologistName).toBe('Dr. Carlos Mendoza');

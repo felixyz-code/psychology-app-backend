@@ -8,6 +8,9 @@ type PrismaMock = {
   user: {
     findUnique: jest.Mock;
   };
+  userSession: {
+    findUnique: jest.Mock;
+  };
 };
 
 type PassportJwtInternals = {
@@ -47,6 +50,9 @@ describe('JwtStrategy', () => {
       user: {
         findUnique: jest.fn(),
       },
+      userSession: {
+        findUnique: jest.fn(),
+      },
     };
     strategy = new JwtStrategy(
       { jwtSecret: 'test-jwt-secret' } as AppConfigService,
@@ -57,7 +63,10 @@ describe('JwtStrategy', () => {
   it('uses current user data rather than token claims', async () => {
     prisma.user.findUnique.mockResolvedValue(currentUser);
 
-    await expect(strategy.validate(payload)).resolves.toEqual(currentUser);
+    await expect(strategy.validate(payload)).resolves.toEqual({
+      ...currentUser,
+      sessionId: undefined,
+    });
     expect(prisma.user.findUnique).toHaveBeenCalledWith({
       where: { id: payload.sub },
       select: {
@@ -67,6 +76,35 @@ describe('JwtStrategy', () => {
         role: true,
       },
     });
+  });
+
+  it('validates active session and attaches sessionId when sid claim is provided', async () => {
+    prisma.user.findUnique.mockResolvedValue(currentUser);
+    prisma.userSession.findUnique.mockResolvedValue({
+      id: 'active-session-id',
+      isRevoked: false,
+      expiresAt: new Date(Date.now() + 1000000),
+    });
+
+    await expect(
+      strategy.validate({ ...payload, sid: 'active-session-id' }),
+    ).resolves.toEqual({
+      ...currentUser,
+      sessionId: 'active-session-id',
+    });
+  });
+
+  it('rejects access token when session has been revoked', async () => {
+    prisma.user.findUnique.mockResolvedValue(currentUser);
+    prisma.userSession.findUnique.mockResolvedValue({
+      id: 'revoked-session-id',
+      isRevoked: true,
+      expiresAt: new Date(Date.now() + 1000000),
+    });
+
+    await expect(
+      strategy.validate({ ...payload, sid: 'revoked-session-id' }),
+    ).rejects.toBeInstanceOf(UnauthorizedException);
   });
 
   it('rejects an unknown user', async () => {
