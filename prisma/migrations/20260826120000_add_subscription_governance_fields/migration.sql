@@ -1,3 +1,6 @@
+-- AlterEnum
+ALTER TYPE "UserRole" ADD VALUE IF NOT EXISTS 'SUPERADMIN';
+
 -- AlterTable
 ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "isSuperAdmin" BOOLEAN NOT NULL DEFAULT false;
 
