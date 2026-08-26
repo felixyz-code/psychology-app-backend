@@ -1,9 +1,12 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { TeleconsultationRoomStatus } from '@prisma/client';
 
 export class TeleconsultationAccessResponseDto {
   @ApiProperty({ example: '550e8400-e29b-41d4-a716-446655440000' })
   id: string;
+
+  @ApiPropertyOptional({ example: '550e8400-e29b-41d4-a716-446655440000' })
+  appointmentId?: string;
 
   @ApiProperty({ example: 'a1b2c3d4e5f67890' })
   roomCode: string;

@@ -229,16 +229,47 @@ describe('NotificationTemplatesService', () => {
       expect(preview.channel).toBe(NotificationChannel.EMAIL);
     });
 
-    it('renders ad-hoc preview without templateId', async () => {
+    it('renders WhatsApp appointment reminder with bold formatting, date and time', async () => {
       const preview = await service.renderPreview({
         channel: NotificationChannel.WHATSAPP,
         eventType: NotificationEventType.APPOINTMENT_REMINDER_24H,
-        body: 'Hola *{{patientName}}*, cita con *{{therapistName}}*',
-        customContext: { patientName: 'Valeria' },
+        body: 'Hola *{{patientName}}*, le recordamos su cita mañana a las *{{appointmentTime}}* con {{therapistName}} en {{organizationName}}.',
+        customContext: {
+          patientName: 'Sofía Navarro',
+          appointmentTime: '15:00 hrs',
+          therapistName: 'Lic. Andrés Salgado',
+          organizationName: 'Centro Psicológico Integral',
+        },
       });
 
-      expect(preview.renderedBody).toContain('Valeria');
-      expect(preview.channel).toBe(NotificationChannel.WHATSAPP);
+      expect(preview.renderedBody).toBe(
+        'Hola *Sofía Navarro*, le recordamos su cita mañana a las *15:00 hrs* con Lic. Andrés Salgado en Centro Psicológico Integral.',
+      );
+      expect(preview.detectedVariables).toEqual([
+        'patientName',
+        'appointmentTime',
+        'therapistName',
+        'organizationName',
+      ]);
+      expect(preview.unmappedVariables).toEqual([]);
+    });
+
+    it('renders Email appointment cancellation template with context interpolation', async () => {
+      const preview = await service.renderPreview({
+        channel: NotificationChannel.EMAIL,
+        eventType: NotificationEventType.APPOINTMENT_CANCELLED,
+        subject: 'Cita Cancelada - {{organizationName}}',
+        body: '<p>Estimado/a {{patientName}}, su cita del {{appointmentDate}} ha sido cancelada.</p>',
+        customContext: {
+          organizationName: 'PsiqueOS Clínica',
+          patientName: 'Roberto & Hijos',
+          appointmentDate: '26/08/2026',
+        },
+      });
+
+      expect(preview.renderedSubject).toBe('Cita Cancelada - PsiqueOS Clínica');
+      expect(preview.renderedBody).toContain('Roberto & Hijos');
+      expect(preview.renderedBody).toContain('26/08/2026');
     });
   });
 
