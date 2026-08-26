@@ -530,9 +530,7 @@ export class AdminTenantsService {
       this.prisma.subscription.count({
         where: { status: SubscriptionStatus.ACTIVE },
       }),
-      this.prisma.patient.count({
-        where: { deletedAt: null },
-      }),
+      this.prisma.patient.count(),
       this.prisma.appointment.count(),
       this.prisma.user.count(),
     ]);
@@ -566,3 +564,4 @@ export class AdminTenantsService {
     };
   }
 }
+
