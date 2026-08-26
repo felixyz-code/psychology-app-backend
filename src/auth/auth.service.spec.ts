@@ -3,6 +3,7 @@ import {
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
+import * as crypto from 'crypto';
 import { Prisma, UserRole } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { JwtService } from '@nestjs/jwt';
@@ -771,8 +772,12 @@ describe('AuthService', () => {
 
   describe('Session Hardening & Refresh Token Rotation', () => {
     const sessionId = 'a0000000-0000-4000-8000-000000000001';
-    const rawSecret = '11223344556677889900aabbccddeeff11223344556677889900aabbccddeeff';
-    const secretHash = require('crypto').createHash('sha256').update(rawSecret).digest('hex');
+    const rawSecret =
+      '11223344556677889900aabbccddeeff11223344556677889900aabbccddeeff';
+    const secretHash = crypto
+      .createHash('sha256')
+      .update(rawSecret)
+      .digest('hex');
     const validRefreshToken = `${sessionId}.${rawSecret}`;
 
     it('successfully rotates a valid refresh token and emits new credentials', async () => {
@@ -794,10 +799,14 @@ describe('AuthService', () => {
       });
       jwtService.signAsync.mockResolvedValue('rotated-access-token');
 
-      const result = await service.rotateRefreshToken({ refreshToken: validRefreshToken });
+      const result = await service.rotateRefreshToken({
+        refreshToken: validRefreshToken,
+      });
 
       expect(result.accessToken).toBe('rotated-access-token');
-      expect(result.refreshToken).toMatch(new RegExp(`^${sessionId}\\.[a-f0-9]+$`));
+      expect(result.refreshToken).toMatch(
+        new RegExp(`^${sessionId}\\.[a-f0-9]+$`),
+      );
       expect(result.user).toEqual({
         id: user.id,
         name: user.name,

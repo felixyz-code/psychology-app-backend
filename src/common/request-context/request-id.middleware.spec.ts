@@ -33,8 +33,14 @@ describe('RequestIdMiddleware', () => {
     );
 
     expect(setHeader).toHaveBeenCalledWith('x-request-id', 'request_123');
-    expect(setHeader).toHaveBeenCalledWith('traceparent', expect.stringMatching(/^00-[0-9a-f]{32}-[0-9a-f]{16}-01$/));
-    expect(setHeader).toHaveBeenCalledWith('x-trace-id', expect.stringMatching(/^[0-9a-f]{32}$/));
+    expect(setHeader).toHaveBeenCalledWith(
+      'traceparent',
+      expect.stringMatching(/^00-[0-9a-f]{32}-[0-9a-f]{16}-01$/),
+    );
+    expect(setHeader).toHaveBeenCalledWith(
+      'x-trace-id',
+      expect.stringMatching(/^[0-9a-f]{32}$/),
+    );
     expect(next).toHaveBeenCalledTimes(1);
   });
 
@@ -53,11 +59,14 @@ describe('RequestIdMiddleware', () => {
   });
 
   it('extracts and propagates W3C traceparent when provided by incoming request', () => {
-    const incomingTrace = '00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01';
+    const incomingTrace =
+      '00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01';
     const setHeader = jest.fn();
     const next = jest.fn(() => {
       expect(context.traceId).toBe('4bf92f3577b34da6a3ce929d0e0e4736');
-      expect(context.traceparent).toMatch(/^00-4bf92f3577b34da6a3ce929d0e0e4736-[0-9a-f]{16}-01$/);
+      expect(context.traceparent).toMatch(
+        /^00-4bf92f3577b34da6a3ce929d0e0e4736-[0-9a-f]{16}-01$/,
+      );
     });
 
     middleware.use(
@@ -71,7 +80,10 @@ describe('RequestIdMiddleware', () => {
       next,
     );
 
-    expect(setHeader).toHaveBeenCalledWith('x-trace-id', '4bf92f3577b34da6a3ce929d0e0e4736');
+    expect(setHeader).toHaveBeenCalledWith(
+      'x-trace-id',
+      '4bf92f3577b34da6a3ce929d0e0e4736',
+    );
     expect(next).toHaveBeenCalledTimes(1);
   });
 });

@@ -51,22 +51,32 @@ export class MetricsService {
     lines.push(`process_uptime_seconds ${uptime.toFixed(3)}`);
     lines.push('');
 
-    lines.push('# HELP process_cpu_user_seconds_total Total user CPU time spent in seconds.');
+    lines.push(
+      '# HELP process_cpu_user_seconds_total Total user CPU time spent in seconds.',
+    );
     lines.push('# TYPE process_cpu_user_seconds_total counter');
     lines.push(`process_cpu_user_seconds_total ${(cpu.user / 1e6).toFixed(6)}`);
     lines.push('');
 
-    lines.push('# HELP process_cpu_system_seconds_total Total system CPU time spent in seconds.');
+    lines.push(
+      '# HELP process_cpu_system_seconds_total Total system CPU time spent in seconds.',
+    );
     lines.push('# TYPE process_cpu_system_seconds_total counter');
-    lines.push(`process_cpu_system_seconds_total ${(cpu.system / 1e6).toFixed(6)}`);
+    lines.push(
+      `process_cpu_system_seconds_total ${(cpu.system / 1e6).toFixed(6)}`,
+    );
     lines.push('');
 
-    lines.push('# HELP nodejs_heap_size_total_bytes Process heap memory total in bytes.');
+    lines.push(
+      '# HELP nodejs_heap_size_total_bytes Process heap memory total in bytes.',
+    );
     lines.push('# TYPE nodejs_heap_size_total_bytes gauge');
     lines.push(`nodejs_heap_size_total_bytes ${mem.heapTotal}`);
     lines.push('');
 
-    lines.push('# HELP nodejs_heap_size_used_bytes Process heap memory used in bytes.');
+    lines.push(
+      '# HELP nodejs_heap_size_used_bytes Process heap memory used in bytes.',
+    );
     lines.push('# TYPE nodejs_heap_size_used_bytes gauge');
     lines.push(`nodejs_heap_size_used_bytes ${mem.heapUsed}`);
     lines.push('');
@@ -76,7 +86,9 @@ export class MetricsService {
     lines.push(`nodejs_rss_bytes ${mem.rss}`);
     lines.push('');
 
-    lines.push('# HELP nodejs_external_memory_bytes Process external memory in bytes.');
+    lines.push(
+      '# HELP nodejs_external_memory_bytes Process external memory in bytes.',
+    );
     lines.push('# TYPE nodejs_external_memory_bytes gauge');
     lines.push(`nodejs_external_memory_bytes ${mem.external}`);
     lines.push('');
@@ -91,7 +103,9 @@ export class MetricsService {
     }
     lines.push('');
 
-    lines.push('# HELP http_request_duration_seconds Total HTTP request processing duration in seconds.');
+    lines.push(
+      '# HELP http_request_duration_seconds Total HTTP request processing duration in seconds.',
+    );
     lines.push('# TYPE http_request_duration_seconds summary');
     for (const entry of this.httpMetrics.values()) {
       lines.push(

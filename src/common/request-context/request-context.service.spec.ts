@@ -74,7 +74,9 @@ describe('RequestContextService tenant isolation', () => {
         expect(context.requestId).toBe('req-123');
         expect(context.traceId).toBe('trace-abc-32chars-000000000000000');
         expect(context.spanId).toBe('span-16chars0000');
-        expect(context.traceparent).toBe('00-trace-abc-32chars-000000000000000-span-16chars0000-01');
+        expect(context.traceparent).toBe(
+          '00-trace-abc-32chars-000000000000000-span-16chars0000-01',
+        );
       },
     );
   });

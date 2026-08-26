@@ -81,17 +81,17 @@ export class AuthController {
 
   @Post('login')
   @Public()
-  @ApiOperation({ summary: 'Authenticate a user and return a JWT access token and refresh token' })
+  @ApiOperation({
+    summary:
+      'Authenticate a user and return a JWT access token and refresh token',
+  })
   @ApiBody({ type: LoginDto })
   @ApiCreatedResponse({
     description: 'Login successful',
     type: LoginResponseDto,
   })
   @ApiUnauthorizedResponse({ description: 'Invalid email or password' })
-  login(
-    @Body() loginDto: LoginDto,
-    @Req() request: RequestWithMetadata,
-  ) {
+  login(@Body() loginDto: LoginDto, @Req() request: RequestWithMetadata) {
     const ipAddress = request.ip ?? request.socket?.remoteAddress;
     const userAgent = (request.headers['user-agent'] as string) ?? undefined;
     return this.authService.login(loginDto, ipAddress, userAgent);
@@ -100,7 +100,8 @@ export class AuthController {
   @Post('refresh')
   @Public()
   @ApiOperation({
-    summary: 'Rotate refresh token and issue a fresh access token with reuse detection',
+    summary:
+      'Rotate refresh token and issue a fresh access token with reuse detection',
   })
   @ApiBody({ type: RefreshTokenDto })
   @ApiOkResponse({
@@ -110,10 +111,7 @@ export class AuthController {
   @ApiUnauthorizedResponse({
     description: 'Invalid, expired, or compromised refresh token',
   })
-  refresh(
-    @Body() dto: RefreshTokenDto,
-    @Req() request: RequestWithMetadata,
-  ) {
+  refresh(@Body() dto: RefreshTokenDto, @Req() request: RequestWithMetadata) {
     const ipAddress = request.ip ?? request.socket?.remoteAddress;
     const userAgent = (request.headers['user-agent'] as string) ?? undefined;
     return this.authService.rotateRefreshToken(dto, ipAddress, userAgent);
@@ -121,7 +119,9 @@ export class AuthController {
 
   @Get('sessions')
   @ApiBearerAuth('bearer')
-  @ApiOperation({ summary: 'List all active connected sessions for the authenticated user' })
+  @ApiOperation({
+    summary: 'List all active connected sessions for the authenticated user',
+  })
   @ApiOkResponse({
     description: 'Active sessions retrieved successfully',
     type: [UserSessionResponseDto],
@@ -150,7 +150,9 @@ export class AuthController {
 
   @Post('sessions/revoke-others')
   @ApiBearerAuth('bearer')
-  @ApiOperation({ summary: 'Revoke all active sessions except the current one' })
+  @ApiOperation({
+    summary: 'Revoke all active sessions except the current one',
+  })
   @ApiOkResponse({
     description: 'Other sessions revoked successfully',
     type: RevokeOtherSessionsResponseDto,
@@ -278,4 +280,3 @@ export class AuthController {
     return this.authService.updatePreferredOrganization(user, dto);
   }
 }
-

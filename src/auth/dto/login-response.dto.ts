@@ -38,4 +38,3 @@ export class LoginResponseDto {
   @ApiProperty({ type: AuthenticatedUserResponseDto })
   user: AuthenticatedUserResponseDto;
 }
-

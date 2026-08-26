@@ -73,13 +73,14 @@ export class AdminTenantsService {
 
       if (latestSub?.plan) {
         const staffEnt = latestSub.plan.entitlements.find(
-          (e) => e.definition.key === EntitlementKey.MAX_STAFF_SEATS,
+          (e) =>
+            e.definition.key === (EntitlementKey.MAX_STAFF_SEATS as string),
         );
         const patEnt = latestSub.plan.entitlements.find(
-          (e) => e.definition.key === EntitlementKey.MAX_PATIENTS,
+          (e) => e.definition.key === (EntitlementKey.MAX_PATIENTS as string),
         );
         const branchEnt = latestSub.plan.entitlements.find(
-          (e) => e.definition.key === EntitlementKey.MAX_BRANCHES,
+          (e) => e.definition.key === (EntitlementKey.MAX_BRANCHES as string),
         );
 
         therapistsLimit = staffEnt?.numericValue ?? 1;
@@ -564,4 +565,3 @@ export class AdminTenantsService {
     };
   }
 }
-
