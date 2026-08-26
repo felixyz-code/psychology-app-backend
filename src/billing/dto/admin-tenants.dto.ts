@@ -273,4 +273,3 @@ export class PlatformMetricsResponseDto {
   @ApiProperty({ type: PlatformMetricsMemoryDto })
   memory: PlatformMetricsMemoryDto;
 }
-

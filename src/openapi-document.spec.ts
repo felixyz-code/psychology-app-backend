@@ -303,9 +303,9 @@ describe('OpenAPI document', () => {
     expect(
       document.paths['/admin/tenants/{id}/quotas'].patch?.security,
     ).toEqual([{ bearer: [] }]);
-    expect(
-      document.paths['/admin/tenants/{id}/freeze'].post?.security,
-    ).toEqual([{ bearer: [] }]);
+    expect(document.paths['/admin/tenants/{id}/freeze'].post?.security).toEqual(
+      [{ bearer: [] }],
+    );
     expect(document.paths['/admin/audit-logs'].get?.security).toEqual([
       { bearer: [] },
     ]);

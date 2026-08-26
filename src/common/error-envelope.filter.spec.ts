@@ -50,7 +50,10 @@ describe('ErrorEnvelopeFilter', () => {
         traceId: 'trace_abc_32chars_0000000000000',
       },
       () => {
-        filter.catch(new ForbiddenException('Organization access denied'), host);
+        filter.catch(
+          new ForbiddenException('Organization access denied'),
+          host,
+        );
       },
     );
 

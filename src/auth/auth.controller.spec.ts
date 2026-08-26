@@ -112,27 +112,54 @@ describe('AuthController', () => {
 
   it('delegates POST /auth/login with request metadata to authService', async () => {
     const dto = { email: 'test@example.com', password: 'secret' };
-    const req = { ip: '127.0.0.1', headers: { 'user-agent': 'JestClient/1.0' } };
+    const req = {
+      ip: '127.0.0.1',
+      headers: { 'user-agent': 'JestClient/1.0' },
+    };
     const response = { accessToken: 'jwt', refreshToken: 's.secret', user };
     authService.login = jest.fn().mockResolvedValue(response);
 
-    await expect(controller.login(dto, req as never)).resolves.toEqual(response);
-    expect(authService.login).toHaveBeenCalledWith(dto, '127.0.0.1', 'JestClient/1.0');
+    await expect(controller.login(dto, req as never)).resolves.toEqual(
+      response,
+    );
+    expect(authService.login).toHaveBeenCalledWith(
+      dto,
+      '127.0.0.1',
+      'JestClient/1.0',
+    );
   });
 
   it('delegates POST /auth/refresh with request metadata to authService', async () => {
     const dto = { refreshToken: 'session-id.secret' };
-    const req = { ip: '127.0.0.1', headers: { 'user-agent': 'JestClient/1.0' } };
-    const response = { accessToken: 'new-jwt', refreshToken: 'session-id.new-secret', user };
+    const req = {
+      ip: '127.0.0.1',
+      headers: { 'user-agent': 'JestClient/1.0' },
+    };
+    const response = {
+      accessToken: 'new-jwt',
+      refreshToken: 'session-id.new-secret',
+      user,
+    };
     authService.rotateRefreshToken = jest.fn().mockResolvedValue(response);
 
-    await expect(controller.refresh(dto, req as never)).resolves.toEqual(response);
-    expect(authService.rotateRefreshToken).toHaveBeenCalledWith(dto, '127.0.0.1', 'JestClient/1.0');
+    await expect(controller.refresh(dto, req as never)).resolves.toEqual(
+      response,
+    );
+    expect(authService.rotateRefreshToken).toHaveBeenCalledWith(
+      dto,
+      '127.0.0.1',
+      'JestClient/1.0',
+    );
   });
 
   it('delegates GET /auth/sessions to authService', async () => {
     const sessions = [
-      { id: 's1', ipAddress: '127.0.0.1', userAgent: 'Chrome', isCurrent: true },
+      {
+        id: 's1',
+        ipAddress: '127.0.0.1',
+        userAgent: 'Chrome',
+        isCurrent: true,
+      },
     ];
     authService.listActiveSessions = jest.fn().mockResolvedValue(sessions);
 
@@ -144,15 +171,26 @@ describe('AuthController', () => {
     const response = { success: true, message: 'Session revoked' };
     authService.revokeSession = jest.fn().mockResolvedValue(response);
 
-    await expect(controller.revokeSession(user, 'session-target-id')).resolves.toEqual(response);
-    expect(authService.revokeSession).toHaveBeenCalledWith(user, 'session-target-id');
+    await expect(
+      controller.revokeSession(user, 'session-target-id'),
+    ).resolves.toEqual(response);
+    expect(authService.revokeSession).toHaveBeenCalledWith(
+      user,
+      'session-target-id',
+    );
   });
 
   it('delegates POST /auth/sessions/revoke-others to authService', async () => {
-    const response = { success: true, revokedCount: 2, message: 'All others revoked' };
+    const response = {
+      success: true,
+      revokedCount: 2,
+      message: 'All others revoked',
+    };
     authService.revokeOtherSessions = jest.fn().mockResolvedValue(response);
 
-    await expect(controller.revokeOtherSessions(user)).resolves.toEqual(response);
+    await expect(controller.revokeOtherSessions(user)).resolves.toEqual(
+      response,
+    );
     expect(authService.revokeOtherSessions).toHaveBeenCalledWith(user);
   });
 

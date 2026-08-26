@@ -63,7 +63,6 @@ function verifySecret(providedSecret: string, storedHash: string): boolean {
   );
 }
 
-
 class PreferenceEligibilityError extends Error {
   constructor(
     readonly reasonCode:
@@ -684,7 +683,8 @@ export class AuthService {
       name: user.name,
       email: user.email,
       role: user.role,
-      isSuperAdmin: user.role === UserRole.SUPERADMIN || user.isSuperAdmin === true,
+      isSuperAdmin:
+        user.role === UserRole.SUPERADMIN || user.isSuperAdmin === true,
       sid: user.sessionId,
     });
   }
@@ -701,7 +701,8 @@ export class AuthService {
       name: user.name,
       email: user.email,
       role: user.role,
-      isSuperAdmin: user.role === UserRole.SUPERADMIN || user.isSuperAdmin === true,
+      isSuperAdmin:
+        user.role === UserRole.SUPERADMIN || user.isSuperAdmin === true,
     });
   }
 
@@ -717,7 +718,8 @@ export class AuthService {
       name: user.name,
       email: user.email,
       role: user.role,
-      isSuperAdmin: user.role === UserRole.SUPERADMIN || user.isSuperAdmin === true,
+      isSuperAdmin:
+        user.role === UserRole.SUPERADMIN || user.isSuperAdmin === true,
     };
   }
 

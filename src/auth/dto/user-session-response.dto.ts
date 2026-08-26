@@ -42,7 +42,8 @@ export class UserSessionResponseDto {
   createdAt: Date;
 
   @ApiProperty({
-    description: 'Indicates if this session corresponds to the current caller token',
+    description:
+      'Indicates if this session corresponds to the current caller token',
     example: true,
   })
   isCurrent: boolean;

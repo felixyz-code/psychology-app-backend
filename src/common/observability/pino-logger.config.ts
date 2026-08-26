@@ -2,8 +2,7 @@ import { IncomingMessage, ServerResponse } from 'node:http';
 import { Params } from 'nestjs-pino';
 import { AppConfigService } from '../../config/configuration';
 
-const traceparentPattern =
-  /^00-([0-9a-f]{32})-([0-9a-f]{16})-([0-9a-f]{2})$/i;
+const traceparentPattern = /^00-([0-9a-f]{32})-([0-9a-f]{16})-([0-9a-f]{2})$/i;
 
 export function createPinoHttpConfig(config: AppConfigService): Params {
   const isProd = config.nodeEnv === 'production';
@@ -49,7 +48,8 @@ export function createPinoHttpConfig(config: AppConfigService): Params {
 
         return {
           requestId: requestId || (req as unknown as { id?: string }).id,
-          traceId: traceId || requestId || (req as unknown as { id?: string }).id,
+          traceId:
+            traceId || requestId || (req as unknown as { id?: string }).id,
         };
       },
       redact: {

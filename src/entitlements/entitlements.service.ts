@@ -103,7 +103,7 @@ export class EntitlementsService {
 
     // Evaluate custom quota limits configured at subscription/tenant level
     if (
-      key === EntitlementKey.MAX_STAFF_SEATS &&
+      key === (EntitlementKey.MAX_STAFF_SEATS as string) &&
       context.customTherapistsLimit !== undefined &&
       context.customTherapistsLimit !== null
     ) {
@@ -115,7 +115,7 @@ export class EntitlementsService {
     }
 
     if (
-      key === EntitlementKey.MAX_PATIENTS &&
+      key === (EntitlementKey.MAX_PATIENTS as string) &&
       context.customPatientsLimit !== undefined &&
       context.customPatientsLimit !== null
     ) {
@@ -127,7 +127,7 @@ export class EntitlementsService {
     }
 
     if (
-      key === EntitlementKey.MAX_BRANCHES &&
+      key === (EntitlementKey.MAX_BRANCHES as string) &&
       context.customBranchesLimit !== undefined &&
       context.customBranchesLimit !== null
     ) {

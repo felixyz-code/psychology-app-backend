@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { OrganizationStatus, SubscriptionStatus } from '@prisma/client';
+import { SubscriptionStatus } from '@prisma/client';
 import { AdminTenantsController } from './admin-tenants.controller';
 import { AdminTenantsService } from '../services/admin-tenants.service';
 
@@ -118,7 +118,7 @@ describe('AdminTenantsController', () => {
     });
 
     const query = { limit: 20, offset: 0 };
-    const result = await controller.getGlobalAuditLogs(query as any);
+    const result = await controller.getGlobalAuditLogs(query);
 
     expect(service.getGlobalAuditLogs).toHaveBeenCalledWith(query);
     expect(result.items).toEqual([]);

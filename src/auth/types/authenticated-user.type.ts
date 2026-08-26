@@ -8,4 +8,3 @@ export type AuthenticatedUser = {
   isSuperAdmin?: boolean;
   sessionId?: string;
 };
-

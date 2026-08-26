@@ -4,8 +4,7 @@ import { NextFunction, Request, Response } from 'express';
 import { RequestContextService } from './request-context.service';
 
 const requestIdPattern = /^[A-Za-z0-9_-]{8,128}$/;
-const traceparentPattern =
-  /^00-([0-9a-f]{32})-([0-9a-f]{16})-([0-9a-f]{2})$/i;
+const traceparentPattern = /^00-([0-9a-f]{32})-([0-9a-f]{16})-([0-9a-f]{2})$/i;
 
 @Injectable()
 export class RequestIdMiddleware implements NestMiddleware {
