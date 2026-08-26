@@ -3,30 +3,42 @@ import { Request, Response } from 'express';
 import { lastValueFrom, of, throwError } from 'rxjs';
 import { RequestContextService } from '../request-context/request-context.service';
 import { HttpLoggingInterceptor } from './http-logging.interceptor';
+import { MetricsService } from '../../metrics/metrics.service';
 
 describe('HttpLoggingInterceptor', () => {
   let context: RequestContextService;
+  let metricsService: jest.Mocked<MetricsService>;
   let interceptor: HttpLoggingInterceptor;
 
   beforeEach(() => {
     context = new RequestContextService();
-    interceptor = new HttpLoggingInterceptor(context);
+    metricsService = {
+      recordHttpRequest: jest.fn(),
+      getMetrics: jest.fn(),
+    } as unknown as jest.Mocked<MetricsService>;
+    interceptor = new HttpLoggingInterceptor(context, metricsService);
   });
 
-  it('logs a structured successful request without its body', async () => {
+  it('logs a structured successful request without its body and records metric', async () => {
     const log = jest.spyOn(Logger.prototype, 'log').mockImplementation();
 
-    await context.run('request_123', () =>
-      lastValueFrom(
-        interceptor.intercept(createExecutionContext(), {
-          handle: () => of({ password: 'not-for-logs' }),
-        }),
-      ),
+    await context.run(
+      {
+        requestId: 'request_123',
+        traceId: 'trace_32chars_hex_00000000000000',
+      },
+      () =>
+        lastValueFrom(
+          interceptor.intercept(createExecutionContext(), {
+            handle: () => of({ password: 'not-for-logs' }),
+          }),
+        ),
     );
 
     expect(JSON.parse(log.mock.calls.at(-1)?.[0] as string)).toMatchObject({
       event: 'http_request',
       requestId: 'request_123',
+      traceId: 'trace_32chars_hex_00000000000000',
       method: 'POST',
       path: '/patients/opaque-id',
       statusCode: 201,
@@ -34,9 +46,15 @@ describe('HttpLoggingInterceptor', () => {
     expect(log).not.toHaveBeenCalledWith(
       expect.stringContaining('not-for-logs'),
     );
+    expect(metricsService.recordHttpRequest).toHaveBeenCalledWith(
+      'POST',
+      '/patients/opaque-id',
+      201,
+      expect.any(Number),
+    );
   });
 
-  it('logs a sanitized error without error details', async () => {
+  it('logs a sanitized error without error details and records metric', async () => {
     const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
 
     await context.run('request_123', async () =>
@@ -57,6 +75,12 @@ describe('HttpLoggingInterceptor', () => {
     });
     expect(warn).not.toHaveBeenCalledWith(
       expect.stringContaining('JWT secret'),
+    );
+    expect(metricsService.recordHttpRequest).toHaveBeenCalledWith(
+      'POST',
+      '/patients/opaque-id',
+      500,
+      expect.any(Number),
     );
   });
 

@@ -2,10 +2,12 @@ import { Controller, Get } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { HealthCheck } from '@nestjs/terminus';
 import { Public } from '../auth/decorators/public.decorator';
+import { SkipTenantContext } from '../tenant-context/decorators/skip-tenant-context.decorator';
 import { HealthService } from './health.service';
 
 @Controller('health')
 @ApiTags('health')
+@SkipTenantContext()
 export class HealthController {
   constructor(private readonly healthService: HealthService) {}
 
@@ -25,3 +27,4 @@ export class HealthController {
     return this.healthService.ready();
   }
 }
+

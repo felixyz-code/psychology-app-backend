@@ -34,24 +34,32 @@ describe('ErrorEnvelopeFilter', () => {
       code: 'VALIDATION_ERROR',
       message: 'Invalid payload',
       requestId: 'unavailable',
+      traceId: 'unavailable',
       details: null,
     });
   });
 
-  it('redacts forbidden details while preserving the request correlation id', () => {
+  it('redacts forbidden details while preserving the request correlation id and trace id', () => {
     const context = new RequestContextService();
     const filter = new ErrorEnvelopeFilter(context);
     const { host, json } = createHost();
 
-    context.run('request_123', () => {
-      filter.catch(new ForbiddenException('Organization access denied'), host);
-    });
+    context.run(
+      {
+        requestId: 'request_123',
+        traceId: 'trace_abc_32chars_0000000000000',
+      },
+      () => {
+        filter.catch(new ForbiddenException('Organization access denied'), host);
+      },
+    );
 
     expect(json).toHaveBeenCalledWith({
       statusCode: 403,
       code: 'FORBIDDEN',
       message: 'Organization access denied',
       requestId: 'request_123',
+      traceId: 'trace_abc_32chars_0000000000000',
       details: null,
     });
   });
@@ -70,6 +78,7 @@ describe('ErrorEnvelopeFilter', () => {
       code: 'TENANT_CONTEXT_REQUIRED',
       message: 'Organization selection is required',
       requestId: 'unavailable',
+      traceId: 'unavailable',
       details: { reason: 'MISSING' },
     });
   });
@@ -88,6 +97,7 @@ describe('ErrorEnvelopeFilter', () => {
       code: 'CONCURRENT_UPDATE',
       message: 'Organization changed concurrently',
       requestId: 'unavailable',
+      traceId: 'unavailable',
       details: { retryContext: true },
     });
   });
@@ -109,6 +119,7 @@ describe('ErrorEnvelopeFilter', () => {
       code: 'LAST_OWNER_PROTECTED',
       message: 'Organization must retain an active owner',
       requestId: 'unavailable',
+      traceId: 'unavailable',
       details: null,
     });
   });
@@ -134,6 +145,7 @@ describe('ErrorEnvelopeFilter', () => {
       code: 'RATE_LIMITED',
       message: 'Too many requests',
       requestId: 'unavailable',
+      traceId: 'unavailable',
       details: { retryAfterSeconds: 30 },
     });
   });
@@ -154,6 +166,7 @@ describe('ErrorEnvelopeFilter', () => {
         code: 'VALIDATION_ERROR',
         message: expectedMessage,
         requestId: 'unavailable',
+        traceId: 'unavailable',
         details: null,
       });
     },
@@ -184,6 +197,7 @@ describe('ErrorEnvelopeFilter', () => {
       code: 'PLAN_LIMIT_EXCEEDED',
       message: 'Patient limit reached for current plan',
       requestId: 'unavailable',
+      traceId: 'unavailable',
       details: {
         quotaKey: 'MAX_PATIENTS',
         limit: 25,
@@ -216,6 +230,7 @@ describe('ErrorEnvelopeFilter', () => {
       code: 'FEATURE_NOT_AVAILABLE',
       message: 'PDF export is not available on your current plan',
       requestId: 'unavailable',
+      traceId: 'unavailable',
       details: {
         featureKey: 'CAN_EXPORT_PDF',
         requiredTier: 'PROFESSIONAL',

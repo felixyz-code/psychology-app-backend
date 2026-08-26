@@ -38,6 +38,7 @@ import { UserProfileModule } from './user-profile/user-profile.module';
 import { ScheduleBlocksModule } from './schedule-blocks/schedule-blocks.module';
 import { NotificationTemplatesModule } from './notification-templates/notification-templates.module';
 import { TeleconsultationModule } from './teleconsultation/teleconsultation.module';
+import { MetricsModule } from './metrics/metrics.module';
 
 @Module({
   imports: [
@@ -58,6 +59,7 @@ import { TeleconsultationModule } from './teleconsultation/teleconsultation.modu
     NotificationTemplatesModule,
     FinancialTransactionsModule,
     HealthModule,
+    MetricsModule,
     TenantContextModule,
     OrganizationsModule,
     OrganizationLogoAssetsModule,
