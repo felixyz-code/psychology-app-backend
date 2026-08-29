@@ -20,7 +20,8 @@ export class AssignProfessionalBranchDto {
   userId: string;
 
   @ApiPropertyOptional({
-    description: 'Whether this branch is the primary location for the professional',
+    description:
+      'Whether this branch is the primary location for the professional',
     default: false,
   })
   @IsOptional()

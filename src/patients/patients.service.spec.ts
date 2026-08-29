@@ -130,8 +130,14 @@ describe('PatientsService D1 tenant-aware policy', () => {
 
   it.each([
     ['a missing patient', psychologistScope],
-    ['a patient from another psychologist in the same organization', psychologistScope],
-    ['a patient from another organization for the same psychologist', psychologistScope],
+    [
+      'a patient from another psychologist in the same organization',
+      psychologistScope,
+    ],
+    [
+      'a patient from another organization for the same psychologist',
+      psychologistScope,
+    ],
     ['a legacy patient with a null organizationId', psychologistScope],
   ])('returns the same 404 for %s', async (_, scope) => {
     prisma.patient.findFirst.mockResolvedValue(null);
@@ -393,7 +399,9 @@ describe('PatientsService D1 tenant-aware policy', () => {
         branchId: 'branch-target-id',
       });
       prisma.patientAssignment.updateMany.mockResolvedValue({ count: 1 });
-      prisma.patientAssignment.create.mockResolvedValue({ id: 'new-assignment-id' });
+      prisma.patientAssignment.create.mockResolvedValue({
+        id: 'new-assignment-id',
+      });
       prisma.patient.update.mockResolvedValue({
         id: 'patient-a-id',
         branchId: 'branch-target-id',
@@ -501,13 +509,17 @@ describe('PatientsService D1 tenant-aware policy', () => {
           },
           scopeA,
         ),
-      ).rejects.toThrow('El profesional asignado no tiene acceso a la sede destino.');
+      ).rejects.toThrow(
+        'El profesional asignado no tiene acceso a la sede destino.',
+      );
     });
   });
 
   describe('receptionist branch isolation', () => {
     it('scopes patient directory to branches assigned in UserBranchAccess for RECEPTIONIST', async () => {
-      policy.decisionFor = jest.fn().mockReturnValue(CapabilityDecision.CONDITIONAL);
+      policy.decisionFor = jest
+        .fn()
+        .mockReturnValue(CapabilityDecision.CONDITIONAL);
       prisma.userBranchAccess.findMany.mockResolvedValue([
         { branchId: 'branch-assigned-1' },
       ]);
@@ -540,7 +552,9 @@ describe('PatientsService D1 tenant-aware policy', () => {
     });
 
     it('returns empty list when RECEPTIONIST has no assigned branches', async () => {
-      policy.decisionFor = jest.fn().mockReturnValue(CapabilityDecision.CONDITIONAL);
+      policy.decisionFor = jest
+        .fn()
+        .mockReturnValue(CapabilityDecision.CONDITIONAL);
       prisma.userBranchAccess.findMany.mockResolvedValue([]);
 
       const result = await service.findAll(receptionistScope);
@@ -550,7 +564,9 @@ describe('PatientsService D1 tenant-aware policy', () => {
     });
 
     it('throws ForbiddenException when RECEPTIONIST requests branch they lack access to', async () => {
-      policy.decisionFor = jest.fn().mockReturnValue(CapabilityDecision.CONDITIONAL);
+      policy.decisionFor = jest
+        .fn()
+        .mockReturnValue(CapabilityDecision.CONDITIONAL);
       prisma.userBranchAccess.findMany.mockResolvedValue([
         { branchId: 'branch-1' },
       ]);

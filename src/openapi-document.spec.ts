@@ -45,9 +45,9 @@ describe('OpenAPI document', () => {
     const document = createDocument(app);
 
     expect(Object.keys(document.paths)).toHaveLength(145);
-    expect(
-      document.paths['/patients/{id}/transfer'].post?.security,
-    ).toEqual([{ bearer: [] }]);
+    expect(document.paths['/patients/{id}/transfer'].post?.security).toEqual([
+      { bearer: [] },
+    ]);
     expect(
       document.paths['/teleconsultation/access/{roomCode}'].get?.security,
     ).toBeUndefined();
@@ -252,10 +252,13 @@ describe('OpenAPI document', () => {
       document.paths['/enterprise/branches/{id}/professionals'].post?.security,
     ).toEqual([{ bearer: [] }]);
     expect(
-      document.paths['/enterprise/branches/{id}/professionals/{userId}/schedule'].put?.security,
+      document.paths[
+        '/enterprise/branches/{id}/professionals/{userId}/schedule'
+      ].put?.security,
     ).toEqual([{ bearer: [] }]);
     expect(
-      document.paths['/enterprise/branches/{id}/professionals/{userId}'].delete?.security,
+      document.paths['/enterprise/branches/{id}/professionals/{userId}'].delete
+        ?.security,
     ).toEqual([{ bearer: [] }]);
     expect(
       document.paths['/enterprise/corporate/clients'].post?.security,

@@ -218,8 +218,7 @@ export class BranchesController {
   })
   @ApiParam({ name: 'id', description: 'Branch UUID' })
   @ApiOkResponse({
-    description:
-      'List of assigned professionals and their in-person schedules',
+    description: 'List of assigned professionals and their in-person schedules',
   })
   @ApiNotFoundResponse({ description: 'Branch not found' })
   getBranchProfessionals(

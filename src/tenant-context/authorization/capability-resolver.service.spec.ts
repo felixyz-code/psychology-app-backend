@@ -59,10 +59,16 @@ describe('CapabilityResolverService', () => {
 
   it('grants patient.read to OWNER, ADMIN, and RECEPTIONIST, and conditional to PSYCHOLOGIST, AUDITOR, and READ_ONLY', () => {
     expect(
-      resolver.resolve(MembershipRole.OWNER, OrganizationCapability.PATIENT_READ),
+      resolver.resolve(
+        MembershipRole.OWNER,
+        OrganizationCapability.PATIENT_READ,
+      ),
     ).toBe(CapabilityDecision.ALLOW);
     expect(
-      resolver.resolve(MembershipRole.ADMIN, OrganizationCapability.PATIENT_READ),
+      resolver.resolve(
+        MembershipRole.ADMIN,
+        OrganizationCapability.PATIENT_READ,
+      ),
     ).toBe(CapabilityDecision.ALLOW);
     expect(
       resolver.resolve(
