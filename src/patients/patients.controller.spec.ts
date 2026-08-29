@@ -35,7 +35,7 @@ describe('PatientsController tenant-aware scope', () => {
   let controller: PatientsController;
   let service: Pick<
     PatientsService,
-    'create' | 'findAll' | 'findOne' | 'update' | 'remove'
+    'create' | 'findAll' | 'findOne' | 'update' | 'remove' | 'transferBranch'
   >;
 
   beforeEach(() => {
