@@ -12,4 +12,5 @@ export type PatientAccessScope = Readonly<{
   userId: string;
   legacyUserRole: UserRole;
   resolutionMode: TenantResolutionMode;
+  branchId?: string;
 }>;

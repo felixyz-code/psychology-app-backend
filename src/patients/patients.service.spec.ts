@@ -22,10 +22,20 @@ type PrismaMock = {
     deleteMany: jest.Mock;
     findFirst: jest.Mock;
     findMany: jest.Mock;
+    update: jest.Mock;
     updateMany: jest.Mock;
   };
   document: { findMany: jest.Mock };
-  patientAssignment: { deleteMany: jest.Mock; findFirst: jest.Mock };
+  patientAssignment: {
+    create: jest.Mock;
+    deleteMany: jest.Mock;
+    findFirst: jest.Mock;
+    updateMany: jest.Mock;
+  };
+  branch: { findFirst: jest.Mock };
+  userBranchAccess: { findMany: jest.Mock; findUnique: jest.Mock };
+  organizationMembership: { findFirst: jest.Mock };
+  $transaction: jest.Mock;
 };
 
 const scopeA: PatientAccessScope = {
@@ -40,17 +50,23 @@ const psychologistScope: PatientAccessScope = {
   ...scopeA,
   organizationRole: MembershipRole.PSYCHOLOGIST,
 };
+const receptionistScope: PatientAccessScope = {
+  ...scopeA,
+  organizationRole: MembershipRole.RECEPTIONIST,
+  userId: 'receptionist-a-id',
+  membershipId: 'receptionist-mem-id',
+};
 const auditorScope: PatientAccessScope = {
   ...scopeA,
   organizationRole: MembershipRole.AUDITOR,
 };
 const scopeSameOrganizationOtherPsychologist: PatientAccessScope = {
-  ...scopeA,
+  ...psychologistScope,
   userId: 'psychologist-b-id',
   membershipId: 'membership-b-id',
 };
 const scopeSamePsychologistOtherOrganization: PatientAccessScope = {
-  ...scopeA,
+  ...psychologistScope,
   organizationId: 'organization-b-id',
   membershipId: 'membership-c-id',
 };
@@ -69,10 +85,20 @@ describe('PatientsService D1 tenant-aware policy', () => {
         deleteMany: jest.fn(),
         findFirst: jest.fn(),
         findMany: jest.fn(),
+        update: jest.fn(),
         updateMany: jest.fn(),
       },
       document: { findMany: jest.fn() },
-      patientAssignment: { deleteMany: jest.fn(), findFirst: jest.fn() },
+      patientAssignment: {
+        create: jest.fn(),
+        deleteMany: jest.fn(),
+        findFirst: jest.fn(),
+        updateMany: jest.fn(),
+      },
+      branch: { findFirst: jest.fn() },
+      userBranchAccess: { findMany: jest.fn(), findUnique: jest.fn() },
+      organizationMembership: { findFirst: jest.fn() },
+      $transaction: jest.fn((callback) => callback(prisma)),
     };
     documentsService = { cleanupDocumentFiles: jest.fn() };
     policy = {
@@ -90,23 +116,29 @@ describe('PatientsService D1 tenant-aware policy', () => {
   it('lists only patients matching tenant, legacy owner, and active assignment', async () => {
     prisma.patient.findMany.mockResolvedValue([]);
 
-    await service.findAll(scopeA);
+    await service.findAll(psychologistScope);
 
     expect(policy.decisionFor).toHaveBeenCalledWith(
-      scopeA,
+      psychologistScope,
       OrganizationCapability.PATIENT_READ,
     );
     expect(prisma.patient.findMany).toHaveBeenCalledWith({
-      where: assignedScopeWhere(scopeA),
+      where: assignedScopeWhere(psychologistScope),
       orderBy: { createdAt: 'desc' },
     });
   });
 
   it.each([
-    ['a missing patient', scopeA],
-    ['a patient from another psychologist in the same organization', scopeA],
-    ['a patient from another organization for the same psychologist', scopeA],
-    ['a legacy patient with a null organizationId', scopeA],
+    ['a missing patient', psychologistScope],
+    [
+      'a patient from another psychologist in the same organization',
+      psychologistScope,
+    ],
+    [
+      'a patient from another organization for the same psychologist',
+      psychologistScope,
+    ],
+    ['a legacy patient with a null organizationId', psychologistScope],
   ])('returns the same 404 for %s', async (_, scope) => {
     prisma.patient.findFirst.mockResolvedValue(null);
 
@@ -121,6 +153,43 @@ describe('PatientsService D1 tenant-aware policy', () => {
       },
     });
     expect(policy.decisionFor).not.toHaveBeenCalled();
+  });
+
+  it('allows OWNER to list all patients in the tenant when branch is null or ALL', async () => {
+    prisma.patient.findMany.mockResolvedValue([]);
+
+    await service.findAll(scopeA);
+
+    expect(prisma.patient.findMany).toHaveBeenCalledWith({
+      where: { organizationId: scopeA.organizationId },
+      orderBy: { createdAt: 'desc' },
+    });
+  });
+
+  it('filters patients by branch for OWNER when specific branchId is provided', async () => {
+    prisma.patient.findMany.mockResolvedValue([]);
+
+    await service.findAll({ ...scopeA, branchId: 'branch-1' });
+
+    expect(prisma.patient.findMany).toHaveBeenCalledWith({
+      where: {
+        organizationId: scopeA.organizationId,
+        OR: [
+          { branchId: 'branch-1' },
+          {
+            psychologist: {
+              branchAccesses: {
+                some: {
+                  branchId: 'branch-1',
+                  organizationId: scopeA.organizationId,
+                },
+              },
+            },
+          },
+        ],
+      },
+      orderBy: { createdAt: 'desc' },
+    });
   });
 
   it('keeps same-organization and same-psychologist scope variants distinct', async () => {
@@ -188,12 +257,12 @@ describe('PatientsService D1 tenant-aware policy', () => {
     });
   });
 
-  it('denies conditional non-clinical roles instead of returning a projection', () => {
+  it('denies conditional non-clinical roles instead of returning a projection', async () => {
     policy.decisionFor = jest
       .fn()
       .mockReturnValue(CapabilityDecision.CONDITIONAL);
 
-    expect(() => service.findAll(auditorScope)).toThrow(
+    await expect(service.findAll(auditorScope)).rejects.toEqual(
       new ForbiddenException('Organization capability is required'),
     );
     expect(observability.capabilityDenied).toHaveBeenCalledWith(
@@ -204,10 +273,10 @@ describe('PatientsService D1 tenant-aware policy', () => {
     expect(prisma.patient.findMany).not.toHaveBeenCalled();
   });
 
-  it('denies missing capability before reads or mutations', () => {
+  it('denies missing capability before reads or mutations', async () => {
     policy.decisionFor = jest.fn().mockReturnValue(CapabilityDecision.DENY);
 
-    expect(() => service.findAll(scopeA)).toThrow(
+    await expect(service.findAll(scopeA)).rejects.toEqual(
       new ForbiddenException('Organization capability is required'),
     );
     expect(observability.capabilityDenied).toHaveBeenCalledWith(
@@ -307,6 +376,208 @@ describe('PatientsService D1 tenant-aware policy', () => {
     expect(documentsService.cleanupDocumentFiles).toHaveBeenCalledWith([
       'uploads/patients/patient-a-id/one.pdf',
     ]);
+  });
+
+  describe('transferBranch', () => {
+    it('transfers patient and reassigns primary assignment to target psychologist', async () => {
+      prisma.patient.findFirst.mockResolvedValue({
+        id: 'patient-a-id',
+        branchId: 'branch-old-id',
+        psychologistId: 'psychologist-a-id',
+      });
+      prisma.branch.findFirst.mockResolvedValue({
+        id: 'branch-target-id',
+        name: 'Sucursal Norte',
+        isActive: true,
+      });
+      prisma.organizationMembership.findFirst.mockResolvedValue({
+        id: 'membership-b-id',
+      });
+      prisma.userBranchAccess.findUnique.mockResolvedValue({
+        id: 'access-id',
+        userId: 'psychologist-b-id',
+        branchId: 'branch-target-id',
+      });
+      prisma.patientAssignment.updateMany.mockResolvedValue({ count: 1 });
+      prisma.patientAssignment.create.mockResolvedValue({
+        id: 'new-assignment-id',
+      });
+      prisma.patient.update.mockResolvedValue({
+        id: 'patient-a-id',
+        branchId: 'branch-target-id',
+        psychologistId: 'psychologist-b-id',
+      });
+
+      const result = await service.transferBranch(
+        'patient-a-id',
+        {
+          targetBranchId: 'branch-target-id',
+          targetPsychologistId: 'psychologist-b-id',
+          reason: 'Cambio de domicilio del paciente',
+        },
+        scopeA,
+      );
+
+      expect(prisma.branch.findFirst).toHaveBeenCalledWith({
+        where: {
+          id: 'branch-target-id',
+          organizationId: scopeA.organizationId,
+          deletedAt: null,
+          isActive: true,
+        },
+      });
+      expect(prisma.userBranchAccess.findUnique).toHaveBeenCalledWith({
+        where: {
+          userId_branchId: {
+            userId: 'psychologist-b-id',
+            branchId: 'branch-target-id',
+          },
+        },
+      });
+      expect(prisma.patientAssignment.updateMany).toHaveBeenCalledWith({
+        where: {
+          patientId: 'patient-a-id',
+          organizationId: scopeA.organizationId,
+          status: PatientAssignmentStatus.ACTIVE,
+        },
+        data: expect.objectContaining({
+          status: PatientAssignmentStatus.ENDED,
+          closureReason: expect.stringContaining('Cambio de domicilio'),
+        }),
+      });
+      expect(prisma.patientAssignment.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          patientId: 'patient-a-id',
+          membershipId: 'membership-b-id',
+          role: 'PRIMARY',
+          status: PatientAssignmentStatus.ACTIVE,
+          creationReason: expect.stringContaining('Cambio de domicilio'),
+        }),
+      });
+      expect(prisma.patient.update).toHaveBeenCalledWith({
+        where: { id: 'patient-a-id' },
+        data: {
+          branchId: 'branch-target-id',
+          psychologistId: 'psychologist-b-id',
+        },
+      });
+      expect(result.branchId).toBe('branch-target-id');
+    });
+
+    it('rejects transfer when target branch is not found or inactive', async () => {
+      prisma.patient.findFirst.mockResolvedValue({
+        id: 'patient-a-id',
+        branchId: 'branch-old-id',
+        psychologistId: 'psychologist-a-id',
+      });
+      prisma.branch.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.transferBranch(
+          'patient-a-id',
+          {
+            targetBranchId: 'branch-nonexistent',
+            reason: 'Transfer test',
+          },
+          scopeA,
+        ),
+      ).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('rejects transfer when target psychologist lacks UserBranchAccess to target branch', async () => {
+      prisma.patient.findFirst.mockResolvedValue({
+        id: 'patient-a-id',
+        branchId: 'branch-old-id',
+        psychologistId: 'psychologist-a-id',
+      });
+      prisma.branch.findFirst.mockResolvedValue({
+        id: 'branch-target-id',
+        isActive: true,
+      });
+      prisma.organizationMembership.findFirst.mockResolvedValue({
+        id: 'membership-b-id',
+      });
+      prisma.userBranchAccess.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.transferBranch(
+          'patient-a-id',
+          {
+            targetBranchId: 'branch-target-id',
+            targetPsychologistId: 'psychologist-b-id',
+            reason: 'Transfer without branch access',
+          },
+          scopeA,
+        ),
+      ).rejects.toThrow(
+        'El profesional asignado no tiene acceso a la sede destino.',
+      );
+    });
+  });
+
+  describe('receptionist branch isolation', () => {
+    it('scopes patient directory to branches assigned in UserBranchAccess for RECEPTIONIST', async () => {
+      policy.decisionFor = jest
+        .fn()
+        .mockReturnValue(CapabilityDecision.CONDITIONAL);
+      prisma.userBranchAccess.findMany.mockResolvedValue([
+        { branchId: 'branch-assigned-1' },
+      ]);
+      prisma.patient.findMany.mockResolvedValue([
+        { id: 'p-1', firstName: 'Paciente', lastName: 'Uno' },
+      ]);
+
+      const result = await service.findAll(receptionistScope);
+
+      expect(prisma.patient.findMany).toHaveBeenCalledWith({
+        where: {
+          organizationId: receptionistScope.organizationId,
+          OR: [
+            { branchId: { in: ['branch-assigned-1'] } },
+            {
+              psychologist: {
+                branchAccesses: {
+                  some: {
+                    branchId: { in: ['branch-assigned-1'] },
+                    organizationId: receptionistScope.organizationId,
+                  },
+                },
+              },
+            },
+          ],
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+      expect(result.length).toBe(1);
+    });
+
+    it('returns empty list when RECEPTIONIST has no assigned branches', async () => {
+      policy.decisionFor = jest
+        .fn()
+        .mockReturnValue(CapabilityDecision.CONDITIONAL);
+      prisma.userBranchAccess.findMany.mockResolvedValue([]);
+
+      const result = await service.findAll(receptionistScope);
+
+      expect(result).toEqual([]);
+      expect(prisma.patient.findMany).not.toHaveBeenCalled();
+    });
+
+    it('throws ForbiddenException when RECEPTIONIST requests branch they lack access to', async () => {
+      policy.decisionFor = jest
+        .fn()
+        .mockReturnValue(CapabilityDecision.CONDITIONAL);
+      prisma.userBranchAccess.findMany.mockResolvedValue([
+        { branchId: 'branch-1' },
+      ]);
+
+      await expect(
+        service.findAll({
+          ...receptionistScope,
+          branchId: 'branch-unauthorized',
+        }),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+    });
   });
 });
 

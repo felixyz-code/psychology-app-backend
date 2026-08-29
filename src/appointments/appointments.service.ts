@@ -547,8 +547,63 @@ export class AppointmentsService {
   private visibleAppointmentWhere(
     scope: AppointmentScope,
   ): Prisma.AppointmentWhereInput {
+    let branchFilter: Prisma.AppointmentWhereInput = {};
+
+    if (scope.organizationRole === MembershipRole.RECEPTIONIST) {
+      if (scope.branchId) {
+        branchFilter = {
+          psychologist: {
+            branchAccesses: {
+              some: {
+                branchId: scope.branchId,
+                organizationId: scope.organizationId,
+                branch: {
+                  userAccesses: {
+                    some: {
+                      userId: scope.userId,
+                      organizationId: scope.organizationId,
+                    },
+                  },
+                },
+              },
+            },
+          },
+        };
+      } else {
+        branchFilter = {
+          psychologist: {
+            branchAccesses: {
+              some: {
+                organizationId: scope.organizationId,
+                branch: {
+                  userAccesses: {
+                    some: {
+                      userId: scope.userId,
+                      organizationId: scope.organizationId,
+                    },
+                  },
+                },
+              },
+            },
+          },
+        };
+      }
+    } else if (scope.branchId) {
+      branchFilter = {
+        psychologist: {
+          branchAccesses: {
+            some: {
+              branchId: scope.branchId,
+              organizationId: scope.organizationId,
+            },
+          },
+        },
+      };
+    }
+
     return {
       organizationId: scope.organizationId,
+      ...branchFilter,
       ...(scope.organizationRole === MembershipRole.PSYCHOLOGIST
         ? {
             OR: [

@@ -122,6 +122,7 @@ const ids = {
   userBranchAccessB1Psych: seedUuid(35000000, 7),
   userBranchAccessMultiA: seedUuid(35000000, 8),
   userBranchAccessMultiB: seedUuid(35000000, 9),
+  userBranchAccessA2Receptionist: seedUuid(35000000, 10),
 };
 
 type SeedUser = {
@@ -364,6 +365,13 @@ const userBranchAccesses = [
     branchId: ids.branchB1,
     isPrimary: true,
   },
+  {
+    id: ids.userBranchAccessA2Receptionist,
+    organizationId: ids.orgA,
+    userId: ids.receptionistA,
+    branchId: ids.branchA2,
+    isPrimary: true,
+  },
 ] satisfies Prisma.UserBranchAccessCreateManyInput[];
 
 const patients = [
@@ -390,6 +398,8 @@ const patients = [
     'Uriel',
     'Unassigned',
     'patient.unassigned.a@example.test',
+    { phoneNumber: '+526621230000', birthDate: '1990-01-01' },
+    ids.branchA2,
   ),
   patient(
     ids.patientB,
@@ -1557,15 +1567,29 @@ function patient(
   demographics: {
     phoneNumber: string | null;
     birthDate: string | null;
+    branchId?: string | null;
   } = {
     phoneNumber: '+526621230000',
     birthDate: '1990-01-01',
   },
+  branchId?: string | null,
 ) {
+  const defaultBranchId =
+    branchId !== undefined
+      ? branchId
+      : demographics.branchId !== undefined
+        ? demographics.branchId
+        : organizationId === ids.orgA
+          ? ids.branchA1
+          : organizationId === ids.orgB
+            ? ids.branchB1
+            : null;
+
   return {
     id,
     organizationId,
     psychologistId,
+    branchId: defaultBranchId,
     firstName,
     lastName,
     email,
@@ -1974,13 +1998,10 @@ async function seedTenantDevelopmentData(passwordHash: string) {
     }),
   ]);
 
-  await prisma.$transaction([
-    prisma.organizationMembership.createMany({ data: memberships }),
-    prisma.patient.createMany({ data: patients }),
-  ]);
-
+  await prisma.organizationMembership.createMany({ data: memberships });
   await prisma.branch.createMany({ data: branches });
   await prisma.userBranchAccess.createMany({ data: userBranchAccesses });
+  await prisma.patient.createMany({ data: patients });
 
   await prisma.$transaction([
     prisma.patientAssignment.createMany({ data: assignments }),

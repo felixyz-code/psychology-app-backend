@@ -107,6 +107,7 @@ const ROLE_CAPABILITY_POLICY: Readonly<
       OrganizationCapability.MEMBERSHIP_LEAVE,
       OrganizationCapability.APPOINTMENT_READ,
       OrganizationCapability.NOTIFICATION_TEMPLATE_READ,
+      OrganizationCapability.PATIENT_READ,
     ],
     conditional: [
       OrganizationCapability.APPOINTMENT_MANAGE,

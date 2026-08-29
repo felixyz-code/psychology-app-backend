@@ -9,6 +9,7 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Put,
   Query,
   UsePipes,
   ValidationPipe,
@@ -29,6 +30,8 @@ import {
 } from '@nestjs/swagger';
 import { OrganizationStatus } from '@prisma/client';
 import { AuditLog } from '../../../audit-logs/decorators/audit-log.decorator';
+import { CurrentUser } from '../../../auth/decorators/current-user.decorator';
+import type { AuthenticatedUser } from '../../../auth/types/authenticated-user.type';
 import { AllowedOrganizationStatuses } from '../../../tenant-context/decorators/allowed-organization-statuses.decorator';
 import { CurrentTenant } from '../../../tenant-context/decorators/current-tenant.decorator';
 import { TenantRequired } from '../../../tenant-context/decorators/tenant-required.decorator';
@@ -37,6 +40,8 @@ import { BranchesService } from './branches.service';
 import { CreateBranchDto } from './dto/create-branch.dto';
 import { UpdateBranchDto } from './dto/update-branch.dto';
 import { AssignUserBranchDto } from './dto/assign-user-branch.dto';
+import { AssignProfessionalBranchDto } from './dto/assign-professional-branch.dto';
+import { UpdateProfessionalScheduleDto } from './dto/update-professional-schedule.dto';
 
 @ApiTags('enterprise-branches')
 @ApiBearerAuth('bearer')
@@ -205,5 +210,110 @@ export class BranchesController {
     @Param('id', ParseUUIDPipe) branchId: string,
   ) {
     return this.branchesService.getBranchUsers(tenant.organizationId, branchId);
+  }
+
+  @Get(':id/professionals')
+  @ApiOperation({
+    summary: 'List professionals assigned to a branch and their schedule slots',
+  })
+  @ApiParam({ name: 'id', description: 'Branch UUID' })
+  @ApiOkResponse({
+    description: 'List of assigned professionals and their in-person schedules',
+  })
+  @ApiNotFoundResponse({ description: 'Branch not found' })
+  getBranchProfessionals(
+    @CurrentTenant(true) tenant: TenantContext,
+    @Param('id', ParseUUIDPipe) branchId: string,
+  ) {
+    return this.branchesService.getBranchProfessionals(
+      tenant.organizationId,
+      branchId,
+    );
+  }
+
+  @Post(':id/professionals')
+  @HttpCode(HttpStatus.CREATED)
+  @AuditLog({
+    action: 'BRANCH_PROFESSIONAL_ASSIGN',
+    resourceType: 'BranchProfessionalSchedule',
+  })
+  @ApiOperation({
+    summary:
+      'Assign a therapist/professional to a branch with optional schedule slots',
+  })
+  @ApiParam({ name: 'id', description: 'Branch UUID' })
+  @ApiCreatedResponse({
+    description: 'Professional assigned successfully to branch',
+  })
+  @ApiNotFoundResponse({ description: 'Branch or user membership not found' })
+  assignProfessional(
+    @CurrentTenant(true) tenant: TenantContext,
+    @Param('id', ParseUUIDPipe) branchId: string,
+    @Body() dto: AssignProfessionalBranchDto,
+  ) {
+    return this.branchesService.assignProfessionalWithSchedule(
+      tenant.organizationId,
+      branchId,
+      dto,
+    );
+  }
+
+  @Put(':id/professionals/:userId/schedule')
+  @AuditLog({
+    action: 'BRANCH_SCHEDULE_UPDATE',
+    resourceType: 'BranchProfessionalSchedule',
+  })
+  @ApiOperation({
+    summary:
+      'Update weekly in-person schedule slots for an assigned professional',
+  })
+  @ApiParam({ name: 'id', description: 'Branch UUID' })
+  @ApiParam({ name: 'userId', description: 'Professional User UUID' })
+  @ApiOkResponse({
+    description: 'Professional schedule updated successfully',
+  })
+  @ApiNotFoundResponse({ description: 'Branch or assignment not found' })
+  @ApiForbiddenResponse({
+    description: 'Insufficient permissions to update schedule',
+  })
+  updateProfessionalSchedule(
+    @CurrentTenant(true) tenant: TenantContext,
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) branchId: string,
+    @Param('userId', ParseUUIDPipe) userId: string,
+    @Body() dto: UpdateProfessionalScheduleDto,
+  ) {
+    return this.branchesService.updateProfessionalSchedule(
+      tenant.organizationId,
+      branchId,
+      userId,
+      dto,
+      user,
+    );
+  }
+
+  @Delete(':id/professionals/:userId')
+  @AuditLog({
+    action: 'BRANCH_PROFESSIONAL_UNASSIGN',
+    resourceType: 'BranchProfessionalSchedule',
+  })
+  @ApiOperation({
+    summary:
+      'Unassign a professional from a branch and clean up schedule slots',
+  })
+  @ApiParam({ name: 'id', description: 'Branch UUID' })
+  @ApiParam({ name: 'userId', description: 'Professional User UUID' })
+  @ApiOkResponse({ description: 'Professional unassigned from branch' })
+  @ApiNotFoundResponse({ description: 'Branch or assignment not found' })
+  removeProfessional(
+    @CurrentTenant(true) tenant: TenantContext,
+    @Param('id', ParseUUIDPipe) branchId: string,
+    @Param('userId', ParseUUIDPipe) userId: string,
+  ) {
+    return this.branchesService.removeProfessionalFromBranch(
+      tenant.organizationId,
+      branchId,
+      userId,
+    );
   }
 }

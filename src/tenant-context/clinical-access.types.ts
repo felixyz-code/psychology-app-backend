@@ -8,4 +8,5 @@ export type ClinicalAccessScope = Readonly<{
   userId: string;
   legacyUserRole: UserRole;
   resolutionMode: TenantResolutionMode;
+  branchId?: string;
 }>;

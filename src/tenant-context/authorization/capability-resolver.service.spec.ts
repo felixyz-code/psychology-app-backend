@@ -57,6 +57,51 @@ describe('CapabilityResolverService', () => {
     ).not.toContain(OrganizationCapability.PATIENT_READ);
   });
 
+  it('grants patient.read to OWNER, ADMIN, and RECEPTIONIST, and conditional to PSYCHOLOGIST, AUDITOR, and READ_ONLY', () => {
+    expect(
+      resolver.resolve(
+        MembershipRole.OWNER,
+        OrganizationCapability.PATIENT_READ,
+      ),
+    ).toBe(CapabilityDecision.ALLOW);
+    expect(
+      resolver.resolve(
+        MembershipRole.ADMIN,
+        OrganizationCapability.PATIENT_READ,
+      ),
+    ).toBe(CapabilityDecision.ALLOW);
+    expect(
+      resolver.resolve(
+        MembershipRole.RECEPTIONIST,
+        OrganizationCapability.PATIENT_READ,
+      ),
+    ).toBe(CapabilityDecision.ALLOW);
+    expect(
+      resolver.resolve(
+        MembershipRole.PSYCHOLOGIST,
+        OrganizationCapability.PATIENT_READ,
+      ),
+    ).toBe(CapabilityDecision.CONDITIONAL);
+    expect(
+      resolver.resolve(
+        MembershipRole.AUDITOR,
+        OrganizationCapability.PATIENT_READ,
+      ),
+    ).toBe(CapabilityDecision.CONDITIONAL);
+    expect(
+      resolver.resolve(
+        MembershipRole.READ_ONLY,
+        OrganizationCapability.PATIENT_READ,
+      ),
+    ).toBe(CapabilityDecision.CONDITIONAL);
+    expect(
+      resolver.resolve(
+        MembershipRole.BILLING,
+        OrganizationCapability.PATIENT_READ,
+      ),
+    ).toBe(CapabilityDecision.DENY);
+  });
+
   it('grants the explicit financial summary capability only to financial roles', () => {
     expect(
       resolver.resolve(
