@@ -16,6 +16,7 @@ import {
   Controller,
   Delete,
   Get,
+  Headers,
   Param,
   ParseUUIDPipe,
   Patch,
@@ -94,8 +95,11 @@ export class AppointmentsController {
   findAll(
     @CurrentUser() user: AuthenticatedUser,
     @CurrentTenant(true) tenant: TenantContext,
+    @Headers('x-branch-id') branchId?: string,
   ) {
-    return this.appointmentsService.findAll(this.createScope(tenant, user));
+    return this.appointmentsService.findAll(
+      this.createScope(tenant, user, branchId),
+    );
   }
 
   @Get('availability')
@@ -111,10 +115,11 @@ export class AppointmentsController {
     @Query() query: AvailabilityQueryDto,
     @CurrentUser() user: AuthenticatedUser,
     @CurrentTenant(true) tenant: TenantContext,
+    @Headers('x-branch-id') branchId?: string,
   ) {
     return this.appointmentsService.getAvailability(
       query,
-      this.createScope(tenant, user),
+      this.createScope(tenant, user, branchId),
     );
   }
 
@@ -260,7 +265,11 @@ export class AppointmentsController {
     return this.appointmentsService.remove(id, this.createScope(tenant, user));
   }
 
-  private createScope(tenant: TenantContext, user: AuthenticatedUser) {
+  private createScope(
+    tenant: TenantContext,
+    user: AuthenticatedUser,
+    branchId?: string,
+  ) {
     return {
       organizationId: tenant.organizationId,
       membershipId: tenant.membershipId,
@@ -268,6 +277,10 @@ export class AppointmentsController {
       userId: user.id,
       legacyUserRole: tenant.legacyUserRole,
       resolutionMode: tenant.resolutionMode,
+      branchId:
+        branchId && branchId !== 'ALL' && branchId.trim() !== ''
+          ? branchId.trim()
+          : undefined,
     };
   }
 }

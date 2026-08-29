@@ -184,6 +184,7 @@ model User {
   preferences                     UserPreferences?
   auditLogs                       AuditLog[]
   branchAccesses                  UserBranchAccess[]
+  professionalSchedules           BranchProfessionalSchedule[]
   assessmentAdministrations       AssessmentAdministration[] @relation("ProfessionalAssessments")
   scheduleBlocks                  ScheduleBlock[]            @relation("TherapistScheduleBlocks")
   sessions                        UserSession[]
@@ -227,6 +228,7 @@ model Organization {
   subscriptions             Subscription[]
   branches                  Branch[]
   userBranchAccesses        UserBranchAccess[]
+  professionalSchedules     BranchProfessionalSchedule[]
   corporateClients          CorporateClient[]
   paefAgreements            PaefAgreement[]
   benefitPools              BenefitPool[]
@@ -398,6 +400,7 @@ model OrganizationInvitation {
 model Patient {
   id                        String                     @id @default(uuid()) @db.Uuid
   organizationId            String?                    @db.Uuid
+  branchId                  String?                    @map("branch_id") @db.Uuid
   psychologistId            String                     @db.Uuid
   firstName                 String                     @db.VarChar(100)
   lastName                  String                     @db.VarChar(100)
@@ -406,6 +409,7 @@ model Patient {
   birthDate                 DateTime?                  @db.Date
   psychologist              User                       @relation(fields: [psychologistId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   organization              Organization?              @relation(fields: [organizationId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  branch                    Branch?                    @relation(fields: [branchId], references: [id], onDelete: SetNull)
   caseFile                  CaseFile?
   appointments              Appointment[]
   financialTransactions     FinancialTransaction[]
@@ -415,6 +419,7 @@ model Patient {
   updatedAt                 DateTime                   @updatedAt
 
   @@index([psychologistId])
+  @@index([branchId])
   @@index([organizationId, createdAt])
   @@map("patients")
 }
@@ -733,9 +738,11 @@ model Branch {
 
   organization              Organization               @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   userAccesses              UserBranchAccess[]
+  professionalSchedules     BranchProfessionalSchedule[]
   benefitDebitLogs          BenefitDebitLog[]
   auditLogs                 AuditLog[]
   assessmentAdministrations AssessmentAdministration[]
+  patients                  Patient[]
 
   @@unique([organizationId, code])
   @@index([organizationId, isActive, deletedAt])
@@ -758,6 +765,28 @@ model UserBranchAccess {
   @@index([organizationId, userId])
   @@index([branchId])
   @@map("user_branch_accesses")
+}
+
+model BranchProfessionalSchedule {
+  id                  String   @id @default(uuid()) @db.Uuid
+  organizationId      String   @map("organization_id") @db.Uuid
+  branchId            String   @map("branch_id") @db.Uuid
+  userId              String   @map("user_id") @db.Uuid
+  dayOfWeek           Int      @map("day_of_week")
+  startTime           String   @map("start_time") @db.VarChar(5)
+  endTime             String   @map("end_time") @db.VarChar(5)
+  durationSlotMinutes Int      @default(60) @map("duration_slot_minutes")
+  isActive            Boolean  @default(true) @map("is_active")
+  createdAt           DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt           DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  branch       Branch       @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, branchId, userId])
+  @@index([branchId, dayOfWeek])
+  @@map("branch_professional_schedules")
 }
 
 enum PaefAgreementStatus {

@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   ForbiddenException,
   NotFoundException,
@@ -14,6 +15,7 @@ import { BranchesService } from './branches.service';
 describe('BranchesService', () => {
   let service: BranchesService;
   let prisma: {
+    $transaction: jest.Mock;
     branch: {
       findFirst: jest.Mock;
       findMany: jest.Mock;
@@ -31,6 +33,11 @@ describe('BranchesService', () => {
       findMany: jest.Mock;
       delete: jest.Mock;
     };
+    branchProfessionalSchedule: {
+      findMany: jest.Mock;
+      createMany: jest.Mock;
+      deleteMany: jest.Mock;
+    };
   };
   let entitlementsService: {
     checkNumericQuota: jest.Mock;
@@ -44,6 +51,7 @@ describe('BranchesService', () => {
 
   beforeEach(async () => {
     prisma = {
+      $transaction: jest.fn((callback) => callback(prisma)),
       branch: {
         findFirst: jest.fn(),
         findMany: jest.fn(),
@@ -60,6 +68,11 @@ describe('BranchesService', () => {
         findUnique: jest.fn(),
         findMany: jest.fn(),
         delete: jest.fn(),
+      },
+      branchProfessionalSchedule: {
+        findMany: jest.fn(),
+        createMany: jest.fn(),
+        deleteMany: jest.fn(),
       },
     };
 
@@ -432,6 +445,257 @@ describe('BranchesService', () => {
           },
         },
       });
+    });
+  });
+
+  describe('getBranchProfessionals', () => {
+    it('returns assigned professionals with their active schedule slots', async () => {
+      prisma.branch.findFirst.mockResolvedValue({
+        id: branchId,
+        organizationId: orgId,
+      });
+
+      prisma.userBranchAccess.findMany.mockResolvedValue([
+        {
+          id: 'acc-1',
+          organizationId: orgId,
+          branchId,
+          userId,
+          isPrimary: true,
+          createdAt: new Date(),
+          user: {
+            id: userId,
+            name: 'Dr. John Doe',
+            email: 'john@example.com',
+            role: 'PSYCHOLOGIST',
+          },
+        },
+      ]);
+
+      prisma.branchProfessionalSchedule.findMany.mockResolvedValue([
+        {
+          id: 'sch-1',
+          organizationId: orgId,
+          branchId,
+          userId,
+          dayOfWeek: 1,
+          startTime: '09:00',
+          endTime: '14:00',
+          durationSlotMinutes: 60,
+          isActive: true,
+        },
+      ]);
+
+      const result = await service.getBranchProfessionals(orgId, branchId);
+
+      expect(result).toHaveLength(1);
+      expect(result[0].userId).toBe(userId);
+      expect(result[0].schedules).toHaveLength(1);
+      expect(result[0].schedules[0].startTime).toBe('09:00');
+    });
+  });
+
+  describe('assignProfessionalWithSchedule', () => {
+    it('assigns professional and persists schedule slots', async () => {
+      prisma.branch.findFirst.mockResolvedValue({
+        id: branchId,
+        organizationId: orgId,
+      });
+
+      prisma.organizationMembership.findFirst.mockResolvedValue({
+        id: 'mem-1',
+        organizationId: orgId,
+        userId,
+        status: MembershipStatus.ACTIVE,
+      });
+
+      prisma.userBranchAccess.upsert.mockResolvedValue({
+        id: 'acc-1',
+        organizationId: orgId,
+        branchId,
+        userId,
+        isPrimary: true,
+      });
+
+      prisma.branchProfessionalSchedule.findMany.mockResolvedValue([
+        {
+          id: 'sch-1',
+          organizationId: orgId,
+          branchId,
+          userId,
+          dayOfWeek: 1,
+          startTime: '09:00',
+          endTime: '13:00',
+          durationSlotMinutes: 60,
+          isActive: true,
+        },
+      ]);
+
+      const result = await service.assignProfessionalWithSchedule(
+        orgId,
+        branchId,
+        {
+          userId,
+          isPrimary: true,
+          schedules: [
+            {
+              dayOfWeek: 1,
+              startTime: '09:00',
+              endTime: '13:00',
+              durationSlotMinutes: 60,
+            },
+          ],
+        },
+      );
+
+      expect(result.id).toBe('acc-1');
+      expect(result.schedules).toHaveLength(1);
+      expect(prisma.branchProfessionalSchedule.deleteMany).toHaveBeenCalled();
+      expect(prisma.branchProfessionalSchedule.createMany).toHaveBeenCalled();
+    });
+
+    it('throws BadRequestException if startTime >= endTime', async () => {
+      prisma.branch.findFirst.mockResolvedValue({
+        id: branchId,
+        organizationId: orgId,
+      });
+
+      await expect(
+        service.assignProfessionalWithSchedule(orgId, branchId, {
+          userId,
+          schedules: [
+            {
+              dayOfWeek: 1,
+              startTime: '14:00',
+              endTime: '10:00',
+            },
+          ],
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('throws BadRequestException if slots on same day overlap', async () => {
+      prisma.branch.findFirst.mockResolvedValue({
+        id: branchId,
+        organizationId: orgId,
+      });
+
+      await expect(
+        service.assignProfessionalWithSchedule(orgId, branchId, {
+          userId,
+          schedules: [
+            {
+              dayOfWeek: 1,
+              startTime: '09:00',
+              endTime: '12:00',
+            },
+            {
+              dayOfWeek: 1,
+              startTime: '11:00',
+              endTime: '14:00',
+            },
+          ],
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  describe('updateProfessionalSchedule', () => {
+    it('updates schedule when performed by the professional themselves', async () => {
+      prisma.branch.findFirst.mockResolvedValue({
+        id: branchId,
+        organizationId: orgId,
+      });
+
+      prisma.userBranchAccess.findUnique.mockResolvedValue({
+        userId,
+        branchId,
+        organizationId: orgId,
+      });
+
+      prisma.branchProfessionalSchedule.findMany.mockResolvedValue([
+        {
+          id: 'sch-2',
+          organizationId: orgId,
+          branchId,
+          userId,
+          dayOfWeek: 2,
+          startTime: '10:00',
+          endTime: '16:00',
+          durationSlotMinutes: 60,
+          isActive: true,
+        },
+      ]);
+
+      const result = await service.updateProfessionalSchedule(
+        orgId,
+        branchId,
+        userId,
+        {
+          schedules: [
+            {
+              dayOfWeek: 2,
+              startTime: '10:00',
+              endTime: '16:00',
+              durationSlotMinutes: 60,
+            },
+          ],
+        },
+        { id: userId, role: 'PSYCHOLOGIST' },
+      );
+
+      expect(result.schedules).toHaveLength(1);
+      expect(result.schedules[0].startTime).toBe('10:00');
+    });
+
+    it('throws ForbiddenException if another non-admin user attempts update', async () => {
+      prisma.branch.findFirst.mockResolvedValue({
+        id: branchId,
+        organizationId: orgId,
+      });
+
+      prisma.userBranchAccess.findUnique.mockResolvedValue({
+        userId,
+        branchId,
+        organizationId: orgId,
+      });
+
+      await expect(
+        service.updateProfessionalSchedule(
+          orgId,
+          branchId,
+          userId,
+          {
+            schedules: [],
+          },
+          { id: 'other-user-uuid', role: 'PSYCHOLOGIST' },
+        ),
+      ).rejects.toThrow(ForbiddenException);
+    });
+  });
+
+  describe('removeProfessionalFromBranch', () => {
+    it('unassigns professional and cleans up schedules', async () => {
+      prisma.branch.findFirst.mockResolvedValue({
+        id: branchId,
+        organizationId: orgId,
+      });
+
+      prisma.userBranchAccess.findUnique.mockResolvedValue({
+        userId,
+        branchId,
+        organizationId: orgId,
+      });
+
+      const result = await service.removeProfessionalFromBranch(
+        orgId,
+        branchId,
+        userId,
+      );
+
+      expect(result.success).toBe(true);
+      expect(prisma.branchProfessionalSchedule.deleteMany).toHaveBeenCalled();
+      expect(prisma.userBranchAccess.delete).toHaveBeenCalled();
     });
   });
 });

@@ -7,6 +7,9 @@ export class PatientResponseDto {
   @ApiProperty({ format: 'uuid' })
   psychologistId: string;
 
+  @ApiPropertyOptional({ format: 'uuid', nullable: true })
+  branchId?: string | null;
+
   @ApiProperty()
   firstName: string;
 

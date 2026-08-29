@@ -16,6 +16,10 @@ describe('BranchesController', () => {
     removeUserAccess: jest.Mock;
     getUserBranches: jest.Mock;
     getBranchUsers: jest.Mock;
+    getBranchProfessionals: jest.Mock;
+    assignProfessionalWithSchedule: jest.Mock;
+    updateProfessionalSchedule: jest.Mock;
+    removeProfessionalFromBranch: jest.Mock;
   };
 
   const mockTenant: TenantContext = {
@@ -25,6 +29,13 @@ describe('BranchesController', () => {
     organizationRole: MembershipRole.OWNER,
     legacyUserRole: UserRole.ADMIN,
     resolutionMode: TenantResolutionMode.EXPLICIT,
+  };
+
+  const mockUser = {
+    id: '23000000-0000-4000-8000-000000000001',
+    name: 'Admin User',
+    email: 'admin@example.com',
+    role: UserRole.ADMIN,
   };
 
   const branchId = '34000000-0000-4000-8000-000000000001';
@@ -40,6 +51,10 @@ describe('BranchesController', () => {
       removeUserAccess: jest.fn(),
       getUserBranches: jest.fn(),
       getBranchUsers: jest.fn(),
+      getBranchProfessionals: jest.fn(),
+      assignProfessionalWithSchedule: jest.fn(),
+      updateProfessionalSchedule: jest.fn(),
+      removeProfessionalFromBranch: jest.fn(),
     };
 
     controller = new BranchesController(service as unknown as BranchesService);
@@ -138,6 +153,83 @@ describe('BranchesController', () => {
     expect(service.getUserBranches).toHaveBeenCalledWith(
       mockTenant.organizationId,
       mockTenant.userId,
+    );
+  });
+
+  it('delegates getBranchProfessionals to service', async () => {
+    service.getBranchProfessionals.mockResolvedValue([
+      { userId: 'user-1', schedules: [] },
+    ]);
+    const result = await controller.getBranchProfessionals(
+      mockTenant,
+      branchId,
+    );
+    expect(result).toHaveLength(1);
+    expect(service.getBranchProfessionals).toHaveBeenCalledWith(
+      mockTenant.organizationId,
+      branchId,
+    );
+  });
+
+  it('delegates assignProfessional to service', async () => {
+    const dto = { userId: 'user-1', isPrimary: true, schedules: [] };
+    service.assignProfessionalWithSchedule.mockResolvedValue({ id: 'acc-1' });
+    const result = await controller.assignProfessional(
+      mockTenant,
+      branchId,
+      dto,
+    );
+    expect(result.id).toBe('acc-1');
+    expect(service.assignProfessionalWithSchedule).toHaveBeenCalledWith(
+      mockTenant.organizationId,
+      branchId,
+      dto,
+    );
+  });
+
+  it('delegates updateProfessionalSchedule to service', async () => {
+    const dto = {
+      schedules: [
+        {
+          dayOfWeek: 1,
+          startTime: '09:00',
+          endTime: '13:00',
+        },
+      ],
+    };
+    service.updateProfessionalSchedule.mockResolvedValue({
+      userId: 'user-1',
+      schedules: dto.schedules,
+    });
+    const result = await controller.updateProfessionalSchedule(
+      mockTenant,
+      mockUser,
+      branchId,
+      'user-1',
+      dto,
+    );
+    expect(result.userId).toBe('user-1');
+    expect(service.updateProfessionalSchedule).toHaveBeenCalledWith(
+      mockTenant.organizationId,
+      branchId,
+      'user-1',
+      dto,
+      mockUser,
+    );
+  });
+
+  it('delegates removeProfessional to service', async () => {
+    service.removeProfessionalFromBranch.mockResolvedValue({ success: true });
+    const result = await controller.removeProfessional(
+      mockTenant,
+      branchId,
+      'user-1',
+    );
+    expect(result.success).toBe(true);
+    expect(service.removeProfessionalFromBranch).toHaveBeenCalledWith(
+      mockTenant.organizationId,
+      branchId,
+      'user-1',
     );
   });
 });

@@ -171,7 +171,7 @@ describe('AppointmentsService tenant isolation and notes policy', () => {
 
     expect(prisma.appointment.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { organizationId: 'organization-a-id' },
+        where: expect.objectContaining({ organizationId: 'organization-a-id' }),
       }),
     );
     expect(result[0]).not.toHaveProperty('notes');
@@ -419,6 +419,31 @@ describe('AppointmentsService tenant isolation and notes policy', () => {
     expect(availability.slots[3].title).toBe('Team Meeting');
     // 12:00 - Available
     expect(availability.slots[4].available).toBe(true);
+  });
+
+  it('filters appointments by branchId when specified in scope', async () => {
+    prisma.appointment.findMany.mockResolvedValue([appointment()]);
+
+    await service.findAll({
+      ...scope(MembershipRole.ADMIN),
+      branchId: 'branch-uuid-1',
+    });
+
+    expect(prisma.appointment.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          organizationId: 'organization-a-id',
+          psychologist: {
+            branchAccesses: {
+              some: {
+                branchId: 'branch-uuid-1',
+                organizationId: 'organization-a-id',
+              },
+            },
+          },
+        }),
+      }),
+    );
   });
 });
 

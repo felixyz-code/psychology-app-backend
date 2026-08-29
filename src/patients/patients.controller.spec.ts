@@ -45,6 +45,7 @@ describe('PatientsController tenant-aware scope', () => {
       findOne: jest.fn(),
       update: jest.fn(),
       remove: jest.fn(),
+      transferBranch: jest.fn(),
     };
     controller = new PatientsController(service as PatientsService);
   });
@@ -61,12 +62,18 @@ describe('PatientsController tenant-aware scope', () => {
       lastName: 'Patient',
     };
     const updateDto: UpdatePatientDto = { firstName: 'Updated' };
+    const transferDto = {
+      targetBranchId: 'branch-target-id',
+      targetPsychologistId: 'psychologist-b-id',
+      reason: 'Relocación a otra sucursal',
+    };
 
     await controller.create(createDto, user, tenant);
     await controller.findAll(user, tenant);
     await controller.findOne('patient-id', user, tenant);
     await controller.update('patient-id', updateDto, user, tenant);
     await controller.remove('patient-id', user, tenant);
+    await controller.transfer('patient-id', transferDto, user, tenant);
 
     expect(service.create).toHaveBeenCalledWith(createDto, expectedScope);
     expect(service.findAll).toHaveBeenCalledWith(expectedScope);
@@ -77,6 +84,11 @@ describe('PatientsController tenant-aware scope', () => {
       expectedScope,
     );
     expect(service.remove).toHaveBeenCalledWith('patient-id', expectedScope);
+    expect(service.transferBranch).toHaveBeenCalledWith(
+      'patient-id',
+      transferDto,
+      expectedScope,
+    );
   });
 
   it('does not expose ownership fields in either public patient DTO', () => {

@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -19,6 +20,7 @@ import { OrganizationPolicyService } from '../tenant-context/authorization/organ
 import { TenantObservabilityService } from '../tenant-context/tenant-observability.service';
 import { CreatePatientDto } from './dto/create-patient.dto';
 import { UpdatePatientDto } from './dto/update-patient.dto';
+import { TransferPatientBranchDto } from './dto/transfer-patient-branch.dto';
 import { PatientAccessScope } from './types/patient-access-scope.type';
 
 @Injectable()
@@ -42,6 +44,9 @@ export class PatientsService {
         ...this.withoutOwnership(createPatientDto),
         organizationId: scope.organizationId,
         psychologistId: scope.userId,
+        ...(createPatientDto.branchId || scope.branchId
+          ? { branchId: createPatientDto.branchId ?? scope.branchId }
+          : {}),
         assignments: {
           create: {
             organizationId: scope.organizationId,
@@ -56,21 +61,73 @@ export class PatientsService {
     });
   }
 
-  findAll(scope: PatientAccessScope) {
+  async findAll(scope: PatientAccessScope) {
     this.requirePatientCapability(
       scope,
       OrganizationCapability.PATIENT_READ,
       'patients.find_all',
-      { allowConditionalForAssignedProfessional: true },
+      {
+        allowConditionalForAssignedProfessional: true,
+        allowReceptionistBranchScope: true,
+      },
     );
 
+    if (scope.organizationRole === MembershipRole.RECEPTIONIST) {
+      return this.findReceptionistPatients(scope);
+    }
+
     return this.prisma.patient.findMany({
-      where: this.assignedScopeWhere(scope),
+      where: this.visiblePatientWhere(scope),
       orderBy: { createdAt: 'desc' },
     });
   }
 
   async findOne(id: string, scope: PatientAccessScope) {
+    if (scope.organizationRole === MembershipRole.RECEPTIONIST) {
+      this.requirePatientCapability(
+        scope,
+        OrganizationCapability.PATIENT_READ,
+        'patients.find_one',
+        { allowReceptionistBranchScope: true },
+      );
+      const accesses = await this.prisma.userBranchAccess.findMany({
+        where: {
+          userId: scope.userId,
+          organizationId: scope.organizationId,
+        },
+        select: { branchId: true },
+      });
+      const allowedBranchIds = accesses.map((a) => a.branchId);
+      if (allowedBranchIds.length === 0) {
+        throw this.patientNotFound();
+      }
+
+      const patient = await this.prisma.patient.findFirst({
+        where: {
+          id,
+          organizationId: scope.organizationId,
+          OR: [
+            { branchId: { in: allowedBranchIds } },
+            {
+              psychologist: {
+                branchAccesses: {
+                  some: {
+                    branchId: { in: allowedBranchIds },
+                    organizationId: scope.organizationId,
+                  },
+                },
+              },
+            },
+          ],
+        },
+      });
+
+      if (!patient) {
+        throw this.patientNotFound();
+      }
+      return patient;
+    }
+
     const patient = await this.findTenantPatientOrThrow(id, scope);
     this.requirePatientCapability(
       scope,
@@ -80,6 +137,120 @@ export class PatientsService {
     );
     await this.requireActiveAssignment(id, scope);
     return patient;
+  }
+
+  async transferBranch(
+    id: string,
+    dto: TransferPatientBranchDto,
+    scope: PatientAccessScope,
+  ) {
+    this.requirePatientCapability(
+      scope,
+      OrganizationCapability.PATIENT_UPDATE,
+      'patients.transfer',
+      { allowConditionalForAssignedProfessional: true },
+    );
+
+    const patient = await this.prisma.patient.findFirst({
+      where: {
+        id,
+        organizationId: scope.organizationId,
+      },
+    });
+
+    if (!patient) {
+      throw this.patientNotFound();
+    }
+
+    const targetBranch = await this.prisma.branch.findFirst({
+      where: {
+        id: dto.targetBranchId,
+        organizationId: scope.organizationId,
+        deletedAt: null,
+        isActive: true,
+      },
+    });
+
+    if (!targetBranch) {
+      throw new NotFoundException(
+        'Target branch not found or is inactive in this organization',
+      );
+    }
+
+    const targetPsychologistId =
+      dto.targetPsychologistId ?? patient.psychologistId;
+
+    const membership = await this.prisma.organizationMembership.findFirst({
+      where: {
+        userId: targetPsychologistId,
+        organizationId: scope.organizationId,
+        status: 'ACTIVE',
+        organization: { status: 'ACTIVE' },
+      },
+      select: { id: true },
+    });
+
+    if (!membership) {
+      throw new NotFoundException(
+        'Target psychologist not found or is not active in this organization',
+      );
+    }
+
+    const branchAccess = await this.prisma.userBranchAccess.findUnique({
+      where: {
+        userId_branchId: {
+          userId: targetPsychologistId,
+          branchId: dto.targetBranchId,
+        },
+      },
+    });
+
+    if (!branchAccess) {
+      throw new BadRequestException(
+        'El profesional asignado no tiene acceso a la sede destino.',
+      );
+    }
+
+    const isPsychologistChanged =
+      targetPsychologistId !== patient.psychologistId;
+
+    return this.prisma.$transaction(async (tx) => {
+      if (isPsychologistChanged) {
+        await tx.patientAssignment.updateMany({
+          where: {
+            patientId: patient.id,
+            organizationId: scope.organizationId,
+            status: PatientAssignmentStatus.ACTIVE,
+          },
+          data: {
+            status: PatientAssignmentStatus.ENDED,
+            endedAt: new Date(),
+            closureReason: `TRANSFER_TO_BRANCH: ${dto.reason.trim()}`,
+            closedByMembershipId: scope.membershipId,
+          },
+        });
+
+        await tx.patientAssignment.create({
+          data: {
+            organizationId: scope.organizationId,
+            patientId: patient.id,
+            membershipId: membership.id,
+            role: PatientAssignmentRole.PRIMARY,
+            status: PatientAssignmentStatus.ACTIVE,
+            createdByMembershipId: scope.membershipId,
+            creationReason: `TRANSFERRED_FROM_BRANCH: ${dto.reason.trim()}`,
+          },
+        });
+      }
+
+      return tx.patient.update({
+        where: { id: patient.id },
+        data: {
+          branchId: dto.targetBranchId,
+          psychologistId: targetPsychologistId,
+        },
+      });
+    });
   }
 
   async update(
@@ -147,6 +318,57 @@ export class PatientsService {
     );
 
     return patient;
+  }
+
+  private visiblePatientWhere(
+    scope: PatientAccessScope,
+  ): Prisma.PatientWhereInput {
+    let branchFilter: Prisma.PatientWhereInput = {};
+
+    const hasBranchFilter =
+      scope.branchId &&
+      scope.branchId !== 'ALL' &&
+      scope.branchId.trim() !== '';
+
+    if (hasBranchFilter) {
+      branchFilter = {
+        OR: [
+          { branchId: scope.branchId },
+          {
+            psychologist: {
+              branchAccesses: {
+                some: {
+                  branchId: scope.branchId,
+                  organizationId: scope.organizationId,
+                },
+              },
+            },
+          },
+        ],
+      };
+    }
+
+    if (
+      scope.organizationRole === MembershipRole.OWNER ||
+      scope.organizationRole === MembershipRole.ADMIN
+    ) {
+      return {
+        organizationId: scope.organizationId,
+        ...branchFilter,
+      };
+    }
+
+    if (scope.organizationRole === MembershipRole.PSYCHOLOGIST) {
+      return {
+        ...this.assignedScopeWhere(scope),
+        ...branchFilter,
+      };
+    }
+
+    return {
+      ...this.assignedScopeWhere(scope),
+      ...branchFilter,
+    };
   }
 
   private scopeWhere(scope: PatientAccessScope): Prisma.PatientWhereInput {
@@ -238,11 +460,76 @@ export class PatientsService {
     };
   }
 
+  private async findReceptionistPatients(scope: PatientAccessScope) {
+    const accesses = await this.prisma.userBranchAccess.findMany({
+      where: {
+        userId: scope.userId,
+        organizationId: scope.organizationId,
+      },
+      select: { branchId: true },
+    });
+    const allowedBranchIds = accesses.map((a) => a.branchId);
+
+    if (scope.branchId) {
+      if (!allowedBranchIds.includes(scope.branchId)) {
+        throw new ForbiddenException(
+          'User does not have access to this branch',
+        );
+      }
+      return this.prisma.patient.findMany({
+        where: {
+          organizationId: scope.organizationId,
+          OR: [
+            { branchId: scope.branchId },
+            {
+              psychologist: {
+                branchAccesses: {
+                  some: {
+                    branchId: scope.branchId,
+                    organizationId: scope.organizationId,
+                  },
+                },
+              },
+            },
+          ],
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+    }
+
+    if (allowedBranchIds.length === 0) {
+      return [];
+    }
+
+    return this.prisma.patient.findMany({
+      where: {
+        organizationId: scope.organizationId,
+        OR: [
+          { branchId: { in: allowedBranchIds } },
+          {
+            psychologist: {
+              branchAccesses: {
+                some: {
+                  branchId: { in: allowedBranchIds },
+                  organizationId: scope.organizationId,
+                },
+              },
+            },
+          },
+        ],
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
   private requirePatientCapability(
     scope: PatientAccessScope,
     capability: OrganizationCapability,
     operation: string,
-    options: { allowConditionalForAssignedProfessional?: boolean } = {},
+    options: {
+      allowConditionalForAssignedProfessional?: boolean;
+      allowReceptionistBranchScope?: boolean;
+    } = {},
   ) {
     const decision = this.policy.decisionFor(scope, capability);
     if (decision === CapabilityDecision.ALLOW) {
@@ -253,6 +540,14 @@ export class PatientsService {
       decision === CapabilityDecision.CONDITIONAL &&
       options.allowConditionalForAssignedProfessional &&
       scope.organizationRole === MembershipRole.PSYCHOLOGIST
+    ) {
+      return;
+    }
+
+    if (
+      decision === CapabilityDecision.CONDITIONAL &&
+      options.allowReceptionistBranchScope &&
+      scope.organizationRole === MembershipRole.RECEPTIONIST
     ) {
       return;
     }
