@@ -44,6 +44,8 @@ export function validateRuntimeEnv(env: NodeJS.ProcessEnv): RuntimeConfig {
     errors,
     false,
   );
+  const stripeSecretKey = readOptional(env, 'STRIPE_SECRET_KEY');
+  const stripeWebhookSecret = readOptional(env, 'STRIPE_WEBHOOK_SECRET');
 
   if (databaseUrl && !isPostgresConnectionString(databaseUrl)) {
     errors.push('DATABASE_URL must be a PostgreSQL connection string');
@@ -92,6 +94,8 @@ export function validateRuntimeEnv(env: NodeJS.ProcessEnv): RuntimeConfig {
     swaggerEnabled,
     trustProxyHops,
     publicFreelancerBootstrapEnabled,
+    stripeSecretKey,
+    stripeWebhookSecret,
   };
 }
 

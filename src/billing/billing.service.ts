@@ -1,5 +1,5 @@
 import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { BillingInterval, SubscriptionStatus } from '@prisma/client';
+import { BillingInterval, PlanTier, SubscriptionStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { BILLING_PROVIDER } from './billing.constants';
 import type {
@@ -340,6 +340,207 @@ export class BillingService {
   }
 
   /**
+   * Retrieves comprehensive overview of an organization's subscription, plan, quotas, and current usage.
+   */
+  async getSubscriptionOverview(organizationId: string) {
+    const org = await this.prisma.organization.findUnique({
+      where: { id: organizationId },
+      include: {
+        subscriptions: {
+          include: {
+            plan: {
+              include: {
+                quota: true,
+              },
+            },
+          },
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+        },
+      },
+    });
+
+    if (!org) {
+      throw new NotFoundException(
+        `Organization with ID "${organizationId}" not found`,
+      );
+    }
+
+    let sub = org.subscriptions[0] ?? null;
+
+    // If no subscription exists, resolve or fallback to Free/Starter plan
+    if (!sub) {
+      let defaultPlan = await this.prisma.plan.findFirst({
+        where: { tier: PlanTier.STARTER, isActive: true },
+        include: { quota: true },
+      });
+      if (!defaultPlan) {
+        defaultPlan = await this.prisma.plan.findFirst({
+          where: { isActive: true },
+          include: { quota: true },
+          orderBy: { sortOrder: 'asc' },
+        });
+      }
+
+      if (!defaultPlan) {
+        throw new NotFoundException('No billing plans configured in system');
+      }
+
+      const now = new Date();
+      const periodEnd = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+
+      sub = await this.prisma.subscription.create({
+        data: {
+          organizationId,
+          planId: defaultPlan.id,
+          status: SubscriptionStatus.ACTIVE,
+          currentPeriodStart: now,
+          currentPeriodEnd: periodEnd,
+          currentPeriodStartedAt: now,
+          currentPeriodEndsAt: periodEnd,
+        },
+        include: {
+          plan: {
+            include: {
+              quota: true,
+            },
+          },
+        },
+      });
+    }
+
+    // Determine Quotas (from plan quota relation or tier-based defaults)
+    const plan = sub.plan;
+    const quota = plan.quota ?? this.getDefaultQuotaForTier(plan.tier);
+
+    // Calculate Real-Time Usage
+    const therapistsCount = await this.prisma.organizationMembership.count({
+      where: {
+        organizationId,
+        status: 'ACTIVE',
+      },
+    });
+
+    const branchesCount = await this.prisma.branch.count({
+      where: {
+        organizationId,
+        isActive: true,
+        deletedAt: null,
+      },
+    });
+
+    // Monthly notification usage
+    const now = new Date();
+    const periodStart = sub.currentPeriodStart ?? sub.currentPeriodStartedAt ?? now;
+    const periodEnd = sub.currentPeriodEnd ?? sub.currentPeriodEndsAt ?? now;
+
+    // Check tracked usage table if present or default
+    const trackedUsage = await this.prisma.organizationUsage.findFirst({
+      where: {
+        organizationId,
+        periodStart: { lte: now },
+        periodEnd: { gte: now },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const isGracePeriod =
+      sub.status === SubscriptionStatus.PAST_DUE &&
+      sub.gracePeriodEndsAt !== null &&
+      sub.gracePeriodEndsAt > now;
+
+    return {
+      id: sub.id,
+      organizationId,
+      status: sub.status,
+      stripeCustomerId: sub.stripeCustomerId,
+      stripeSubscriptionId: sub.stripeSubscriptionId,
+      stripePriceId: sub.stripePriceId,
+      cancelAtPeriodEnd: sub.cancelAtPeriodEnd,
+      currentPeriodStart: periodStart,
+      currentPeriodEnd: periodEnd,
+      gracePeriodEndsAt: sub.gracePeriodEndsAt,
+      isGracePeriod,
+      plan: {
+        id: plan.id,
+        tier: plan.tier,
+        code: plan.code,
+        name: plan.name,
+        description: plan.description,
+        billingInterval: plan.billingInterval,
+        basePrice: plan.basePrice.toString(),
+        currency: plan.currency,
+        stripePriceId: plan.stripePriceId,
+      },
+      quotas: {
+        maxTherapists: sub.customTherapistsLimit ?? quota.maxTherapists,
+        maxBranches: sub.customBranchesLimit ?? quota.maxBranches,
+        maxNotificationsPerMonth: quota.maxNotificationsPerMonth,
+        maxPatients: sub.customPatientsLimit ?? quota.maxPatients,
+        canCustomBrand: quota.canCustomBrand,
+        canTeleconsultation: quota.canTeleconsultation,
+      },
+      usage: {
+        therapistsCount,
+        branchesCount,
+        notificationsCount: trackedUsage?.notificationsCount ?? 0,
+        periodStart,
+        periodEnd,
+      },
+    };
+  }
+
+  private getDefaultQuotaForTier(tier: PlanTier) {
+    switch (tier) {
+      case PlanTier.STARTER:
+        return {
+          maxTherapists: 1,
+          maxBranches: 1,
+          maxNotificationsPerMonth: 100,
+          maxPatients: 100,
+          canCustomBrand: false,
+          canTeleconsultation: true,
+        };
+      case PlanTier.PRO:
+        return {
+          maxTherapists: 3,
+          maxBranches: 2,
+          maxNotificationsPerMonth: 500,
+          maxPatients: 500,
+          canCustomBrand: true,
+          canTeleconsultation: true,
+        };
+      case PlanTier.CLINIC:
+        return {
+          maxTherapists: 10,
+          maxBranches: 5,
+          maxNotificationsPerMonth: 2000,
+          maxPatients: 2000,
+          canCustomBrand: true,
+          canTeleconsultation: true,
+        };
+      case PlanTier.ENTERPRISE:
+        return {
+          maxTherapists: 9999,
+          maxBranches: 9999,
+          maxNotificationsPerMonth: 999999,
+          maxPatients: 999999,
+          canCustomBrand: true,
+          canTeleconsultation: true,
+        };
+      default:
+        return {
+          maxTherapists: 1,
+          maxBranches: 1,
+          maxNotificationsPerMonth: 50,
+          maxPatients: 25,
+          canCustomBrand: false,
+          canTeleconsultation: true,
+        };
+    }
+  }
+
+  /**
    * Helper to find subscription by internal id or externalSubscriptionId.
    */
   private async findSubscriptionByIdOrExternal(idOrExternalId: string) {
@@ -375,3 +576,4 @@ export class BillingService {
     return end;
   }
 }
+

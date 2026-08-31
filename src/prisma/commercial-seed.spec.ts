@@ -21,10 +21,12 @@ describe('Commercial Seed Data & Catalog Integrity', () => {
     expect(keys).toHaveLength(9);
   });
 
-  it('defines the 3 baseline commercial tiers: FREE, PROFESSIONAL, ENTERPRISE', () => {
+  it('defines the commercial tiers including STARTER, PRO, CLINIC, ENTERPRISE', () => {
     const tiers = plans.map((p) => p.tier);
     expect(tiers).toContain(PlanTier.FREE);
-    expect(tiers).toContain(PlanTier.PROFESSIONAL);
+    expect(tiers).toContain(PlanTier.STARTER);
+    expect(tiers).toContain(PlanTier.PRO);
+    expect(tiers).toContain(PlanTier.CLINIC);
     expect(tiers).toContain(PlanTier.ENTERPRISE);
   });
 
@@ -60,6 +62,23 @@ describe('Commercial Seed Data & Catalog Integrity', () => {
     expect(maxBranchesEnt?.numericValue).toBe(1);
   });
 
+  it('configures Starter, Pro and Clinic plans with appropriate quotas', () => {
+    const starter = plans.find((p) => p.tier === PlanTier.STARTER);
+    expect(starter?.quota?.maxTherapists).toBe(1);
+    expect(starter?.quota?.maxBranches).toBe(1);
+    expect(starter?.quota?.maxNotificationsPerMonth).toBe(100);
+
+    const pro = plans.find((p) => p.tier === PlanTier.PRO);
+    expect(pro?.quota?.maxTherapists).toBe(3);
+    expect(pro?.quota?.maxBranches).toBe(2);
+    expect(pro?.quota?.maxNotificationsPerMonth).toBe(500);
+
+    const clinic = plans.find((p) => p.tier === PlanTier.CLINIC);
+    expect(clinic?.quota?.maxTherapists).toBe(10);
+    expect(clinic?.quota?.maxBranches).toBe(5);
+    expect(clinic?.quota?.maxNotificationsPerMonth).toBe(2000);
+  });
+
   it('configures Enterprise plan with uncapped limits and all features', () => {
     const entPlan = plans.find((p) => p.tier === PlanTier.ENTERPRISE);
     expect(entPlan).toBeDefined();
@@ -90,6 +109,7 @@ describe('Commercial Seed Data & Catalog Integrity', () => {
       entitlementDefinition: { upsert: jest.fn().mockResolvedValue({}) },
       plan: { upsert: jest.fn().mockResolvedValue({}) },
       planEntitlement: { upsert: jest.fn().mockResolvedValue({}) },
+      planQuota: { upsert: jest.fn().mockResolvedValue({}) },
       subscription: { upsert: jest.fn().mockResolvedValue({}) },
     };
 
@@ -100,8 +120,10 @@ describe('Commercial Seed Data & Catalog Integrity', () => {
     });
 
     expect(prisma.entitlementDefinition.upsert).toHaveBeenCalledTimes(9);
-    expect(prisma.plan.upsert).toHaveBeenCalledTimes(3);
-    expect(prisma.planEntitlement.upsert).toHaveBeenCalledTimes(27);
+    expect(prisma.plan.upsert).toHaveBeenCalledTimes(5);
+    expect(prisma.planEntitlement.upsert).toHaveBeenCalledTimes(45);
+    expect(prisma.planQuota.upsert).toHaveBeenCalledTimes(5);
     expect(prisma.subscription.upsert).toHaveBeenCalledTimes(3);
   });
 });
+

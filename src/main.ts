@@ -5,7 +5,10 @@ import { AppConfigService } from './config/configuration';
 import { configureHttpApp, configureSwagger } from './http-app.config';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, { bufferLogs: true });
+  const app = await NestFactory.create(AppModule, {
+    bufferLogs: true,
+    rawBody: true,
+  });
   app.useLogger(app.get(Logger));
   const config = app.get(AppConfigService);
 

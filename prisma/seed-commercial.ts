@@ -29,7 +29,9 @@ export const commercialIds = {
 
   // Plans
   planFree: seedUuid(32000000, 1),
+  planStarter: seedUuid(32000000, 4),
   planPro: seedUuid(32000000, 2),
+  planClinic: seedUuid(32000000, 5),
   planEnterprise: seedUuid(32000000, 3),
 
   // Subscriptions
@@ -134,8 +136,16 @@ export const plans = [
     currency: 'MXN',
     trialDays: 0,
     isActive: true,
-    isPublic: true,
+    isPublic: false,
     sortOrder: 1,
+    quota: {
+      maxTherapists: 1,
+      maxBranches: 1,
+      maxNotificationsPerMonth: 50,
+      maxPatients: 25,
+      canCustomBrand: false,
+      canTeleconsultation: true,
+    },
     entitlements: [
       { definitionId: commercialIds.entMaxPatients, numericValue: 25, booleanValue: null },
       { definitionId: commercialIds.entMaxStaffSeats, numericValue: 1, booleanValue: null },
@@ -149,28 +159,102 @@ export const plans = [
     ],
   },
   {
-    id: commercialIds.planPro,
-    tier: PlanTier.PROFESSIONAL,
-    code: 'pro-monthly',
-    name: 'Professional Plan',
-    description: 'Comprehensive clinical & practice management for growing psychology teams.',
+    id: commercialIds.planStarter,
+    tier: PlanTier.STARTER,
+    code: 'starter-monthly',
+    name: 'Starter Plan',
+    description: 'Ideal para terapeutas independientes con 1 sede y notificaciones esenciales.',
     billingInterval: BillingInterval.MONTHLY,
-    basePrice: new Prisma.Decimal('499.00'),
+    basePrice: new Prisma.Decimal('399.00'),
     currency: 'MXN',
     trialDays: 14,
     isActive: true,
     isPublic: true,
     sortOrder: 2,
+    quota: {
+      maxTherapists: 1,
+      maxBranches: 1,
+      maxNotificationsPerMonth: 100,
+      maxPatients: 100,
+      canCustomBrand: false,
+      canTeleconsultation: true,
+    },
     entitlements: [
-      { definitionId: commercialIds.entMaxPatients, numericValue: 250, booleanValue: null },
-      { definitionId: commercialIds.entMaxStaffSeats, numericValue: 5, booleanValue: null },
+      { definitionId: commercialIds.entMaxPatients, numericValue: 100, booleanValue: null },
+      { definitionId: commercialIds.entMaxStaffSeats, numericValue: 1, booleanValue: null },
       { definitionId: commercialIds.entCanExportPdf, numericValue: null, booleanValue: true },
       { definitionId: commercialIds.entCanUseFinancialModule, numericValue: null, booleanValue: true },
       { definitionId: commercialIds.entCanCustomBrand, numericValue: null, booleanValue: false },
+      { definitionId: commercialIds.entMaxStorageMb, numericValue: 1000, booleanValue: null },
+      { definitionId: commercialIds.entApiAccessEnabled, numericValue: null, booleanValue: false },
+      { definitionId: commercialIds.entMultiBranch, numericValue: null, booleanValue: false },
+      { definitionId: commercialIds.entMaxBranches, numericValue: 1, booleanValue: null },
+    ],
+  },
+  {
+    id: commercialIds.planPro,
+    tier: PlanTier.PRO,
+    code: 'pro-monthly',
+    name: 'Pro Plan',
+    description: 'Para pequeños consultorios y equipos de hasta 3 terapeutas y 2 sedes.',
+    billingInterval: BillingInterval.MONTHLY,
+    basePrice: new Prisma.Decimal('999.00'),
+    currency: 'MXN',
+    trialDays: 14,
+    isActive: true,
+    isPublic: true,
+    sortOrder: 3,
+    quota: {
+      maxTherapists: 3,
+      maxBranches: 2,
+      maxNotificationsPerMonth: 500,
+      maxPatients: 500,
+      canCustomBrand: true,
+      canTeleconsultation: true,
+    },
+    entitlements: [
+      { definitionId: commercialIds.entMaxPatients, numericValue: 500, booleanValue: null },
+      { definitionId: commercialIds.entMaxStaffSeats, numericValue: 3, booleanValue: null },
+      { definitionId: commercialIds.entCanExportPdf, numericValue: null, booleanValue: true },
+      { definitionId: commercialIds.entCanUseFinancialModule, numericValue: null, booleanValue: true },
+      { definitionId: commercialIds.entCanCustomBrand, numericValue: null, booleanValue: true },
       { definitionId: commercialIds.entMaxStorageMb, numericValue: 5000, booleanValue: null },
       { definitionId: commercialIds.entApiAccessEnabled, numericValue: null, booleanValue: false },
       { definitionId: commercialIds.entMultiBranch, numericValue: null, booleanValue: true },
-      { definitionId: commercialIds.entMaxBranches, numericValue: 3, booleanValue: null },
+      { definitionId: commercialIds.entMaxBranches, numericValue: 2, booleanValue: null },
+    ],
+  },
+  {
+    id: commercialIds.planClinic,
+    tier: PlanTier.CLINIC,
+    code: 'clinic-monthly',
+    name: 'Clinic Plan',
+    description: 'Gestión integral para clínicas en crecimiento con hasta 10 terapeutas y 5 sedes.',
+    billingInterval: BillingInterval.MONTHLY,
+    basePrice: new Prisma.Decimal('1999.00'),
+    currency: 'MXN',
+    trialDays: 14,
+    isActive: true,
+    isPublic: true,
+    sortOrder: 4,
+    quota: {
+      maxTherapists: 10,
+      maxBranches: 5,
+      maxNotificationsPerMonth: 2000,
+      maxPatients: 2000,
+      canCustomBrand: true,
+      canTeleconsultation: true,
+    },
+    entitlements: [
+      { definitionId: commercialIds.entMaxPatients, numericValue: 2000, booleanValue: null },
+      { definitionId: commercialIds.entMaxStaffSeats, numericValue: 10, booleanValue: null },
+      { definitionId: commercialIds.entCanExportPdf, numericValue: null, booleanValue: true },
+      { definitionId: commercialIds.entCanUseFinancialModule, numericValue: null, booleanValue: true },
+      { definitionId: commercialIds.entCanCustomBrand, numericValue: null, booleanValue: true },
+      { definitionId: commercialIds.entMaxStorageMb, numericValue: 20000, booleanValue: null },
+      { definitionId: commercialIds.entApiAccessEnabled, numericValue: null, booleanValue: true },
+      { definitionId: commercialIds.entMultiBranch, numericValue: null, booleanValue: true },
+      { definitionId: commercialIds.entMaxBranches, numericValue: 5, booleanValue: null },
     ],
   },
   {
@@ -178,14 +262,22 @@ export const plans = [
     tier: PlanTier.ENTERPRISE,
     code: 'enterprise-custom',
     name: 'Enterprise Plan',
-    description: 'Uncapped clinical multi-location platform with custom integrations & white-label.',
+    description: 'Plataforma clínica sin límites, soporte dedicado y configuración a medida.',
     billingInterval: BillingInterval.MONTHLY,
-    basePrice: new Prisma.Decimal('1999.00'),
+    basePrice: new Prisma.Decimal('4999.00'),
     currency: 'MXN',
     trialDays: 30,
     isActive: true,
     isPublic: true,
-    sortOrder: 3,
+    sortOrder: 5,
+    quota: {
+      maxTherapists: 9999,
+      maxBranches: 9999,
+      maxNotificationsPerMonth: 999999,
+      maxPatients: 999999,
+      canCustomBrand: true,
+      canTeleconsultation: true,
+    },
     entitlements: [
       { definitionId: commercialIds.entMaxPatients, numericValue: -1, booleanValue: null },
       { definitionId: commercialIds.entMaxStaffSeats, numericValue: -1, booleanValue: null },
@@ -200,6 +292,7 @@ export const plans = [
   },
 ];
 
+
 export type CommercialSeedPrismaClient = {
   entitlementDefinition: {
     upsert: (args: Prisma.EntitlementDefinitionUpsertArgs) => Promise<unknown>;
@@ -209,6 +302,9 @@ export type CommercialSeedPrismaClient = {
   };
   planEntitlement: {
     upsert: (args: Prisma.PlanEntitlementUpsertArgs) => Promise<unknown>;
+  };
+  planQuota?: {
+    upsert: (args: Prisma.PlanQuotaUpsertArgs) => Promise<unknown>;
   };
   subscription: {
     upsert: (args: Prisma.SubscriptionUpsertArgs) => Promise<unknown>;
@@ -242,7 +338,7 @@ export async function seedCommercialCoreData(
     });
   }
 
-  // 2. Seed Plans & PlanEntitlements
+  // 2. Seed Plans & PlanEntitlements & PlanQuotas
   for (const plan of plans) {
     await prisma.plan.upsert({
       where: { code: plan.code },
@@ -273,6 +369,29 @@ export async function seedCommercialCoreData(
         sortOrder: plan.sortOrder,
       },
     });
+
+    if (plan.quota && prisma.planQuota) {
+      await prisma.planQuota.upsert({
+        where: { planId: plan.id },
+        update: {
+          maxTherapists: plan.quota.maxTherapists,
+          maxBranches: plan.quota.maxBranches,
+          maxNotificationsPerMonth: plan.quota.maxNotificationsPerMonth,
+          maxPatients: plan.quota.maxPatients,
+          canCustomBrand: plan.quota.canCustomBrand,
+          canTeleconsultation: plan.quota.canTeleconsultation,
+        },
+        create: {
+          planId: plan.id,
+          maxTherapists: plan.quota.maxTherapists,
+          maxBranches: plan.quota.maxBranches,
+          maxNotificationsPerMonth: plan.quota.maxNotificationsPerMonth,
+          maxPatients: plan.quota.maxPatients,
+          canCustomBrand: plan.quota.canCustomBrand,
+          canTeleconsultation: plan.quota.canTeleconsultation,
+        },
+      });
+    }
 
     for (const ent of plan.entitlements) {
       await prisma.planEntitlement.upsert({

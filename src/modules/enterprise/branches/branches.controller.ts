@@ -11,6 +11,7 @@ import {
   Post,
   Put,
   Query,
+  UseGuards,
   UsePipes,
   ValidationPipe,
 } from '@nestjs/common';
@@ -36,6 +37,9 @@ import { AllowedOrganizationStatuses } from '../../../tenant-context/decorators/
 import { CurrentTenant } from '../../../tenant-context/decorators/current-tenant.decorator';
 import { TenantRequired } from '../../../tenant-context/decorators/tenant-required.decorator';
 import type { TenantContext } from '../../../tenant-context/tenant-context.types';
+import { QuotaGuard } from '../../../billing/guards/quota.guard';
+import { RequireQuota } from '../../../billing/decorators/require-quota.decorator';
+import { QuotaResource } from '../../../billing/exceptions/quota-exceeded.exception';
 import { BranchesService } from './branches.service';
 import { CreateBranchDto } from './dto/create-branch.dto';
 import { UpdateBranchDto } from './dto/update-branch.dto';
@@ -66,6 +70,8 @@ export class BranchesController {
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
+  @UseGuards(QuotaGuard)
+  @RequireQuota(QuotaResource.BRANCHES)
   @AuditLog({ action: 'BRANCH_CREATE', resourceType: 'Branch' })
   @ApiOperation({
     summary: 'Create a new branch for the organization',

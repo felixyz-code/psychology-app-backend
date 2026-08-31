@@ -9,6 +9,7 @@ import {
   TenantResolutionMode,
   type TenantContext,
 } from '../common/request-context/request-context.service';
+import { QuotaEnforcementService } from '../billing/services/quota-enforcement.service';
 import { NotificationTemplatesController } from './notification-templates.controller';
 import { NotificationTemplatesService } from './notification-templates.service';
 
@@ -23,6 +24,9 @@ describe('NotificationTemplatesController', () => {
     seedDefaultsForOrganization: jest.Mock;
     renderPreview: jest.Mock;
     getVariablesMetadata: jest.Mock;
+  };
+  let quotaService: {
+    assertCanSendNotification: jest.Mock;
   };
 
   const mockTenant: TenantContext = {
@@ -57,10 +61,16 @@ describe('NotificationTemplatesController', () => {
       renderPreview: jest.fn(),
       getVariablesMetadata: jest.fn(),
     };
+    quotaService = {
+      assertCanSendNotification: jest.fn().mockResolvedValue(undefined),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [NotificationTemplatesController],
-      providers: [{ provide: NotificationTemplatesService, useValue: service }],
+      providers: [
+        { provide: NotificationTemplatesService, useValue: service },
+        { provide: QuotaEnforcementService, useValue: quotaService },
+      ],
     }).compile();
 
     controller = module.get<NotificationTemplatesController>(

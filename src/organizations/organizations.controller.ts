@@ -36,6 +36,9 @@ import { OrganizationCapability } from '../tenant-context/authorization/organiza
 import { CurrentTenant } from '../tenant-context/decorators/current-tenant.decorator';
 import { TenantRequired } from '../tenant-context/decorators/tenant-required.decorator';
 import type { TenantContext } from '../tenant-context/tenant-context.types';
+import { QuotaGuard } from '../billing/guards/quota.guard';
+import { RequireQuota } from '../billing/decorators/require-quota.decorator';
+import { QuotaResource } from '../billing/exceptions/quota-exceeded.exception';
 import { ChangeOrganizationStatusDto } from './dto/change-organization-status.dto';
 import { ChangeMembershipRoleDto } from './dto/change-membership-role.dto';
 import { ChangeMembershipStatusDto } from './dto/change-membership-status.dto';
@@ -494,8 +497,9 @@ export class OrganizationsController {
 
   @Post(':organizationId/invitations')
   @TenantRequired()
-  @UseGuards(CapabilitiesGuard)
+  @UseGuards(CapabilitiesGuard, QuotaGuard)
   @RequireCapabilities(OrganizationCapability.INVITATION_CREATE)
+  @RequireQuota(QuotaResource.THERAPISTS)
   @AuditLog({
     action: 'INVITATION_CREATE',
     resourceType: 'OrganizationInvitation',
