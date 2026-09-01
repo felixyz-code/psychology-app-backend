@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { PlanTier, SubscriptionStatus } from '@prisma/client';
+import { MembershipRole, PlanTier, SubscriptionStatus, UserRole } from '@prisma/client';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
+import { TenantResolutionMode } from '../../common/request-context/request-context.service';
 import { TenantContextGuard } from '../../tenant-context/guards/tenant-context.guard';
 import { TenantContext } from '../../tenant-context/tenant-context.types';
 import { BillingService } from '../billing.service';
@@ -19,8 +20,9 @@ describe('BillingController', () => {
   const mockTenant: TenantContext = {
     organizationId: 'org-uuid-1',
     membershipId: 'mem-1',
-    membershipRole: 'OWNER' as any,
-    membershipStatus: 'ACTIVE' as any,
+    organizationRole: MembershipRole.OWNER,
+    legacyUserRole: UserRole.ADMIN,
+    resolutionMode: TenantResolutionMode.EXPLICIT,
     userId: 'user-1',
   };
 
