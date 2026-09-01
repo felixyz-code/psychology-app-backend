@@ -8,6 +8,7 @@ import {
   Patch,
   Post,
   Query,
+  UseGuards,
   UsePipes,
   ValidationPipe,
 } from '@nestjs/common';
@@ -28,6 +29,9 @@ import {
 import { UserRole } from '@prisma/client';
 import { AuditLog } from '../audit-logs/decorators/audit-log.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { QuotaGuard } from '../billing/guards/quota.guard';
+import { RequireQuota } from '../billing/decorators/require-quota.decorator';
+import { QuotaResource } from '../billing/exceptions/quota-exceeded.exception';
 import { CurrentTenant } from '../tenant-context/decorators/current-tenant.decorator';
 import { TenantRequired } from '../tenant-context/decorators/tenant-required.decorator';
 import type { TenantContext } from '../tenant-context/tenant-context.types';
@@ -157,6 +161,8 @@ export class NotificationTemplatesController {
   }
 
   @Post()
+  @UseGuards(QuotaGuard)
+  @RequireQuota(QuotaResource.NOTIFICATIONS)
   @AuditLog({
     action: 'NOTIFICATION_TEMPLATE_CREATED',
     resourceType: 'NotificationTemplate',

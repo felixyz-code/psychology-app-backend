@@ -6,4 +6,8 @@ export * from './controllers/admin-billing.controller';
 export * from './dto/manual-transition.dto';
 export * from './dto/extend-trial.dto';
 export * from './dto/plan-override.dto';
+export * from './exceptions/quota-exceeded.exception';
+export * from './services/quota-enforcement.service';
+export * from './decorators/require-quota.decorator';
+export * from './guards/quota.guard';
 export * from './billing.module';

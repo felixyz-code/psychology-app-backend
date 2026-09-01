@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { BillingModule } from '../../../billing/billing.module';
 import { PrismaModule } from '../../../prisma/prisma.module';
 import { EntitlementsModule } from '../../../entitlements/entitlements.module';
 import { TenantContextModule } from '../../../tenant-context/tenant-context.module';
@@ -7,7 +8,12 @@ import { BranchesService } from './branches.service';
 import { BranchContextGuard } from './guards/branch-context.guard';
 
 @Module({
-  imports: [PrismaModule, EntitlementsModule, TenantContextModule],
+  imports: [
+    PrismaModule,
+    EntitlementsModule,
+    TenantContextModule,
+    BillingModule,
+  ],
   controllers: [BranchesController],
   providers: [BranchesService, BranchContextGuard],
   exports: [BranchesService, BranchContextGuard],

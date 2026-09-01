@@ -28,6 +28,7 @@ const CONTRACT_ERROR_CODES = new Set([
   'INVITATION_RECIPIENT_MISMATCH',
   'RATE_LIMITED',
   'PLAN_LIMIT_EXCEEDED',
+  'QUOTA_EXCEEDED',
   'FEATURE_NOT_AVAILABLE',
   'BRANCH_CODE_EXISTS',
   'CANNOT_DELETE_ONLY_BRANCH',
@@ -158,6 +159,10 @@ export class ErrorEnvelopeFilter implements ExceptionFilter {
       return 'CONFLICT';
     }
 
+    if (statusCode === 402) {
+      return 'QUOTA_EXCEEDED';
+    }
+
     if (statusCode === 404) {
       return 'RESOURCE_NOT_FOUND';
     }
@@ -180,6 +185,24 @@ export class ErrorEnvelopeFilter implements ExceptionFilter {
     const response = exception.getResponse();
     if (!response || typeof response !== 'object') {
       return null;
+    }
+
+    if (code === 'QUOTA_EXCEEDED') {
+      const details =
+        'details' in response &&
+        response.details &&
+        typeof response.details === 'object'
+          ? (response.details as Record<string, unknown>)
+          : null;
+      if (details) return details;
+      const respObj = response as Record<string, unknown>;
+      return {
+        resource: respObj.resource,
+        currentUsage: respObj.currentUsage,
+        maxAllowed: respObj.maxAllowed,
+        currentTier: respObj.currentTier,
+        suggestedTier: respObj.suggestedTier,
+      };
     }
 
     if (code === 'TENANT_CONTEXT_REQUIRED') {

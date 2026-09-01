@@ -44,7 +44,7 @@ describe('OpenAPI document', () => {
   it('documents every certified route and the Bearer security scheme', () => {
     const document = createDocument(app);
 
-    expect(Object.keys(document.paths)).toHaveLength(145);
+    expect(Object.keys(document.paths)).toHaveLength(149);
     expect(document.paths['/patients/{id}/transfer'].post?.security).toEqual([
       { bearer: [] },
     ]);

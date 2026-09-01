@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { BillingModule } from '../billing/billing.module';
 import { PrismaModule } from '../prisma/prisma.module';
 import { TenantContextModule } from '../tenant-context/tenant-context.module';
 import { InvitationsService } from './invitations.service';
@@ -9,7 +10,7 @@ import { OrganizationsService } from './organizations.service';
 import { OrganizationConfigurationService } from './organization-configuration.service';
 
 @Module({
-  imports: [PrismaModule, TenantContextModule],
+  imports: [PrismaModule, TenantContextModule, BillingModule],
   controllers: [OrganizationsController, OrganizationInvitationsController],
   providers: [
     OrganizationsService,

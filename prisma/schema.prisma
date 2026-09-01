@@ -103,6 +103,9 @@ enum PatientAssignmentStatus {
 
 enum PlanTier {
   FREE
+  STARTER
+  PRO
+  CLINIC
   PROFESSIONAL
   ENTERPRISE
   CUSTOM
@@ -119,6 +122,9 @@ enum SubscriptionStatus {
   ACTIVE
   PAST_DUE
   CANCELED
+  INCOMPLETE
+  INCOMPLETE_EXPIRED
+  UNPAID
   EXPIRED
   LIFETIME_SPONSOR
   FROZEN
@@ -240,6 +246,7 @@ model Organization {
   scheduleBlocks            ScheduleBlock[]
   notificationTemplates     NotificationTemplate[]
   teleconsultationRooms     TeleconsultationRoom[]
+  usages                    OrganizationUsage[]
   createdAt                 DateTime                   @default(now()) @db.Timestamptz(3)
   updatedAt                 DateTime                   @updatedAt @db.Timestamptz(3)
 
@@ -644,9 +651,11 @@ model Plan {
   isActive        Boolean           @default(true)
   isPublic        Boolean           @default(true)
   sortOrder       Int               @default(0) @db.Integer
+  stripePriceId   String?           @map("stripe_price_id") @db.VarChar(255)
   metadata        Json?
   subscriptions   Subscription[]
   entitlements    PlanEntitlement[]
+  quota           PlanQuota?
   createdAt       DateTime          @default(now()) @db.Timestamptz(3)
   updatedAt       DateTime          @updatedAt @db.Timestamptz(3)
 
@@ -663,6 +672,12 @@ model Subscription {
   externalProvider       PaymentProvider    @default(MANUAL)
   externalSubscriptionId String?            @db.VarChar(255)
   externalCustomerId     String?            @db.VarChar(255)
+  stripeCustomerId       String?            @map("stripe_customer_id") @db.VarChar(255)
+  stripeSubscriptionId   String?            @unique @map("stripe_subscription_id") @db.VarChar(255)
+  stripePriceId          String?            @map("stripe_price_id") @db.VarChar(255)
+  cancelAtPeriodEnd      Boolean            @default(false) @map("cancel_at_period_end")
+  currentPeriodStart     DateTime           @default(now()) @map("current_period_start") @db.Timestamptz(3)
+  currentPeriodEnd       DateTime           @default(now()) @map("current_period_end") @db.Timestamptz(3)
   trialStartedAt         DateTime?          @db.Timestamptz(3)
   trialEndsAt            DateTime?          @db.Timestamptz(3)
   currentPeriodStartedAt DateTime           @default(now()) @db.Timestamptz(3)
@@ -687,7 +702,43 @@ model Subscription {
   @@index([status, currentPeriodEndsAt])
   @@index([externalProvider, externalSubscriptionId])
   @@index([externalCustomerId])
+  @@index([stripeCustomerId])
   @@map("subscriptions")
+}
+
+model PlanQuota {
+  id                       String   @id @default(uuid()) @db.Uuid
+  planId                   String   @unique @map("plan_id") @db.Uuid
+  maxTherapists            Int      @default(1) @map("max_therapists")
+  maxBranches              Int      @default(1) @map("max_branches")
+  maxNotificationsPerMonth Int      @default(100) @map("max_notifications_per_month")
+  maxPatients              Int?     @map("max_patients")
+  canCustomBrand           Boolean  @default(false) @map("can_custom_brand")
+  canTeleconsultation      Boolean  @default(true) @map("can_teleconsultation")
+  createdAt                DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt                DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  plan                     Plan     @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@map("plan_quotas")
+}
+
+model OrganizationUsage {
+  id                 String       @id @default(uuid()) @db.Uuid
+  organizationId     String       @map("organization_id") @db.Uuid
+  periodStart        DateTime     @map("period_start") @db.Timestamptz(3)
+  periodEnd          DateTime     @map("period_end") @db.Timestamptz(3)
+  therapistsCount    Int          @default(0) @map("therapists_count")
+  branchesCount      Int          @default(0) @map("branches_count")
+  notificationsCount Int          @default(0) @map("notifications_count")
+  createdAt          DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt          DateTime     @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization       Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, periodStart])
+  @@index([organizationId, periodStart, periodEnd])
+  @@map("organization_usages")
 }
 
 model EntitlementDefinition {

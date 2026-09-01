@@ -50,4 +50,12 @@ export class AppConfigService {
   get publicFreelancerBootstrapEnabled() {
     return this.runtimeConfig.publicFreelancerBootstrapEnabled;
   }
+
+  get stripeSecretKey() {
+    return this.runtimeConfig.stripeSecretKey;
+  }
+
+  get stripeWebhookSecret() {
+    return this.runtimeConfig.stripeWebhookSecret;
+  }
 }

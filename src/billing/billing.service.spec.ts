@@ -404,4 +404,79 @@ describe('BillingService', () => {
       expect(result).toEqual(mockPlans);
     });
   });
+
+  describe('getSubscriptionOverview', () => {
+    it('throws NotFoundException if organization does not exist', async () => {
+      (prismaMock as any).organization = {
+        findUnique: jest.fn().mockResolvedValue(null),
+      };
+
+      await expect(
+        service.getSubscriptionOverview('non-existent-org'),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('returns formatted subscription overview with quotas and usage metrics', async () => {
+      const now = new Date();
+      const mockSub = {
+        id: 'sub-1',
+        status: SubscriptionStatus.ACTIVE,
+        stripeCustomerId: 'cus_123',
+        stripeSubscriptionId: 'sub_123',
+        stripePriceId: 'price_123',
+        cancelAtPeriodEnd: false,
+        currentPeriodStart: now,
+        currentPeriodEnd: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000),
+        plan: {
+          id: 'plan-pro-id',
+          tier: PlanTier.PRO,
+          code: 'pro-monthly',
+          name: 'Pro Plan',
+          description: 'Pro description',
+          billingInterval: BillingInterval.MONTHLY,
+          basePrice: { toString: () => '999.00' },
+          currency: 'MXN',
+          stripePriceId: 'price_123',
+          quota: {
+            maxTherapists: 3,
+            maxBranches: 2,
+            maxNotificationsPerMonth: 500,
+            maxPatients: 500,
+            canCustomBrand: true,
+            canTeleconsultation: true,
+          },
+        },
+      };
+
+      (prismaMock as any).organization = {
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'org-1',
+          subscriptions: [mockSub],
+        }),
+      };
+      (prismaMock as any).organizationMembership = {
+        count: jest.fn().mockResolvedValue(2),
+      };
+      (prismaMock as any).branch = {
+        count: jest.fn().mockResolvedValue(1),
+      };
+      (prismaMock as any).organizationUsage = {
+        findFirst: jest.fn().mockResolvedValue({
+          notificationsCount: 85,
+        }),
+      };
+
+      const result = await service.getSubscriptionOverview('org-1');
+
+      expect(result.id).toBe('sub-1');
+      expect(result.status).toBe(SubscriptionStatus.ACTIVE);
+      expect(result.plan.tier).toBe(PlanTier.PRO);
+      expect(result.quotas.maxTherapists).toBe(3);
+      expect(result.quotas.maxBranches).toBe(2);
+      expect(result.quotas.maxNotificationsPerMonth).toBe(500);
+      expect(result.usage.therapistsCount).toBe(2);
+      expect(result.usage.branchesCount).toBe(1);
+      expect(result.usage.notificationsCount).toBe(85);
+    });
+  });
 });

@@ -11,4 +11,6 @@ export type RuntimeConfig = {
   swaggerEnabled: boolean;
   trustProxyHops: number;
   publicFreelancerBootstrapEnabled: boolean;
+  stripeSecretKey?: string;
+  stripeWebhookSecret?: string;
 };
