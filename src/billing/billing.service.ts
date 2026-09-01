@@ -431,7 +431,8 @@ export class BillingService {
 
     // Monthly notification usage
     const now = new Date();
-    const periodStart = sub.currentPeriodStart ?? sub.currentPeriodStartedAt ?? now;
+    const periodStart =
+      sub.currentPeriodStart ?? sub.currentPeriodStartedAt ?? now;
     const periodEnd = sub.currentPeriodEnd ?? sub.currentPeriodEndsAt ?? now;
 
     // Check tracked usage table if present or default
@@ -576,4 +577,3 @@ export class BillingService {
     return end;
   }
 }
-

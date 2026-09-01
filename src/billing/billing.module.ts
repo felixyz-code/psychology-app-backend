@@ -44,4 +44,3 @@ import { StripeBillingService } from './services/stripe-billing.service';
   ],
 })
 export class BillingModule {}
-

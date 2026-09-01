@@ -11,10 +11,17 @@ describe('StripeBillingService', () => {
   let prisma: {
     organization: { findUnique: jest.Mock };
     plan: { findFirst: jest.Mock };
-    subscription: { findFirst: jest.Mock; create: jest.Mock; update: jest.Mock };
+    subscription: {
+      findFirst: jest.Mock;
+      create: jest.Mock;
+      update: jest.Mock;
+    };
   };
   let auditLogService: { create: jest.Mock };
-  let configService: { stripeSecretKey: string | null; stripeWebhookSecret: string | null };
+  let configService: {
+    stripeSecretKey: string | null;
+    stripeWebhookSecret: string | null;
+  };
 
   const orgId = 'org-uuid-1111-2222-3333-444444444444';
   const subId = 'sub-uuid-1111-2222-3333-444444444444';
@@ -70,9 +77,14 @@ describe('StripeBillingService', () => {
         subscriptions: [],
       });
 
-      const session = await service.createCheckoutSession(orgId, 'price_starter');
+      const session = await service.createCheckoutSession(
+        orgId,
+        'price_starter',
+      );
 
-      expect(session.url).toContain('https://checkout.stripe.com/mock_pay/price_starter');
+      expect(session.url).toContain(
+        'https://checkout.stripe.com/mock_pay/price_starter',
+      );
       expect(session.sessionId).toContain('cs_mock_');
       expect(auditLogService.create).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -91,9 +103,9 @@ describe('StripeBillingService', () => {
     it('throws BadRequestException if organization has no Stripe customer ID', async () => {
       prisma.subscription.findFirst.mockResolvedValue(null);
 
-      await expect(
-        service.createCustomerPortalSession(orgId),
-      ).rejects.toThrow(BadRequestException);
+      await expect(service.createCustomerPortalSession(orgId)).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('creates mock portal session and emits BILLING_PORTAL_SESSION_INITIATED audit log', async () => {
@@ -105,7 +117,9 @@ describe('StripeBillingService', () => {
 
       const session = await service.createCustomerPortalSession(orgId);
 
-      expect(session.url).toContain('https://billing.stripe.com/mock_portal/cus_mock_123');
+      expect(session.url).toContain(
+        'https://billing.stripe.com/mock_portal/cus_mock_123',
+      );
       expect(auditLogService.create).toHaveBeenCalledWith(
         expect.objectContaining({
           organizationId: orgId,

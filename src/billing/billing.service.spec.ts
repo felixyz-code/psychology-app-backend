@@ -407,7 +407,9 @@ describe('BillingService', () => {
 
   describe('getSubscriptionOverview', () => {
     it('throws NotFoundException if organization does not exist', async () => {
-      (prismaMock as any).organization = { findUnique: jest.fn().mockResolvedValue(null) };
+      (prismaMock as any).organization = {
+        findUnique: jest.fn().mockResolvedValue(null),
+      };
 
       await expect(
         service.getSubscriptionOverview('non-existent-org'),
@@ -478,4 +480,3 @@ describe('BillingService', () => {
     });
   });
 });
-

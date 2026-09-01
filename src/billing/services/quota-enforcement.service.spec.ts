@@ -1,10 +1,6 @@
 import { NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
-import {
-  MembershipStatus,
-  PlanTier,
-  SubscriptionStatus,
-} from '@prisma/client';
+import { MembershipStatus, PlanTier, SubscriptionStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import {
   QuotaExceededException,
@@ -93,7 +89,9 @@ describe('QuotaEnforcementService', () => {
 
       prisma.organizationMembership.count.mockResolvedValue(0);
 
-      await expect(service.assertCanAddTherapist(orgId)).resolves.toBeUndefined();
+      await expect(
+        service.assertCanAddTherapist(orgId),
+      ).resolves.toBeUndefined();
       expect(prisma.organizationMembership.count).toHaveBeenCalledWith({
         where: {
           organizationId: orgId,
@@ -201,7 +199,9 @@ describe('QuotaEnforcementService', () => {
       // 3 active therapists is under the custom limit of 5
       prisma.organizationMembership.count.mockResolvedValue(3);
 
-      await expect(service.assertCanAddTherapist(orgId)).resolves.toBeUndefined();
+      await expect(
+        service.assertCanAddTherapist(orgId),
+      ).resolves.toBeUndefined();
     });
 
     it('bypasses quota validation for ENTERPRISE tier (unlimited)', async () => {
@@ -220,7 +220,9 @@ describe('QuotaEnforcementService', () => {
         ],
       });
 
-      await expect(service.assertCanAddTherapist(orgId)).resolves.toBeUndefined();
+      await expect(
+        service.assertCanAddTherapist(orgId),
+      ).resolves.toBeUndefined();
       expect(prisma.organizationMembership.count).not.toHaveBeenCalled();
     });
 
@@ -240,7 +242,9 @@ describe('QuotaEnforcementService', () => {
         ],
       });
 
-      await expect(service.assertCanAddTherapist(orgId)).resolves.toBeUndefined();
+      await expect(
+        service.assertCanAddTherapist(orgId),
+      ).resolves.toBeUndefined();
       expect(prisma.organizationMembership.count).not.toHaveBeenCalled();
     });
 
@@ -260,7 +264,9 @@ describe('QuotaEnforcementService', () => {
         ],
       });
 
-      await expect(service.assertCanAddTherapist(orgId)).resolves.toBeUndefined();
+      await expect(
+        service.assertCanAddTherapist(orgId),
+      ).resolves.toBeUndefined();
       expect(prisma.organizationMembership.count).not.toHaveBeenCalled();
     });
 
@@ -317,7 +323,9 @@ describe('QuotaEnforcementService', () => {
 
       prisma.organizationMembership.count.mockResolvedValue(0);
 
-      await expect(service.assertCanAddTherapist(orgId)).resolves.toBeUndefined();
+      await expect(
+        service.assertCanAddTherapist(orgId),
+      ).resolves.toBeUndefined();
     });
 
     it('blocks therapist creation when subscription is PAST_DUE and grace period has expired', async () => {
@@ -350,7 +358,9 @@ describe('QuotaEnforcementService', () => {
         const quotaError = error as QuotaExceededException;
         expect(quotaError.getStatus()).toBe(402);
         const response = quotaError.getResponse() as Record<string, unknown>;
-        expect(response.message).toContain('grace period for this organization has expired');
+        expect(response.message).toContain(
+          'grace period for this organization has expired',
+        );
       }
     });
 
@@ -379,9 +389,9 @@ describe('QuotaEnforcementService', () => {
     it('throws NotFoundException when organization does not exist', async () => {
       prisma.organization.findUnique.mockResolvedValue(null);
 
-      await expect(service.assertCanAddTherapist('non-existent')).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(
+        service.assertCanAddTherapist('non-existent'),
+      ).rejects.toThrow(NotFoundException);
     });
   });
 
@@ -407,7 +417,9 @@ describe('QuotaEnforcementService', () => {
 
       prisma.branch.count.mockResolvedValue(1);
 
-      await expect(service.assertCanCreateBranch(orgId)).resolves.toBeUndefined();
+      await expect(
+        service.assertCanCreateBranch(orgId),
+      ).resolves.toBeUndefined();
       expect(prisma.branch.count).toHaveBeenCalledWith({
         where: {
           organizationId: orgId,
@@ -475,7 +487,9 @@ describe('QuotaEnforcementService', () => {
 
       prisma.branch.count.mockResolvedValue(5);
 
-      await expect(service.assertCanCreateBranch(orgId)).resolves.toBeUndefined();
+      await expect(
+        service.assertCanCreateBranch(orgId),
+      ).resolves.toBeUndefined();
     });
   });
 

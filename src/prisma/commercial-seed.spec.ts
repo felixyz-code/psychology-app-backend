@@ -126,4 +126,3 @@ describe('Commercial Seed Data & Catalog Integrity', () => {
     expect(prisma.subscription.upsert).toHaveBeenCalledTimes(3);
   });
 });
-

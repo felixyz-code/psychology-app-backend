@@ -4,7 +4,7 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { PlanTier, SubscriptionStatus } from '@prisma/client';
+import { PlanTier, Subscription, SubscriptionStatus } from '@prisma/client';
 import Stripe from 'stripe';
 import { AuditLogService } from '../../audit-logs/audit-logs.service';
 import { AuditSeverity } from '../../audit-logs/audit-logs.types';
@@ -72,7 +72,8 @@ export class StripeBillingService {
     const customerId = existingSub?.stripeCustomerId ?? undefined;
 
     const defaultSuccessUrl =
-      successUrl ?? 'https://app.psicologia.com/billing?session_id={CHECKOUT_SESSION_ID}&success=true';
+      successUrl ??
+      'https://app.psicologia.com/billing?session_id={CHECKOUT_SESSION_ID}&success=true';
     const defaultCancelUrl =
       cancelUrl ?? 'https://app.psicologia.com/billing?canceled=true';
 
@@ -168,8 +169,7 @@ export class StripeBillingService {
       );
     }
 
-    const defaultReturnUrl =
-      returnUrl ?? 'https://app.psicologia.com/billing';
+    const defaultReturnUrl = returnUrl ?? 'https://app.psicologia.com/billing';
 
     let result: { url: string };
 
@@ -262,31 +262,23 @@ export class StripeBillingService {
 
     switch (event.type) {
       case 'checkout.session.completed':
-        await this.handleCheckoutSessionCompleted(
-          event.data.object as Stripe.Checkout.Session,
-        );
+        await this.handleCheckoutSessionCompleted(event.data.object);
         break;
 
       case 'customer.subscription.updated':
-        await this.handleCustomerSubscriptionUpdated(
-          event.data.object as Stripe.Subscription,
-        );
+        await this.handleCustomerSubscriptionUpdated(event.data.object);
         break;
 
       case 'customer.subscription.deleted':
-        await this.handleCustomerSubscriptionDeleted(
-          event.data.object as Stripe.Subscription,
-        );
+        await this.handleCustomerSubscriptionDeleted(event.data.object);
         break;
 
       case 'invoice.payment_failed':
-        await this.handleInvoicePaymentFailed(
-          event.data.object as Stripe.Invoice,
-        );
+        await this.handleInvoicePaymentFailed(event.data.object);
         break;
 
       case 'invoice.paid':
-        await this.handleInvoicePaid(event.data.object as Stripe.Invoice);
+        await this.handleInvoicePaid(event.data.object);
         break;
 
       default:
@@ -381,44 +373,41 @@ export class StripeBillingService {
     const previousTier = existingSub?.plan?.tier ?? null;
     const newTier = targetPlan.tier;
 
-    let updatedSub;
-    if (existingSub) {
-      updatedSub = await this.prisma.subscription.update({
-        where: { id: existingSub.id },
-        data: {
-          planId: targetPlan.id,
-          status: SubscriptionStatus.ACTIVE,
-          stripeCustomerId,
-          stripeSubscriptionId,
-          stripePriceId,
-          cancelAtPeriodEnd: false,
-          currentPeriodStart: periodStart,
-          currentPeriodEnd: periodEnd,
-          currentPeriodStartedAt: periodStart,
-          currentPeriodEndsAt: periodEnd,
-          gracePeriodEndsAt: null,
-          canceledAt: null,
-          endedAt: null,
-        },
-      });
-    } else {
-      updatedSub = await this.prisma.subscription.create({
-        data: {
-          organizationId,
-          planId: targetPlan.id,
-          status: SubscriptionStatus.ACTIVE,
-          stripeCustomerId,
-          stripeSubscriptionId,
-          stripePriceId,
-          cancelAtPeriodEnd: false,
-          currentPeriodStart: periodStart,
-          currentPeriodEnd: periodEnd,
-          currentPeriodStartedAt: periodStart,
-          currentPeriodEndsAt: periodEnd,
-          gracePeriodEndsAt: null,
-        },
-      });
-    }
+    const updatedSub: Subscription = existingSub
+      ? await this.prisma.subscription.update({
+          where: { id: existingSub.id },
+          data: {
+            planId: targetPlan.id,
+            status: SubscriptionStatus.ACTIVE,
+            stripeCustomerId,
+            stripeSubscriptionId,
+            stripePriceId,
+            cancelAtPeriodEnd: false,
+            currentPeriodStart: periodStart,
+            currentPeriodEnd: periodEnd,
+            currentPeriodStartedAt: periodStart,
+            currentPeriodEndsAt: periodEnd,
+            gracePeriodEndsAt: null,
+            canceledAt: null,
+            endedAt: null,
+          },
+        })
+      : await this.prisma.subscription.create({
+          data: {
+            organizationId,
+            planId: targetPlan.id,
+            status: SubscriptionStatus.ACTIVE,
+            stripeCustomerId,
+            stripeSubscriptionId,
+            stripePriceId,
+            cancelAtPeriodEnd: false,
+            currentPeriodStart: periodStart,
+            currentPeriodEnd: periodEnd,
+            currentPeriodStartedAt: periodStart,
+            currentPeriodEndsAt: periodEnd,
+            gracePeriodEndsAt: null,
+          },
+        });
 
     // Determine appropriate audit action
     let auditAction = 'BILLING_SUBSCRIPTION_CREATED';
@@ -538,7 +527,9 @@ export class StripeBillingService {
         currentPeriodEnd,
         currentPeriodStartedAt: currentPeriodStart,
         currentPeriodEndsAt: currentPeriodEnd,
-        canceledAt: rawSub.canceled_at ? new Date(rawSub.canceled_at * 1000) : null,
+        canceledAt: rawSub.canceled_at
+          ? new Date(rawSub.canceled_at * 1000)
+          : null,
         endedAt: rawSub.ended_at ? new Date(rawSub.ended_at * 1000) : null,
       },
     });
@@ -830,7 +821,9 @@ export class StripeBillingService {
     });
   }
 
-  private mapStripeStatus(status: Stripe.Subscription.Status): SubscriptionStatus {
+  private mapStripeStatus(
+    status: Stripe.Subscription.Status,
+  ): SubscriptionStatus {
     switch (status) {
       case 'active':
         return SubscriptionStatus.ACTIVE;

@@ -22,13 +22,22 @@ export class PlanQuotaDto {
 }
 
 export class OrganizationUsageDto {
-  @ApiProperty({ example: 2, description: 'Number of active therapists in organization' })
+  @ApiProperty({
+    example: 2,
+    description: 'Number of active therapists in organization',
+  })
   therapistsCount!: number;
 
-  @ApiProperty({ example: 1, description: 'Number of active branches in organization' })
+  @ApiProperty({
+    example: 1,
+    description: 'Number of active branches in organization',
+  })
   branchesCount!: number;
 
-  @ApiProperty({ example: 45, description: 'Number of notifications sent in the current billing period' })
+  @ApiProperty({
+    example: 45,
+    description: 'Number of notifications sent in the current billing period',
+  })
   notificationsCount!: number;
 
   @ApiPropertyOptional({ example: '2026-08-01T00:00:00.000Z' })
@@ -51,7 +60,9 @@ export class PlanDetailDto {
   @ApiProperty({ example: 'Pro Plan' })
   name!: string;
 
-  @ApiPropertyOptional({ example: 'Para pequeños consultorios y equipos de hasta 3 terapeutas' })
+  @ApiPropertyOptional({
+    example: 'Para pequeños consultorios y equipos de hasta 3 terapeutas',
+  })
   description?: string | null;
 
   @ApiProperty({ enum: BillingInterval, example: BillingInterval.MONTHLY })
@@ -95,10 +106,18 @@ export class SubscriptionOverviewResponseDto {
   @ApiProperty({ example: '2026-08-31T23:59:59.999Z' })
   currentPeriodEnd!: Date;
 
-  @ApiPropertyOptional({ example: '2026-09-07T23:59:59.999Z', description: 'Expiration date of the grace period if subscription is PAST_DUE' })
+  @ApiPropertyOptional({
+    example: '2026-09-07T23:59:59.999Z',
+    description:
+      'Expiration date of the grace period if subscription is PAST_DUE',
+  })
   gracePeriodEndsAt?: Date | null;
 
-  @ApiPropertyOptional({ example: false, description: 'Indicates whether the organization is currently operating within an active grace period' })
+  @ApiPropertyOptional({
+    example: false,
+    description:
+      'Indicates whether the organization is currently operating within an active grace period',
+  })
   isGracePeriod?: boolean;
 
   @ApiProperty({ type: () => PlanDetailDto })

@@ -1,7 +1,6 @@
 import { ExecutionContext, ForbiddenException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { Test, TestingModule } from '@nestjs/testing';
-import { REQUIRE_QUOTA_KEY } from '../decorators/require-quota.decorator';
 import {
   QuotaExceededException,
   QuotaResource,
@@ -44,7 +43,9 @@ describe('QuotaGuard', () => {
     guard = module.get<QuotaGuard>(QuotaGuard);
   });
 
-  function createMockExecutionContext(request: Record<string, unknown>): ExecutionContext {
+  function createMockExecutionContext(
+    request: Record<string, unknown>,
+  ): ExecutionContext {
     return {
       switchToHttp: () => ({
         getRequest: () => request,
@@ -63,7 +64,9 @@ describe('QuotaGuard', () => {
     const result = await guard.canActivate(context);
 
     expect(result).toBe(true);
-    expect(quotaEnforcementService.assertCanAddTherapist).not.toHaveBeenCalled();
+    expect(
+      quotaEnforcementService.assertCanAddTherapist,
+    ).not.toHaveBeenCalled();
   });
 
   it('enforces THERAPISTS quota using tenantContext.organizationId', async () => {
@@ -77,7 +80,9 @@ describe('QuotaGuard', () => {
     const result = await guard.canActivate(context);
 
     expect(result).toBe(true);
-    expect(quotaEnforcementService.assertCanAddTherapist).toHaveBeenCalledWith(orgId);
+    expect(quotaEnforcementService.assertCanAddTherapist).toHaveBeenCalledWith(
+      orgId,
+    );
   });
 
   it('enforces BRANCHES quota using params.organizationId', async () => {
@@ -91,12 +96,16 @@ describe('QuotaGuard', () => {
     const result = await guard.canActivate(context);
 
     expect(result).toBe(true);
-    expect(quotaEnforcementService.assertCanCreateBranch).toHaveBeenCalledWith(orgId);
+    expect(quotaEnforcementService.assertCanCreateBranch).toHaveBeenCalledWith(
+      orgId,
+    );
   });
 
   it('enforces NOTIFICATIONS quota using header x-organization-id', async () => {
     reflector.getAllAndOverride.mockReturnValue(QuotaResource.NOTIFICATIONS);
-    quotaEnforcementService.assertCanSendNotification.mockResolvedValue(undefined);
+    quotaEnforcementService.assertCanSendNotification.mockResolvedValue(
+      undefined,
+    );
 
     const context = createMockExecutionContext({
       headers: { 'x-organization-id': orgId },
@@ -105,7 +114,9 @@ describe('QuotaGuard', () => {
     const result = await guard.canActivate(context);
 
     expect(result).toBe(true);
-    expect(quotaEnforcementService.assertCanSendNotification).toHaveBeenCalledWith(orgId);
+    expect(
+      quotaEnforcementService.assertCanSendNotification,
+    ).toHaveBeenCalledWith(orgId);
   });
 
   it('throws ForbiddenException when no organizationId can be derived from request context', async () => {
@@ -113,8 +124,12 @@ describe('QuotaGuard', () => {
 
     const context = createMockExecutionContext({});
 
-    await expect(guard.canActivate(context)).rejects.toThrow(ForbiddenException);
-    expect(quotaEnforcementService.assertCanAddTherapist).not.toHaveBeenCalled();
+    await expect(guard.canActivate(context)).rejects.toThrow(
+      ForbiddenException,
+    );
+    expect(
+      quotaEnforcementService.assertCanAddTherapist,
+    ).not.toHaveBeenCalled();
   });
 
   it('propagates QuotaExceededException (402) thrown by service', async () => {
@@ -133,6 +148,8 @@ describe('QuotaGuard', () => {
       tenantContext: { organizationId: orgId },
     });
 
-    await expect(guard.canActivate(context)).rejects.toThrow(QuotaExceededException);
+    await expect(guard.canActivate(context)).rejects.toThrow(
+      QuotaExceededException,
+    );
   });
 });

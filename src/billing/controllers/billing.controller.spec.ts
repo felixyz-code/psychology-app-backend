@@ -1,5 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { MembershipRole, PlanTier, SubscriptionStatus, UserRole } from '@prisma/client';
+import {
+  MembershipRole,
+  PlanTier,
+  SubscriptionStatus,
+  UserRole,
+} from '@prisma/client';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { TenantResolutionMode } from '../../common/request-context/request-context.service';
 import { TenantContextGuard } from '../../tenant-context/guards/tenant-context.guard';
@@ -97,7 +102,9 @@ describe('BillingController', () => {
         url: 'https://checkout.stripe.com/pay/cs_123',
         sessionId: 'cs_123',
       };
-      stripeBillingService.createCheckoutSession.mockResolvedValue(mockResponse);
+      stripeBillingService.createCheckoutSession.mockResolvedValue(
+        mockResponse,
+      );
 
       const result = await controller.createCheckoutSession(mockTenant, {
         priceId: 'price_pro_mxn',
@@ -129,7 +136,9 @@ describe('BillingController', () => {
       });
 
       expect(result).toEqual(mockResponse);
-      expect(stripeBillingService.createCustomerPortalSession).toHaveBeenCalledWith(
+      expect(
+        stripeBillingService.createCustomerPortalSession,
+      ).toHaveBeenCalledWith(
         'org-uuid-1',
         'https://app.psicologia.com/billing',
       );
@@ -147,7 +156,9 @@ describe('BillingController', () => {
       );
 
       const mockReq = {
-        rawBody: Buffer.from(JSON.stringify({ type: 'checkout.session.completed' })),
+        rawBody: Buffer.from(
+          JSON.stringify({ type: 'checkout.session.completed' }),
+        ),
       } as any;
 
       const result = await controller.handleWebhook('sig_123', mockReq);

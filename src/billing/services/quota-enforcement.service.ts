@@ -24,10 +24,7 @@ export class QuotaEnforcementService {
   async assertCanAddTherapist(organizationId: string): Promise<void> {
     const subscription = await this.resolveActiveSubscription(organizationId);
 
-    this.assertSubscriptionStateAllowed(
-      subscription,
-      QuotaResource.THERAPISTS,
-    );
+    this.assertSubscriptionStateAllowed(subscription, QuotaResource.THERAPISTS);
 
     if (this.isUnlimited(subscription)) {
       return;
@@ -71,10 +68,7 @@ export class QuotaEnforcementService {
   async assertCanCreateBranch(organizationId: string): Promise<void> {
     const subscription = await this.resolveActiveSubscription(organizationId);
 
-    this.assertSubscriptionStateAllowed(
-      subscription,
-      QuotaResource.BRANCHES,
-    );
+    this.assertSubscriptionStateAllowed(subscription, QuotaResource.BRANCHES);
 
     if (this.isUnlimited(subscription)) {
       return;

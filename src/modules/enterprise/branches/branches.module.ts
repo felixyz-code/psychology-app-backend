@@ -8,7 +8,12 @@ import { BranchesService } from './branches.service';
 import { BranchContextGuard } from './guards/branch-context.guard';
 
 @Module({
-  imports: [PrismaModule, EntitlementsModule, TenantContextModule, BillingModule],
+  imports: [
+    PrismaModule,
+    EntitlementsModule,
+    TenantContextModule,
+    BillingModule,
+  ],
   controllers: [BranchesController],
   providers: [BranchesService, BranchContextGuard],
   exports: [BranchesService, BranchContextGuard],

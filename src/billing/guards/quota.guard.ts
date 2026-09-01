@@ -6,10 +6,7 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { REQUIRE_QUOTA_KEY } from '../decorators/require-quota.decorator';
-import {
-  QuotaExceededException,
-  QuotaResource,
-} from '../exceptions/quota-exceeded.exception';
+import { QuotaResource } from '../exceptions/quota-exceeded.exception';
 import { QuotaEnforcementService } from '../services/quota-enforcement.service';
 
 type RequestWithTenant = {
@@ -49,12 +46,16 @@ export class QuotaGuard implements CanActivate {
     switch (resource) {
       case QuotaResource.THERAPISTS:
       case 'THERAPISTS' as QuotaResource:
-        await this.quotaEnforcementService.assertCanAddTherapist(organizationId);
+        await this.quotaEnforcementService.assertCanAddTherapist(
+          organizationId,
+        );
         break;
 
       case QuotaResource.BRANCHES:
       case 'BRANCHES' as QuotaResource:
-        await this.quotaEnforcementService.assertCanCreateBranch(organizationId);
+        await this.quotaEnforcementService.assertCanCreateBranch(
+          organizationId,
+        );
         break;
 
       case QuotaResource.NOTIFICATIONS:

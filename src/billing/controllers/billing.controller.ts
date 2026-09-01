@@ -50,7 +50,8 @@ export class BillingController {
 
   @Get('subscription')
   @ApiOperation({
-    summary: 'Get current subscription details, plan quotas and real-time usage',
+    summary:
+      'Get current subscription details, plan quotas and real-time usage',
     description:
       'Retrieves the active organization subscription, quota limits and consolidated consumption metrics.',
   })
@@ -126,7 +127,11 @@ export class BillingController {
   ) {
     const rawBody =
       req.rawBody ??
-      (req.body ? (typeof req.body === 'string' ? req.body : JSON.stringify(req.body)) : '');
+      (req.body
+        ? typeof req.body === 'string'
+          ? req.body
+          : JSON.stringify(req.body)
+        : '');
 
     return this.stripeBillingService.handleWebhookEvent(signature, rawBody);
   }
